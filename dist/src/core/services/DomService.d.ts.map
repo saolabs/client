@@ -1,0 +1,1 @@
+{"version":3,"file":"DomService.d.ts","sourceRoot":"","sources":["../../../../src/core/services/DomService.ts"],"names":[],"mappings":"AAGA,qBAAa,UAAU;IACnB,OAAO,CAAC,SAAS,CAAsB;;IAKvC,KAAK,CAAC,IAAI,EAAE,MAAM,GAAG,IAAI,EAAE;IAM3B,MAAM,CAAC,OAAO,EAAE,MAAM,EAAE,OAAO,CAAC,EAAE,sBAAsB,GAAG,WAAW;CAKzE;AAID,eAAO,MAAM,GAAG,SAAkB,CAAC;AACnC,eAAe,GAAG,CAAC"}

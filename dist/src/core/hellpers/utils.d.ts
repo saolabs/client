@@ -1,0 +1,26 @@
+export declare function generateUUID(length?: number): string;
+export declare function escapeHTML(str: string): string;
+export declare function isEmpty(value: any): boolean;
+export declare function isObject(value: any): boolean;
+export declare function hasProperty(obj: any, prop: string): boolean;
+export declare function hasMethod(obj: any, method: string): boolean;
+export declare function hasAnyProperty(obj: any, props: string[]): boolean;
+export declare function hasData(value: any): boolean;
+export declare function isArray(value: any): boolean;
+export declare function isString(value: any): boolean;
+export declare function isNumber(value: any): boolean;
+export declare function isBoolean(value: any): boolean;
+export declare function isFunction(value: any): boolean;
+export declare function isPromise(value: any): boolean;
+export declare function isHTMLElement(value: any): boolean;
+export declare function isNode(value: any): boolean;
+export declare function isCommentNode(value: any): boolean;
+export declare function isTextNode(value: any): boolean;
+export declare function isOneElement(value: any): boolean;
+export declare function isOneHtml(value: any): boolean;
+export declare function isOneText(value: any): boolean;
+export declare function isOneNativeElement(value: any): boolean;
+export declare function isOneReactive(value: any): boolean;
+export declare function isOneFragment(value: any): boolean;
+export declare function isOneBlock(value: any): boolean;
+//# sourceMappingURL=utils.d.ts.map

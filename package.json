@@ -1,0 +1,70 @@
+{
+  "name": "@saolabs/client",
+  "version": "1.0.0",
+  "description": "Saola Client - Modern TypeScript Framework for Laravel. Reactive SPAs with TypeScript-first approach.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins.d.ts",
+      "import": "./dist/plugins.js",
+      "require": "./dist/plugins.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js",
+      "require": "./dist/core/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "index.ts",
+    "plugins.ts"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "publish-dry-run": "npm publish --dry-run",
+    "test": "echo \"No tests specified yet\""
+  },
+  "keywords": [
+    "typescript",
+    "framework",
+    "laravel",
+    "spa",
+    "reactive",
+    "frontend"
+  ],
+  "author": "Saola Labs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saolabs/saola-client.git"
+  },
+  "bugs": {
+    "url": "https://github.com/saolabs/saola-client/issues"
+  },
+  "homepage": "https://github.com/saolabs/saola-client#readme",
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "dependencies": {
+    "undici-types": "^6.21.0"
+  },
+  "type": "commonjs"
+}

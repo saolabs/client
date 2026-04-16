@@ -1,0 +1,50 @@
+import { InitMode } from "../contracts/common";
+import type { HtmlInterface, OneChildrenFactory, OneElementChildren, WrapperInterface } from "../contracts/ElementInterface";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
+import type { OneObjectType } from "../types/utils";
+/**
+ * Wrapper — renders multiple root nodes into a parent without a wrapping tag.
+ *
+ * Use case: when a ViewController's render() returns multiple sibling elements
+ * (e.g. `<h1>` + `<p>` + `<div>`) without a single root wrapper.
+ *
+ * Wrapper uses open/close Comment markers to track its region in the DOM,
+ * similar to Reactive but without the reactivity overhead.
+ */
+export declare class Wrapper implements WrapperInterface {
+    oneType: OneObjectType;
+    parent: HtmlInterface | null;
+    nodes: Node[];
+    /** Tracked child element wrappers (Html, Output, Reactive, TextElement, etc.) */
+    children: OneElementChildren;
+    private ctx;
+    private childrenFactory;
+    openTag: Comment;
+    closeTag: Comment;
+    id: string;
+    initMode: InitMode;
+    domChildren: Node[];
+    constructor({ ctx, initMode, parentElement, childrenFactory }: {
+        ctx: ViewControllerInterface;
+        initMode?: InitMode;
+        parentElement?: HtmlInterface | null;
+        childrenFactory: OneChildrenFactory;
+    });
+    setParentElement(parent: HtmlInterface | null): void;
+    render(): void;
+    setChildrenFactory(factory: OneChildrenFactory): void;
+    /** Hydrate lifecycle — reattach event listeners or perform other setup */
+    hydrate(): void;
+    /** Start lifecycle — recursively activate children's reactive subscriptions */
+    start(): void;
+    /** Stop lifecycle — recursively deactivate children's reactive subscriptions */
+    stop(): void;
+    /** Remove all nodes between markers from the DOM */
+    clear(): void;
+    destroy(): void;
+    get isOneElement(): boolean;
+    set isOneElement(value: boolean);
+    get isOneFragment(): boolean;
+    set isOneFragment(value: boolean);
+}
+//# sourceMappingURL=Wrapper.d.ts.map

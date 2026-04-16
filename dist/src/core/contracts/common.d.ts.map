@@ -1,0 +1,1 @@
+{"version":3,"file":"common.d.ts","sourceRoot":"","sources":["../../../../src/core/contracts/common.ts"],"names":[],"mappings":"AAAA,MAAM,MAAM,QAAQ,GAAG,QAAQ,GAAG,SAAS,CAAC;AAC5C,oBAAY,SAAS;IACjB,MAAM,WAAW;IACjB,OAAO,YAAY;CACtB;AACD;;;;;GAKG;AACH;;;;;;;;;GASG;AACH,oBAAY,GAAG;IACX,EAAE,gBAAgB;IAClB,OAAO,qBAAqB;IAC5B,UAAU,wBAAwB;IAClC,gBAAgB,8BAA8B;CACjD"}
