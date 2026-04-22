@@ -55,18 +55,18 @@ export class Html implements HtmlInterface {
             this.element = element || config.element as HTMLElement;
             this.tagName = this.element.tagName.toLowerCase();
         } else if (shouldHydrate && config.selector) {
-            const found = document.querySelector(`${tagName}[${ESK.ID}="${id}"]`) as HTMLElement | null;
+            const found = document.querySelector(`${tagName}.${id}`) as HTMLElement | null;
             if (found instanceof HTMLElement) {
                 this.element = found;
                 this.tagName = found.tagName.toLowerCase();
             } else {
                 this.element = document.createElement(tagName);
-                this.element.setAttribute(ESK.ID, id || '');
+                this.element.classList.add(id || '');
                 console.warn(`[Html] Selector "${config.selector}" not found, created new <${tagName}>.`);
             }
         } else {
             this.element = document.createElement(this.tagName);
-            this.element.setAttribute(ESK.ID, id || '');
+            this.element.classList.add(id || '');
             if (shouldHydrate) {
                 console.warn(`[Html] No selector for hydration, created new <${tagName}>.`);
             }
