@@ -18,10 +18,10 @@
  *   - DevTools (future) — to inspect/debug the element tree via markers
  */
 
-import { MarkerRegistryRecord } from "../contracts/MarkerInterface";
+import { MarkerRegistryInterface, MarkerRegistryRecord } from "../contracts/MarkerInterface";
 
 
-export class MarkerRegistryService {
+export class MarkerRegistryService implements MarkerRegistryInterface {
     static class: string = 'MarkerRegistryService';
     /** Tag name → short abbreviation (for compact DOM comments) */
     private shortcuts: Record<string, string> = {

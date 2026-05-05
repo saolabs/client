@@ -15,7 +15,7 @@ import { generateUUID } from "../hellpers/utils";
 import { Output } from "../elements/Output";
 import { View } from "./View";
 import { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/views";
+import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface";
 import { Section } from "./Section";
 import { InitMode } from "../contracts/common";
 import { Block, BlockOutlet, Fragment, Html, TextElement } from "../elements";
@@ -48,7 +48,7 @@ type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | Tex
  *   this.__ctrl__.__foreach(items, (item, key, index, loop) => [...])
  */
 export class ViewController implements ViewControllerInterface {
-    
+
     // ─── Identity ───────────────────────────────────────────────
     oneType: OneObjectType = 'ViewController';
     public viewId: string;
@@ -136,6 +136,7 @@ export class ViewController implements ViewControllerInterface {
 
     public preloadElement: WrapperInterface | null = null; // For pre-rendering elements before the main render
     public mainElement: WrapperInterface | null = null; // The main rendered element tree
+    private wrapperInstance: WrapperInterface | null = null; // For caching the wrapper instance used in render/prerender
     // ─── Lifecycle Flags ────────────────────────────────────────
     /** Whether this view is currently active (mounted in DOM) */
     public isActive: boolean = false;
@@ -283,7 +284,7 @@ export class ViewController implements ViewControllerInterface {
     }
 
     unmount(): void {
-    
+
     }
 
     /**
@@ -375,6 +376,15 @@ export class ViewController implements ViewControllerInterface {
         this.renderFactory = null;
         this.prerenderFactory = null;
         this._isMounted = false;
+    }
+
+    active(): void {
+        this.isActive = true;
+        // Fire onActivated hook
+    }
+    deactive(): void {
+        this.isActive = false;
+        // Fire onDeactivated hook
     }
 
     // ─── Data Lifecycle ─────────────────────────────────────────
@@ -494,6 +504,21 @@ export class ViewController implements ViewControllerInterface {
     }
 
 
+    // Element & Block Creation Methods — called by compiled output to build the element tree directly, instead of returning HTML strings.
+
+    pushBlockAndSections(): void {
+        // This method is called by compiled output after rendering blocks and sections, to ensure they are registered in the manager before any child views try to access them.
+
+
+    }
+
+    /**
+     * 
+     * @param name 
+     * @param config 
+     * @param contentRenderFactory 
+     * @returns 
+     */
     section(name: string, config: { type: SectionItemType; contentType?: SectionContentType; stateKeys?: string[], [key: string]: any }, contentRenderFactory: SectionContentRenderer): SectionInterface {
         if (this.sections.has(name)) {
             const section = this.sections.get(name);
@@ -533,7 +558,7 @@ export class ViewController implements ViewControllerInterface {
 
     blockOutlet(id: string | null = null, name: string, parentElement: HtmlInterface | null): BlockOutletInterface {
         const initMode = this.initMode;
-        if(!id) {
+        if (!id) {
             id = `ob-${name}`;
         }
         const existing = this.elements.get(id);
@@ -583,13 +608,14 @@ export class ViewController implements ViewControllerInterface {
     wrapper(factory: OneChildrenFactory): WrapperInterface {
         const callingMethod = this.callingMethod;
         let key: 'preloadElement' | 'mainElement' = callingMethod === 'prerender' ? 'preloadElement' : 'mainElement';
-        let wrapper = this[key];
+        let wrapper = this.wrapperInstance;
         if (!wrapper) {
             wrapper = new Wrapper({ ctx: this, initMode: this.initMode, parentElement: this.parentElement, childrenFactory: factory });
-            this[key] = wrapper;
-        }else{
+            this.wrapperInstance = wrapper;
+        } else {
             wrapper.setChildrenFactory(factory);
         }
+        this[key] = wrapper;
         return wrapper;
     }
 
@@ -600,13 +626,13 @@ export class ViewController implements ViewControllerInterface {
         }
         const existing = this.elements.get(id);
         if (existing instanceof Fragment) {
-            if(childrenFactory) {
+            if (childrenFactory) {
                 existing.setChildrenFactory(childrenFactory);
             }
             return existing;
         }
         const initMode = this.initMode;
-        const fragment = new Fragment({ctx: this, id, initMode, parentElement, childrenFactory });
+        const fragment = new Fragment({ ctx: this, id, initMode, parentElement, childrenFactory });
         this.elements.set(id, fragment);
         return fragment;
     }
@@ -624,7 +650,7 @@ export class ViewController implements ViewControllerInterface {
         const existing = this.elements.get(id);
         if (existing instanceof Html) {
             existing.updateConfig(config);
-            if(childrenFactory) {
+            if (childrenFactory) {
                 existing.setChildrenFactory(childrenFactory);
             }
             return existing;
@@ -660,7 +686,7 @@ export class ViewController implements ViewControllerInterface {
     }
 
     output(id: string | null, parent: HtmlInterface | null, isEscapeHTML: boolean = true, stateKeys: string[] = [], contentFactory: () => string = () => ''): OutputInterface {
-        if(!id) {
+        if (!id) {
             id = `o-${generateUUID(5)}`;
         }
         const existing = this.elements.get(id);
@@ -681,7 +707,7 @@ export class ViewController implements ViewControllerInterface {
         return output;
     }
 
-    text(text: string): Text{
+    text(text: string): Text {
         return document.createTextNode(text) as Text;
     }
 
@@ -692,13 +718,13 @@ export class ViewController implements ViewControllerInterface {
         stateKeys: string[],
         dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>
     ): Component {
-        if(!id) {
+        if (!id) {
             id = `cpn-${generateUUID(5)}`;
         }
         const existing = this.elements.get(id);
         if (existing instanceof Component) {
             existing.setDataFactory(dataFactory);
-            if(stateKeys) {
+            if (stateKeys) {
                 existing.setStateKeys(stateKeys);
             }
             return existing;
@@ -718,13 +744,13 @@ export class ViewController implements ViewControllerInterface {
     }
 
     includeIf(id: string | null = null, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component {
-        if(!id) {
+        if (!id) {
             id = `c-${generateUUID(5)}`;
         }
         const existing = this.elements.get(id);
         if (existing instanceof Component) {
             existing.setDataFactory(dataFactory);
-            if(stateKeys) {
+            if (stateKeys) {
                 existing.setStateKeys(stateKeys);
             }
             return existing;
@@ -743,14 +769,14 @@ export class ViewController implements ViewControllerInterface {
     }
 
     includeWhen(id: string | null, condition: { stateKeys: string[], checker: () => any }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component {
-        if(!id) {
+        if (!id) {
             id = `cpn-${generateUUID(5)}`;
         }
         const existing = this.elements.get(id);
         if (existing instanceof Component) {
             existing.setDataFactory(dataFactory);
             existing.setCondition(condition);
-            if(stateKeys) {
+            if (stateKeys) {
                 existing.setStateKeys(stateKeys);
             }
             return existing;
@@ -771,8 +797,8 @@ export class ViewController implements ViewControllerInterface {
 
     extendView(path: string, data: Record<string, any> = {}): ViewInterface | null {
         this.superViewPath = path;
-        const superView:ViewInterface = this.App.View?.view(path, data, true);
-        if(superView){
+        const superView: ViewInterface = this.App.View?.view(path, data, true);
+        if (superView) {
             this.setSuperView(superView?.__ctrl__);
             return superView;
         }
@@ -958,7 +984,7 @@ export class ViewController implements ViewControllerInterface {
      * Called by ViewManager after creating the view and its super view(s).
      */
     setChainFromOrigin(): void {
-        if(this.superView){
+        if (this.superView) {
             this.superView.setOriginView(this);
             this.superView.setChainFromOrigin();
         }
@@ -968,7 +994,7 @@ export class ViewController implements ViewControllerInterface {
      * When a view is destroyed, it should eject itself from the origin chain to prevent memory leaks.
      */
     ejectOriginChain(): void {
-        if(this.originView){
+        if (this.originView) {
             const origin = this.originView;
             this.originView = null;
             origin.ejectOriginChain();

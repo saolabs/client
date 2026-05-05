@@ -182,6 +182,7 @@ export class ViewManager implements ViewManagerInterface {
             tagName: this.container.tagName.toLowerCase(),
             element: this.container,
             initMode: 'hydrate',
+            childrenFactory: () => [],
         });
         if (config?.registry) {
             this.setViewRegistry(config.registry);
@@ -432,8 +433,10 @@ export class ViewManager implements ViewManagerInterface {
 
         if(oldLayoutView){
             oldLayoutView.__ctrl__.stop();
+            oldLayoutView.__ctrl__.deactive();
         }
         oldPageView?.__ctrl__.stop();
+        oldPageView?.__ctrl__.deactive();
 
         // ── Phase 2: Render chain ──
         const renderResult = await this.renderPageView(view, data ?? {}, this.rootElement, InitModes.CREATE, true);
@@ -460,61 +463,25 @@ export class ViewManager implements ViewManagerInterface {
             return renderResult;
         }
 
-        // ══════════════════════════════════════════════════════════
-        // Case 1: Có superView + cùng layout instance (reuse layout)
-        // ══════════════════════════════════════════════════════════
-        if (hasSuperView && isSameLayout) {
-            // Cắt origin chain cũ → gắn page mới vào layout
-            oldLayoutView!.__ctrl__.ejectOriginChain();
-            pageView.__ctrl__.setChainFromOrigin();
+        // ============══════════════════════════════════════════════════════════
+        // case 1: khong có superView
+        if(!hasSuperView){
+            if(oldLayoutView){
+                this.currentLayoutView = null;
+                this.currentLayoutPath = null;
+            }
 
-            
-            // Mount block content mới vào layout outlets
-            this.blockManager.mountAll();
-            
+            pageView.__ctrl__.setParentElement(this.rootElement!);
+            if(pageView.__ctrl__.mainElement){
+                pageView.__ctrl__.mainElement.setParentElement(this.rootElement!);
+                
+            }
+            else if(pageView.__ctrl__.preloadElement){
+                pageView.__ctrl__.preloadElement.setParentElement(this.rootElement!);
+            }
+
         }
-        // ══════════════════════════════════════════════════════════
-        // Case 2: Có superView + layout khác (hoặc first mount có layout)
-        // ══════════════════════════════════════════════════════════
-        else if (hasSuperView) {
-            // Cleanup toàn bộ old views
-            oldLayoutView?.__ctrl__.ejectOriginChain();
-            this.stopPageView(oldPageView);
-            this.stopLayoutView(oldLayoutView);
-            this.blockManager.clearAllOutlets();
-            this.unmountLayoutDOM(oldLayoutView);
 
-            // Gắn origin chain cho layout mới
-            pageView.__ctrl__.setChainFromOrigin();
-
-            // Build DOM từ layout wrapper vào container
-            this.buildViewDOM(finalView);
-
-            // Mount block content vào layout outlets
-            this.blockManager.mountAll();
-
-            // Commit & Start toàn bộ chain
-            this.commitViewChain(pageView, finalView, true);
-            this.startViewChain(pageView, finalView, true);
-        }
-        // ══════════════════════════════════════════════════════════
-        // Case 3: Không có superView (standalone view)
-        // ══════════════════════════════════════════════════════════
-        else {
-            // Cleanup toàn bộ old views
-            oldLayoutView?.__ctrl__.ejectOriginChain();
-            this.stopPageView(oldPageView);
-            this.stopLayoutView(oldLayoutView);
-            this.blockManager.clearAllOutlets();
-            this.unmountLayoutDOM(oldLayoutView);
-
-            // Build DOM trực tiếp vào container
-            this.buildViewDOM(pageView);
-
-            // Commit & Start
-            this.commitViewChain(pageView, pageView, false);
-            this.startViewChain(pageView, pageView, false);
-        }
 
         // ── Update state ──
         this.currentPageView = pageView;

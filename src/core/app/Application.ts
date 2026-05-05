@@ -97,7 +97,7 @@ export class Application implements ApplicationInterface {
         '__store',
     ]; // Để track dynamic properties nếu cần
 
-    __store: Map<string, { isOverridable: boolean, value: any }> = new Map(); // Store cho dynamic properties nếu cần
+    __store: Map<any, { isOverridable: boolean, value: any }> = new Map(); // Store cho dynamic properties nếu cần
 
     [key: string]: any; // Cho phép dynamic properties nếu cần
 
@@ -342,31 +342,35 @@ export class Application implements ApplicationInterface {
     }
 
 
-    set<T = any>(name: string, value: T, isOne: boolean = false): void {
-        if (this.ownProperties.includes(name)) {
-            return; // Không cho ghi đè lên thuộc tính có sẵn
-        }
+    set<T = any>(name: any, value: T, isOne: boolean = false): void {
         if (this.__store.has(name) && this.__store.get(name)?.isOverridable === false) {
             return; // Không cho ghi đè lên thuộc tính không thể override
         }
+        const isString = typeof name === 'string';
+        if (isString && this.ownProperties.includes(name)) {
+            return; // Không cho ghi đè lên thuộc tính có sẵn
+        }
         this.__store.set(name, { value, isOverridable: !isOne });
         this.singletons.set(name, value); // Sync → DI container
-        Object.defineProperty(this, name, {
-            get: () => this.__store.get(name)?.value,
-            set: (newValue) => {
-                if (this.__store.has(name) && this.__store.get(name)?.isOverridable === false) {
-                    return; // Không cho ghi đè nếu isOverridable là false
-                }
-                this.__store.set(name, { value: newValue, isOverridable: !isOne });
-                this.singletons.set(name, newValue); // Sync → DI container
-            },
-            configurable: isOne ? false : true,
-            enumerable: false,
-        });
+        if (isString) {
+            Object.defineProperty(this, name, {
+                get: () => this.__store.get(name)?.value,
+                set: (newValue) => {
+                    if (this.__store.has(name) && this.__store.get(name)?.isOverridable === false) {
+                        return; // Không cho ghi đè nếu isOverridable là false
+                    }
+                    this.__store.set(name, { value: newValue, isOverridable: !isOne });
+                    this.singletons.set(name, newValue); // Sync → DI container
+                },
+                configurable: isOne ? false : true,
+                enumerable: false,
+            });
+        }
     }
 
-    get<T = any>(name: string): T {
-        if (this.ownProperties.includes(name)) {
+    get<T = any>(name: any): T {
+        const isString = typeof name === 'string';
+        if (isString && this.ownProperties.includes(name)) {
             return (this as any)[name]; // Trả về thuộc tính có sẵn
         }
         // Check __store first (registered via set())

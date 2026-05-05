@@ -1,7 +1,10 @@
 import { InitMode, InitModes } from "../contracts/common";
 import type { FragmentInterface, HtmlInterface, OneChildrenFactory, OneChildrenFactoryOutput, OneElementChildren, WrapperInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
+import { app } from "../hellpers/app";
 import { generateUUID } from "../hellpers/utils";
+import { MarkerRegistryService } from "../services";
+import { MarkerService } from "../services/MarkerService";
 import type { OneObjectType } from "../types/utils";
 
 /**
@@ -45,10 +48,33 @@ export class Wrapper implements WrapperInterface {
         this.id = ctx.viewId;
         this.initMode = initMode;
 
-        this.openTag = document.createComment('wrapper-start');
-        this.closeTag = document.createComment('wrapper-end');
+        this.init();
+        
 
     }
+
+    init(){
+        const registry = app<MarkerRegistryService>("Registry");
+        if(this.initMode === InitModes.HYDRATE){
+            const markerService: MarkerService = app<MarkerService>(MarkerService);
+            const viewMarker = markerService.first('view', this.id);
+            if (viewMarker) {
+                this.openTag = viewMarker.openTag;
+                this.closeTag = viewMarker.closeTag;
+            } else {
+                this.openTag = registry.createMarkerStart('view', this.id);
+                this.closeTag = registry.createMarkerEnd('view', this.id);
+                console.warn(`Wrapper hydration failed: no marker found for view ID ${this.id}`);
+                
+            }
+        }
+        else {
+            this.openTag = registry.createMarkerStart('view', this.id);
+            this.closeTag = registry.createMarkerEnd('view', this.id);
+        }
+    }
+
+
     setParentElement(parent: HtmlInterface | null): void {
         this.parent = parent;
     }

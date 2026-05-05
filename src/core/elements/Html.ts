@@ -274,6 +274,9 @@ export class Html implements HtmlInterface {
             // Compiled output uses (parentElement) => [...] — pass `this` as parentElement
             children = this.childrenFactory(this);
         }
+        // CLEAR EXISTING CONTENT BEFORE RENDERING NEW CHILDREN
+        this.element.innerHTML = ''; // Clear existing content before rendering children
+
         if (children && children.length > 0) {
             children.forEach(child => {
                 if (typeof child === 'string' || typeof child === 'number') {

@@ -1,0 +1,242 @@
+@props({
+    pageTitle: 'Quản lý đơn hàng',
+    currentUser: request().user(),
+    filters: {
+        status: 'all',
+        search: ''
+    }
+})
+
+@state(
+    orders = [],
+    isLoading = true,
+    stats = { total: 0, revenue: 0 },
+    sidebarOpen = true,
+    debugMode = true,
+    totalPages = 10,
+    currentPage = 1
+)
+
+<template>
+    @extends('layouts.admin')
+
+    @block('content')
+        <div class="admin-wrapper" @class({'sidebar-collapsed': !sidebarOpen})>
+            
+            {{-- Header & Stats --}}
+            <header class="flex justify-between items-center mb-8">
+                <h1>{{ pageTitle }}</h1>
+                <div class="user-profile flex items-center gap-3">
+                    @if (currentUser && currentUser.is_admin) {
+                        <span class="badge badge-admin">Admin Mode</span>
+                    } @else {
+                        <span class="badge badge-staff">Staff</span>
+                    }
+                    @if (currentUser) {
+                        <img src="{{ currentUser.avatar }}" alt="avatar" class="w-10 h-10 rounded-full" />
+                    }
+                </div>
+            </header>
+
+            {{-- Thống kê nhanh --}}
+            <div class="grid grid-cols-4 gap-4 mb-6">
+                @each (key, value in stats) {
+                    <div class="stat-card p-4 bg-white shadow rounded-lg">
+                        <label class="text-gray-500 uppercase text-xs font-bold">{{ key }}</label>
+                        <div class="text-2xl font-semibold">
+                            @switch (key) {
+                                @case ('revenue'):
+                                    <span>${{ formatMoney(value) }}</span>
+                                @break
+                                @default:
+                                    <span>{{ value }}</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            {{-- Bộ lọc --}}
+            <section class="filters-bar mb-6 p-4 bg-gray-50 rounded flex gap-4">
+                <input type="text" placeholder="Tìm mã đơn hàng..." @input(searchOrders(event.target.value)) />
+                
+                <select @change(setStatusFilter(event.target.value))>
+                    @each (status in ['all', 'pending', 'shipping', 'completed', 'cancelled']) {
+                        <option value="{{ status }}" @selected(filters.status == status)>
+                            {{ text('status.' + status) }}
+                        </option>
+                    }
+                </select>
+            </section>
+
+            {{-- Bảng dữ liệu chính --}}
+            <div class="table-responsive bg-white rounded-xl shadow-sm overflow-hidden">
+                @if (isLoading) {
+                    <div class="p-20 text-center">
+                        <div class="spinner"></div>
+                        <p>Đang tải dữ liệu đơn hàng...</p>
+                    </div>
+                } @elseif (orders && orders.length > 0) {
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-100 border-b">
+                            <tr>
+                                <th>ID</th>
+                                <th>Khách hàng</th>
+                                <th>Sản phẩm</th>
+                                <th>Trạng thái</th>
+                                <th>Tổng tiền</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @each (order in orders) {
+                                <tr class="hover:bg-gray-50 transition-colors border-b">
+                                    <td class="font-mono text-blue-600">#{{ order.id }}</td>
+                                    <td>
+                                        <div class="font-bold">{{ order.customer.name }}</div>
+                                        <div class="text-xs text-gray-400">{{ order.customer.email }}</div>
+                                    </td>
+                                    <td>
+                                        <ul class="item-list">
+                                            @each (item in order.items) {
+                                                <li class="text-sm">
+                                                    {{ item.qty }}x {{ item.name }}
+                                                </li>
+                                            }
+                                        </ul>
+                                    </td>
+                                    <td>
+                                        <span @class(['status-dot', 'status-' + order.status])></span>
+                                        {{ order.status_label }}
+                                    </td>
+                                    <td class="font-bold">${{ order.total_amount }}</td>
+                                    <td class="actions">
+                                        <button class="btn-icon" @click(viewDetail(order.id))>👁️</button>
+                                        @if (order.status == 'pending' && currentUser.can('edit_orders')) {
+                                            <button class="btn-icon text-green-500" @click(approveOrder(order.id))>✅</button>
+                                        }
+                                        <button class="btn-icon text-red-500" @click(deleteOrder(order.id))>🗑️</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    
+                    {{-- Phân trang --}}
+                    <footer class="pagination p-4 flex justify-center gap-2">
+                        @for (i = 1; i <= totalPages; i++) {
+                            <button @class(['page-link', 'active': i == currentPage]) @click(goToPage(i))>
+                                {{ i }}
+                            </button>
+                        }
+                    </footer>
+
+                } @else {
+                    <div class="empty-state p-20 text-center">
+                        <img src="/static/empty-orders.svg" class="mx-auto mb-4" />
+                        <h3>Không tìm thấy đơn hàng nào</h3>
+                        <p>Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm của bạn.</p>
+                        <button class="btn-primary mt-4" @click(resetFilters())>Xóa bộ lọc</button>
+                    </div>
+                }
+            </div>
+
+            {{-- Debug Panel (Ví dụ về While) --}}
+            @if (debugMode) {
+                <div class="debug-panel fixed bottom-0 right-0 p-4 bg-black text-green-400 font-mono text-xs opacity-75">
+                    @let(i = 3)
+                    @while (i > 0) {
+                        <div>[DEBUG] System health check: OK ({{ i }})</div>
+                        @let(i = i - 1)
+                    }
+                </div>
+            }
+
+        </div>
+    @endblock
+</template>
+
+<script setup>
+    export default {
+        async onMounted() {
+            this.fetchOrders();
+        },
+        async fetchOrders() {
+            this.isLoading = true;
+            try {
+                // Giả lập API call
+                const data = await api.get('/orders', this.filters);
+                this.orders = data.items;
+                this.stats = data.stats;
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.isLoading = false;
+            }
+        },
+        viewDetail(id) {
+            router.push(`/orders/${id}`);
+        },
+        setStatusFilter(val) {
+            this.filters.status = val;
+            this.fetchOrders();
+        },
+        searchOrders(val) {
+            this.filters.search = val;
+            this.fetchOrders();
+        }
+    }
+</script>
+
+<style>
+    .admin-wrapper {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        padding: 2rem;
+        background: #f8fafc;
+        min-height: 100vh;
+    }
+    .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+    .status-pending { background: #f59e0b; }
+    .status-completed { background: #10b981; }
+    .status-cancelled { background: #ef4444; }
+    
+    .spinner {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3b82f6;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .page-link {
+        padding: 0.5rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.375rem;
+        background: white;
+        cursor: pointer;
+    }
+    .page-link.active {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+    .btn-icon {
+        padding: 4px;
+        border-radius: 4px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+    }
+    .btn-icon:hover {
+        background: #f1f5f9;
+    }
+</style>

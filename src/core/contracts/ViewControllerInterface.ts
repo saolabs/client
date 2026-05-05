@@ -5,7 +5,7 @@ import type { HtmlInterface, FragmentInterface, OneElementEventHandler, OneEleme
 import type { ReactiveInterface } from "./ReactiveInterface";
 import type { BlockInterface } from "./BlockInterface";
 import type { LoopContextInterface } from "./LoopContextInterface";
-import { SectionInterface } from "./views";
+import { SectionInterface } from "../contracts/SectionInterface";
 
 // ─── ViewController Interface ────────────────────────────────────
 
@@ -27,12 +27,13 @@ export interface ViewControllerInterface {
     superViewPath: string | null;
 
     /** Main element (Wrapper) for this view */
-    mainElement: any;
+    mainElement: WrapperInterface | null;
+    preloadElement: WrapperInterface | null;
 
     sections: Map<string, SectionInterface>;
     blocks: Map<string, BlockInterface>;
     urlPath: string | null;
-
+    isActive: boolean;
     childrenFactory: OneChildrenFactory | null;
 
     wrapper: (factory: OneChildrenFactory) => WrapperInterface;
@@ -52,6 +53,9 @@ export interface ViewControllerInterface {
     start(): void;
     /** Stop reactive subscriptions (for caching) */
     stop(): void;
+    active(): void;
+    deactive(): void;
+    pushBlockAndSections(): void;
     /** Loop directives */
     __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: any) => any): any[];
     __for(loopType?: string, start?: number, end?: number, execute?: (loop: any) => any): any;
@@ -62,6 +66,7 @@ export interface ViewControllerInterface {
     setUserDefinedConfig(config: Record<string, any>): void;
     /** Set root element — the container this view renders into */
     setRootElement(rootElement: HtmlInterface): void;
+    setParentElement(parentElement: HtmlInterface): void;
     /** Render the view's element tree into rootElement */
     render(): ViewInterface | FragmentInterface | null;
 

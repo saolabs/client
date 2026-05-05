@@ -1,4 +1,6 @@
+import { MarkerRegistryInterface, MarkerServiceInterface } from "../../contracts/MarkerInterface";
 import { app } from "../../hellpers/app";
+import { MarkerRegistry, MarkerRegistryService } from "../../services";
 import { EventService } from "../../services/EventService";
 import { HttpService } from "../../services/HttpService";
 import { MarkerService } from "../../services/MarkerService";
@@ -15,5 +17,6 @@ export class CoreServiceProvider extends ServiceProvider {
         this.app.set<StoreService>("Storage", StoreService.instance(), true);
         this.app.set<EventService>("Event", EventService.instance(), true);
         this.app.set<HttpService>("Http", HttpService.instance(), true);
+        this.app.set<MarkerRegistryInterface>("Registry", MarkerRegistry, true);
     }
 }
