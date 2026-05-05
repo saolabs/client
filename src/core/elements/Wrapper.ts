@@ -49,11 +49,6 @@ export class Wrapper implements WrapperInterface {
         this.initMode = initMode;
 
         this.init();
-        
-
-    }
-
-    init(){
         const registry = app<MarkerRegistryService>("Registry");
         if(this.initMode === InitModes.HYDRATE){
             const markerService: MarkerService = app<MarkerService>(MarkerService);
@@ -72,6 +67,11 @@ export class Wrapper implements WrapperInterface {
             this.openTag = registry.createMarkerStart('view', this.id);
             this.closeTag = registry.createMarkerEnd('view', this.id);
         }
+
+    }
+
+    init(){
+        
     }
 
 
