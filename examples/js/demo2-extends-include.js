@@ -165,7 +165,7 @@ class Demo2ExtendsIncludeView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             this.block('block-content', 'content', (parentElement) => [
-            this.include("block-content-component-1", __template__ + 'header', parentElement, [], (parentElement) => ({})),
+            this.include("block-content-component-1", __template__+'header', parentElement, [], (parentElement) => ({})),
             this.html(`block-content-div-1`, "div", parentElement,
                 { classes: [{ type: 'static', value: "demo" }, { type: 'binding', value: "active", factory: () => status, stateKeys: ["status"] }], attrs: { "dataCount": { type: 'binding', value: App.Helper.count(demoList), factory: () => App.Helper.count(demoList), stateKeys: [] }, "dataUserName": { type: 'binding', value: user.name, factory: () => user.name, stateKeys: ["user"] } } },
                 (parentElement) => [
@@ -204,12 +204,12 @@ class Demo2ExtendsIncludeView extends View {
                             reactiveContents.push(
                             this.reactive(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1`, "foreach", parentReactive, parentElement, ["posts"], (parentReactive, parentElement) => {
                                 return this.__foreach(posts, (post, __loopKey, __loopIndex, __loop) => [
-                                    this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex}-li-1`, "li", parentElement, {}, (parentElement) => [
-                                        this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex}-li-1-h3-1`, "h3", parentElement, {}, (parentElement) => [
-                                            this.output(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex}-li-1-h3-1-output-1`, parentElement, true, [], (parentElement) => post.title)
+                                    this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement, {}, (parentElement) => [
+                                        this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-h3-1`, "h3", parentElement, {}, (parentElement) => [
+                                            this.output(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-h3-1-output-1`, parentElement, true, [], (parentElement) => post.title)
                                         ]),
-                                        this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex}-li-1-p-2`, "p", parentElement, {}, (parentElement) => [
-                                            this.output(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex}-li-1-p-2-output-1`, parentElement, true, [], (parentElement) => post.content)
+                                        this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-p-2`, "p", parentElement, {}, (parentElement) => [
+                                            this.output(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-p-2-output-1`, parentElement, true, [], (parentElement) => post.content)
                                         ])
                                     ])
                                 ])
@@ -239,10 +239,10 @@ class Demo2ExtendsIncludeView extends View {
                     }, 5)
                     ])
                 ]),
-            this.include("block-content-component-2", __template__ + 'post-list', parentElement, [], (parentElement) => ({"posts": posts, "name": "test"})),
-            this.include("block-content-component-3", __template__ + 'footer', parentElement, [], (parentElement) => ({
+            this.include("block-content-component-2", __template__+'post-list', parentElement, [], (parentElement) => ({"posts": posts, "name": "test"})),
+            this.include("block-content-component-3", __template__+'footer', parentElement, [], (parentElement) => ({
                     __ONE_CHILDREN_CONTENT__: (parentElement) => [
-                    this.include("block-content-component-3-component-1", __template__ + 'post-list', parentElement, [], (parentElement) => ({"posts": posts, "name": "test"}))
+                    this.include("block-content-component-3-component-1", __template__+'post-list', parentElement, [], (parentElement) => ({"posts": posts, "name": "test"}))
                 ]
                 }))
             ]);

@@ -1,5 +1,5 @@
 import { APIClientInterface } from "../../contracts/ApiInterface";
-import { ApiClient } from "../../hellpers/ApiClient";
+import { ApiClient } from "../../helpers/ApiClient";
 import { PROVIDER_NAMES } from "./provider-order";
 import { ServiceProvider } from "./ServiceProvider";
 

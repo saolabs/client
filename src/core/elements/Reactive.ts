@@ -2,7 +2,7 @@ import { InitMode, InitModes } from "../contracts/common";
 import type { HtmlInterface, OneChildrenFactoryOutput, OneElementChildren } from "../contracts/ElementInterface";
 import type { ReactiveInterface, ReactiveChildrenFactory, ReactiveRenderFn } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../hellpers/utils";
+import { generateUUID } from "../helpers/utils";
 import markerRegistry from "../services/MarkerRegistry";
 import type { OneObjectType } from "../types/utils";
 

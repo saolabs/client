@@ -1,7 +1,7 @@
 import { InitMode, InitModes } from "../contracts/common";
 import type { FragmentInterface, HtmlInterface, OneChildrenFactory, OneChildrenFactoryOutput, OneElementChildren } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../hellpers/utils";
+import { generateUUID } from "../helpers/utils";
 import type { OneObjectType } from "../types/utils";
 
 /**

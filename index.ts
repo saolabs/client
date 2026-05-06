@@ -5,7 +5,7 @@
 
 // App
 export { Application } from './src/core/app/Application.js';
-export { app } from './src/core/hellpers/app.js';
+export { app } from './src/core/helpers/app.js';
 export { default as App } from './src/core/bootstrap/app.js';
 
 // Services
@@ -42,7 +42,7 @@ export { ElementManager } from './src/core/elements/ElementManager.js';
 export { Dom, DomService } from './src/core/services/DomService.js';
 
 // Helpers
-export { ApiClient } from './src/core/hellpers/ApiClient.js';
+export { ApiClient } from './src/core/helpers/ApiClient.js';
 
 // Contracts (type-only exports)
 export type { ApplicationInterface } from './src/core/contracts/ApplicationInterface.js';
@@ -59,4 +59,4 @@ export type { ReactiveInterface } from './src/core/contracts/ReactiveInterface.j
 export type { RouterInterface } from './src/core/contracts/RouterInterface.js';
 export type { RouteDefinition, Route, RouteMatch, RouterConfig } from './src/core/routers/Router.js';
 export type { MarkerRecord, MarkerTagName } from './src/core/contracts/MarkerInterface.js';
-export type { APIEndpoints } from './src/core/hellpers/ApiClient.js';
+export type { APIEndpoints } from './src/core/helpers/ApiClient.js';

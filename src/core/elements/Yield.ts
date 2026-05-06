@@ -1,7 +1,7 @@
 import { InitMode, InitModes } from "../contracts/common";
 import { HtmlInterface, OneChildrenFactoryOutput, YieldInterface } from "../contracts/ElementInterface";
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../hellpers/utils";
+import { generateUUID } from "../helpers/utils";
 import { MarkerModel, OneMarker } from "../services/MarkerService";
 import { OneObjectType } from "../types/utils";
 

@@ -1,6 +1,6 @@
 import { CollectionProxyInterface, HelperInterface } from "../contracts/HelperInterface";
 import { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { app } from "../hellpers/app";
+import { app } from "../helpers/app";
 
 /**
  * HelperService — PHP-compatible helper functions for OneView runtime.

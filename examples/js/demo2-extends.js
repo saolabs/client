@@ -203,12 +203,12 @@ class Demo2ExtendsView extends View {
                             reactiveContents.push(
                             this.reactive(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1`, "foreach", parentReactive, parentElement, ["posts"], (parentReactive, parentElement) => {
                                 return this.__foreach(posts, (post, __loopKey, __loopIndex, __loop) => [
-                                    this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex}-li-1`, "li", parentElement, {}, (parentElement) => [
-                                        this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex}-li-1-h3-1`, "h3", parentElement, {}, (parentElement) => [
-                                            this.output(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex}-li-1-h3-1-output-1`, parentElement, true, [], (parentElement) => post.title)
+                                    this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement, {}, (parentElement) => [
+                                        this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-h3-1`, "h3", parentElement, {}, (parentElement) => [
+                                            this.output(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-h3-1-output-1`, parentElement, true, [], (parentElement) => post.title)
                                         ]),
-                                        this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex}-li-1-p-2`, "p", parentElement, {}, (parentElement) => [
-                                            this.output(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex}-li-1-p-2-output-1`, parentElement, true, [], (parentElement) => post.content)
+                                        this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-p-2`, "p", parentElement, {}, (parentElement) => [
+                                            this.output(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-p-2-output-1`, parentElement, true, [], (parentElement) => post.content)
                                         ])
                                     ])
                                 ])

@@ -1,6 +1,6 @@
 import type { HtmlInterface, TextInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { escapeHTML } from "../hellpers/utils";
+import { escapeHTML } from "../helpers/utils";
 import { OneObjectType } from "../types/utils";
 
 /**

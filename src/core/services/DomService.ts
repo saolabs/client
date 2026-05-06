@@ -1,4 +1,4 @@
-import { app } from "../hellpers/app";
+import { app } from "../helpers/app";
 
 
 export class DomService {

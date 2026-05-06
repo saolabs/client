@@ -25,14 +25,14 @@ import type { ViewInterface } from "../contracts/ViewInterface";
 import type { ViewManagerInterface, ActiveViewInfo } from "../contracts/ViewManagerInterface";
 import { BlockManager, BlockManagerService } from "../services/BlockManager";
 import { Html } from "../elements/Html";
-import { hasData } from "../hellpers/utils";
+import { hasData } from "../helpers/utils";
 import logger from "../services/LoggerService";
 import { StoreService } from "../services/StoreService";
 import { View } from "./View";
 import { InitMode, InitModes } from "../contracts/common";
 import { OOTEnum } from "../types/utils";
 import { WrapperInterface } from "../contracts/ElementInterface";
-import { app } from "../hellpers/app";
+import { app } from "../helpers/app";
 
 type RenderPageViewSuccess = {
     type: 'success';

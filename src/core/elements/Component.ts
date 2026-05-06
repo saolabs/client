@@ -3,7 +3,7 @@ import { ComponentInterface } from "../contracts/ComponentInterface";
 import { HtmlInterface, OneChildrenFactory } from "../contracts/ElementInterface";
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { ViewInterface } from "../contracts/ViewInterface";
-import { generateUUID } from "../hellpers/utils";
+import { generateUUID } from "../helpers/utils";
 import { OneObjectType } from "../types/utils";
 
 export class Component implements ComponentInterface {

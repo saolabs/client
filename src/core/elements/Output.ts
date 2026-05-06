@@ -1,7 +1,7 @@
 import { InitMode, InitModes } from "../contracts/common";
 import type { HtmlInterface, OutputInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { escapeHTML, generateUUID } from "../hellpers/utils";
+import { escapeHTML, generateUUID } from "../helpers/utils";
 import type { OneObjectType } from "../types/utils";
 
 /**

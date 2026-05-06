@@ -1,5 +1,5 @@
 import { MarkerRegistryInterface, MarkerServiceInterface } from "../../contracts/MarkerInterface";
-import { app } from "../../hellpers/app";
+import { app } from "../../helpers/app";
 import { MarkerRegistry, MarkerRegistryService } from "../../services";
 import { EventService } from "../../services/EventService";
 import { HttpService } from "../../services/HttpService";

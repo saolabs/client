@@ -235,13 +235,13 @@ class AppView extends View {
                             (parentElement) => [
                             this.reactive(`block-content-main-1-header-1-nav-1-ul-2-foreach-1`, "foreach", parentReactive, parentElement, ["posts"], (parentReactive, parentElement) => {
                                 return this.__foreach(posts, (post, __loopKey, __loopIndex, __loop) => [
-                                    this.html(`block-content-main-1-header-1-nav-1-ul-2-foreach-1-${__loopIndex}-li-1`, "li", parentElement,
+                                    this.html(`block-content-main-1-header-1-nav-1-ul-2-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement,
                                         { classes: [{ type: 'static', value: "menu-item" }, { type: 'static', value: "nav-item" }] },
                                         (parentElement) => [
-                                        this.html(`block-content-main-1-header-1-nav-1-ul-2-foreach-1-${__loopIndex}-li-1-a-1`, "a", parentElement,
+                                        this.html(`block-content-main-1-header-1-nav-1-ul-2-foreach-1-${__loopIndex + 1}-li-1-a-1`, "a", parentElement,
                                             { classes: [{ type: 'static', value: "nav-link" }], attrs: { "href": { type: 'binding', value: `${App.Helper.webPostUrl(post)}`, factory: () => `${App.Helper.webPostUrl(post)}`, stateKeys: [] } } },
                                             (parentElement) => [
-                                            this.output(`block-content-main-1-header-1-nav-1-ul-2-foreach-1-${__loopIndex}-li-1-a-1-output-1`, parentElement, true, [], (parentElement) => post.title)
+                                            this.output(`block-content-main-1-header-1-nav-1-ul-2-foreach-1-${__loopIndex + 1}-li-1-a-1-output-1`, parentElement, true, [], (parentElement) => post.title)
                                             ])
                                         ])
                                 ])

@@ -1,8 +1,8 @@
 import { InitMode, InitModes } from "../contracts/common";
 import type { FragmentInterface, HtmlInterface, OneChildrenFactory, OneChildrenFactoryOutput, OneElementChildren, WrapperInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { app } from "../hellpers/app";
-import { generateUUID } from "../hellpers/utils";
+import { app } from "../helpers/app";
+import { generateUUID } from "../helpers/utils";
 import { MarkerRegistryService } from "../services";
 import { MarkerService } from "../services/MarkerService";
 import type { OneObjectType } from "../types/utils";
@@ -80,6 +80,16 @@ export class Wrapper implements WrapperInterface {
     }
     render(): void {
         
+        
+    }
+
+    mountTo(parent: HtmlInterface): void {
+        if(this.parent){
+            this.parent.clearHTML();
+        }
+        this.parent = parent;
+        parent.clearHTML();
+
     }
 
     setChildrenFactory(factory: OneChildrenFactory): void {

@@ -121,8 +121,8 @@ class AwaitDynamicView extends View {
                             this.output(`div-1-rc-if-1-case_1-h1-1-output-1`, parentElement, true, [], (parentElement) => user.name)
                         ]),
                         this.__foreach(postList, (post, __loopKey, __loopIndex, __loop) => [
-                                this.html(`div-1-rc-if-1-case_1-foreach-1-${__loopIndex}-div-1`, "div", parentElement, {}, (parentElement) => [
-                                    this.output(`div-1-rc-if-1-case_1-foreach-1-${__loopIndex}-div-1-output-1`, parentElement, true, [], (parentElement) => post.title)
+                                this.html(`div-1-rc-if-1-case_1-foreach-1-${__loopIndex + 1}-div-1`, "div", parentElement, {}, (parentElement) => [
+                                    this.output(`div-1-rc-if-1-case_1-foreach-1-${__loopIndex + 1}-div-1-output-1`, parentElement, true, [], (parentElement) => post.title)
                                 ])
                         ])
                         );

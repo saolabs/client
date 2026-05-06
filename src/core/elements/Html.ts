@@ -2,7 +2,7 @@ import { ESK, InitMode, InitModes } from "../contracts/common";
 import type { HtmlInterface, OneChildrenFactory, OneChildrenFactoryOutput, OneElementChildren, OneElementConfig } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
-import { hasData } from "../hellpers/utils";
+import { hasData } from "../helpers/utils";
 import type { OneObjectType } from "../types/utils";
 
 export class Html implements HtmlInterface {
@@ -322,6 +322,12 @@ export class Html implements HtmlInterface {
                 (child as any).stop();
             }
         }
+    }
+
+    
+
+    clearHTML(): void {
+        this.element.innerHTML = '';
     }
 
     remove() {

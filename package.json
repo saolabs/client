@@ -47,12 +47,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/saolabs/saola-client.git"
+    "url": "git+https://github.com/saolabs/client.git"
   },
   "bugs": {
-    "url": "https://github.com/saolabs/saola-client/issues"
+    "url": "https://github.com/saolabs/client/issues"
   },
-  "homepage": "https://github.com/saolabs/saola-client#readme",
+  "homepage": "https://github.com/saolabs/client#readme",
   "devDependencies": {
     "typescript": "^5.0.0",
     "@types/node": "^20.0.0"

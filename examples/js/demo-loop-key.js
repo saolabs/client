@@ -165,30 +165,30 @@ class DemoLoopKeyView extends View {
                                     ]),
                                 this.reactive(`div-1-for-1-${i}-div-1-foreach-1`, "foreach", parentReactive, parentElement, ["categoryList"], (parentReactive, parentElement) => {
                                     return this.__foreach(categoryList, (categoryItem, __loopKey, __loopIndex, __loop) => [
-                                        this.html(`div-1-for-1-${i}-div-1-foreach-1-${categoryItem.id}-div-1`, "div", parentElement,
+                                        this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1`, "div", parentElement,
                                             { classes: [{ type: 'static', value: "category-item" }] },
                                             (parentElement) => [
-                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${categoryItem.id}-div-1-h3-1`, "h3", parentElement,
+                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-h3-1`, "h3", parentElement,
                                                 { classes: [{ type: 'static', value: "category-name" }] },
                                                 (parentElement) => [
-                                                this.output(`div-1-for-1-${i}-div-1-foreach-1-${categoryItem.id}-div-1-h3-1-output-1`, parentElement, true, [], (parentElement) => categoryItem.name)
+                                                this.output(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-h3-1-output-1`, parentElement, true, [], (parentElement) => categoryItem.name)
                                                 ]),
-                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${categoryItem.id}-div-1-div-2`, "div", parentElement,
+                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2`, "div", parentElement,
                                                 { classes: [{ type: 'static', value: "post-list" }] },
                                                 (parentElement) => [
                                                 this.__foreach(categoryItem.posts, (postItem, __loopKey, __loopIndex, __loop) => [
-                                                        this.html(`div-1-for-1-${i}-div-1-foreach-1-${categoryItem.id}-div-1-div-2-foreach-1-${postItem.id}-div-1`, "div", parentElement,
+                                                        this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-div-1`, "div", parentElement,
                                                             { classes: [{ type: 'static', value: "post-item" }] },
                                                             (parentElement) => [
-                                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${categoryItem.id}-div-1-div-2-foreach-1-${postItem.id}-div-1-h4-1`, "h4", parentElement,
+                                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-div-1-h4-1`, "h4", parentElement,
                                                                 { classes: [{ type: 'static', value: "post-title" }] },
                                                                 (parentElement) => [
-                                                                this.output(`div-1-for-1-${i}-div-1-foreach-1-${categoryItem.id}-div-1-div-2-foreach-1-${postItem.id}-div-1-h4-1-output-1`, parentElement, true, [], (parentElement) => postItem.title)
+                                                                this.output(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-div-1-h4-1-output-1`, parentElement, true, [], (parentElement) => postItem.title)
                                                                 ]),
-                                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${categoryItem.id}-div-1-div-2-foreach-1-${postItem.id}-div-1-p-2`, "p", parentElement,
+                                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-div-1-p-2`, "p", parentElement,
                                                                 { classes: [{ type: 'static', value: "post-content" }] },
                                                                 (parentElement) => [
-                                                                this.output(`div-1-for-1-${i}-div-1-foreach-1-${categoryItem.id}-div-1-div-2-foreach-1-${postItem.id}-div-1-p-2-output-1`, parentElement, true, [], (parentElement) => postItem.content)
+                                                                this.output(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-div-1-p-2-output-1`, parentElement, true, [], (parentElement) => postItem.content)
                                                                 ])
                                                             ])
                                                 ])

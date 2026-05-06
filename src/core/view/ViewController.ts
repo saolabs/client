@@ -11,7 +11,7 @@ import { LoopContext } from "./LoopContext";
 import { Reactive } from "../elements/Reactive";
 import BlockManager, { BlockManagerService } from "../services/BlockManager";
 import { Component } from "../elements/Component";
-import { generateUUID } from "../hellpers/utils";
+import { generateUUID } from "../helpers/utils";
 import { Output } from "../elements/Output";
 import { View } from "./View";
 import { ApplicationInterface } from "../contracts/ApplicationInterface";
@@ -21,7 +21,7 @@ import { InitMode } from "../contracts/common";
 import { Block, BlockOutlet, Fragment, Html, TextElement } from "../elements";
 import { Wrapper } from "../elements/Wrapper";
 import { YieldElement } from "../elements/Yield";
-import { app } from "../hellpers/app";
+import { app } from "../helpers/app";
 import { ComponentInterface } from "../contracts/ComponentInterface";
 
 type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | OneNodeInterface;

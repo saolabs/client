@@ -161,9 +161,9 @@ class TestDirectivesView extends View {
                     return reactiveContents;
                 }),
                 this.__foreach([1, 2, 3], (item, __loopKey, __loopIndex, __loop) => [
-                        this.html(`div-1-foreach-2-${__loopIndex}-div-1`, "div", parentElement, {}, (parentElement) => [
+                        this.html(`div-1-foreach-2-${__loopIndex + 1}-div-1`, "div", parentElement, {}, (parentElement) => [
                             this.text('Item: '),
-                            this.output(`div-1-foreach-2-${__loopIndex}-div-1-output-1`, parentElement, true, [], (parentElement) => item)
+                            this.output(`div-1-foreach-2-${__loopIndex + 1}-div-1-output-1`, parentElement, true, [], (parentElement) => item)
                         ])
                 ]),
                 this.html(`div-1-button-4`, "button", parentElement,

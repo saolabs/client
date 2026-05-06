@@ -223,21 +223,21 @@ class FetchBeatifulView extends View {
                         reactiveContents.push(
                         this.reactive(`block-content-div-1-rc-if-1-case_4-foreach-1`, "foreach", parentReactive, parentElement, ["users"], (parentReactive, parentElement) => {
                             return this.__foreach(users, (user, __loopKey, __loopIndex, __loop) => [
-                                this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex}-div-1`, "div", parentElement,
+                                this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1`, "div", parentElement,
                                     { classes: [{ type: 'static', value: "user-card" }, { type: 'static', value: "mb-3" }, { type: 'static', value: "p-3" }, { type: 'static', value: "border" }, { type: 'static', value: "rounded" }] },
                                     (parentElement) => [
-                                    this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex}-div-1-h6-1`, "h6", parentElement, {}, (parentElement) => [
-                                        this.output(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex}-div-1-h6-1-output-1`, parentElement, true, [], (parentElement) => user.name)
+                                    this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-h6-1`, "h6", parentElement, {}, (parentElement) => [
+                                        this.output(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-h6-1-output-1`, parentElement, true, [], (parentElement) => user.name)
                                     ]),
-                                    this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex}-div-1-p-2`, "p", parentElement,
+                                    this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-p-2`, "p", parentElement,
                                         { classes: [{ type: 'static', value: "mb-1" }] },
                                         (parentElement) => [
-                                        this.output(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex}-div-1-p-2-output-1`, parentElement, true, [], (parentElement) => user.email)
+                                        this.output(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-p-2-output-1`, parentElement, true, [], (parentElement) => user.email)
                                         ]),
-                                    this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex}-div-1-small-3`, "small", parentElement,
+                                    this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-small-3`, "small", parentElement,
                                         { classes: [{ type: 'static', value: "text-muted" }] },
                                         (parentElement) => [
-                                        this.output(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex}-div-1-small-3-output-1`, parentElement, true, [], (parentElement) => user.company.name)
+                                        this.output(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-small-3-output-1`, parentElement, true, [], (parentElement) => user.company.name)
                                         ])
                                     ])
                             ])

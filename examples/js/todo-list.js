@@ -244,12 +244,12 @@ class TodoListView extends View {
                                     (parentElement) => [
                                     this.reactive(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1`, "foreach", parentReactive, parentElement, ["todos"], (parentReactive, parentElement) => {
                                         return this.__foreach(todos, (todo, __loopKey, __loopIndex, __loop) => [
-                                            this.html(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex}-li-1`, "li", parentElement,
+                                            this.html(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement,
                                                 { classes: [{ type: 'static', value: "todo-item" }, { type: 'static', value: "{{" }, { type: 'static', value: "$todo->completed" }, { type: 'static', value: "?" }, { type: 'static', value: "'completed'" }, { type: 'static', value: ":" }, { type: 'static', value: "''" }, { type: 'static', value: "}}" }] },
                                                 (parentElement) => [
-                                                this.html(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex}-li-1-input-1`, "input", parentElement, { attrs: { "type": { type: 'static', value: "checkbox" }, "checked": { type: 'static', value: true }, "todo": { type: 'static', value: true }, "completed": { type: 'static', value: true } }, events: { change: [{"handler":"toggleTodo","params":[todo.id]}] } }),
-                                                this.output(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex}-li-1-output-1`, parentElement, true, [], (parentElement) => todo.text),
-                                                this.html(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex}-li-1-button-2`, "button", parentElement,
+                                                this.html(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex + 1}-li-1-input-1`, "input", parentElement, { attrs: { "type": { type: 'static', value: "checkbox" }, "checked": { type: 'static', value: true }, "todo": { type: 'static', value: true }, "completed": { type: 'static', value: true } }, events: { change: [{"handler":"toggleTodo","params":[todo.id]}] } }),
+                                                this.output(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex + 1}-li-1-output-1`, parentElement, true, [], (parentElement) => todo.text),
+                                                this.html(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex + 1}-li-1-button-2`, "button", parentElement,
                                                     { classes: [{ type: 'static', value: "btn" }, { type: 'static', value: "btn-sm" }, { type: 'static', value: "btn-outline-danger" }], events: { click: [{"handler":"deleteTodo","params":[todo.id]}] } },
                                                     (parentElement) => [
                                                     this.text('×')

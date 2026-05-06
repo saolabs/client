@@ -3,7 +3,7 @@ import { InitMode } from "../contracts/common";
 import type { FragmentInterface, HtmlInterface } from "../contracts/ElementInterface";
 import type { ReactiveInterface } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../hellpers/utils";
+import { generateUUID } from "../helpers/utils";
 import markerRegistry from "../services/MarkerRegistry";
 import type { OneObjectType } from "../types/utils";
 import { Fragment } from "./Fragment";

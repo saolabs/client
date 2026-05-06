@@ -1,6 +1,6 @@
 import { ApplicationInterface } from "../../contracts/ApplicationInterface";
 import { ServiceProviderInterface } from "../../contracts/utils";
-import { app } from "../../hellpers/app";
+import { app } from "../../helpers/app";
 import { OneObjectType, OOTEnum } from "../../types/utils";
 import { NamedServiceProvider } from "./provider-order";
 

@@ -1,6 +1,6 @@
 import { MarkerCollectionInterface, MarkerFilter, MarkerModelInterface, MarkerRecord, RegistryIDOrAttributes } from "../contracts/MarkerInterface";
-import { app } from "../hellpers/app";
-import { generateUUID } from "../hellpers/utils";
+import { app } from "../helpers/app";
+import { generateUUID } from "../helpers/utils";
 import { MarkerCollection, MarkerModel } from "./MarkerModel";
 import { MarkerRegistry, MarkerRegistryService } from "./MarkerRegistry";
 

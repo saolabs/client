@@ -1,4 +1,4 @@
-@exec($__ONE_COMPONENT_REGISTRY__ = ['Header' => __template__ + 'header', 'Footer' => __template__ + 'footer', 'post-list' => __template__ + 'post-list']) {{-- Khai báo để sử dụng các component đã đăng ký trong $__ONE_COMPONENT_REGISTRY__ --}}
+@exec($__ONE_COMPONENT_REGISTRY__ = ['Header' => $__template__ . 'header', 'Footer' => $__template__ . 'footer', 'post-list' => $__template__ . 'post-list']) {{-- Khai báo để sử dụng các component đã đăng ký trong $__ONE_COMPONENT_REGISTRY__ --}}
 
 @vars($demoList = [])
 @useState($status, false)
@@ -16,11 +16,10 @@
 
 
 
-
 @extends($__layout__ . 'base')
 @block('content')
     @startMarker('component', 'block-content-component-1')
-    @include(__template__ + 'header')
+    @include($__template__ . 'header')
     @endMarker('component', 'block-content-component-1')
     <div @class([$__VIEW_ID__ . '-block-content-div-1', 'demo', 'active'=> $status]) @attr(['dataCount'=> count($demoList), 'dataUserName'=> $user->name])>
         <h1 @class([$__VIEW_ID__ . '-block-content-div-1-h1-1'])>Hello, @startMarker('output', 'block-content-div-1-h1-1-output-1'){{ $user->name }}@endMarker('output', 'block-content-div-1-h1-1-output-1')!</h1>
@@ -56,15 +55,15 @@
 
     </div>
     @startMarker('component', 'block-content-component-2')
-    @include(__template__ + 'post-list', ['posts' => posts, 'name' => "test"])
+    @include($__template__ . 'post-list', ['posts' => $posts, 'name' => "test"])
     @endMarker('component', 'block-content-component-2')
+    @startMarker('component', 'block-content-component-3')
     @exec($__env->startSection($__ONE_COMPONENT_REGISTRY__['Footer'].'_0'))
-@startMarker('component', 'block-content-component-3')
-@include(__template__ + 'post-list', ['posts' => posts, 'name' => "test"])
-@endMarker('component', 'block-content-component-3')
+@startMarker('component', 'block-content-component-3-component-1')
+@include($__template__ . 'post-list', ['posts' => $posts, 'name' => "test"])
+@endMarker('component', 'block-content-component-3-component-1')
 @exec($__env->stopSection())
 @exec($__Footer__0_content = $__env->yieldContent($__ONE_COMPONENT_REGISTRY__['Footer'].'_0'))
-@startMarker('component', 'block-content-component-4')
-@include(__template__ + 'footer', ['__ONE_CHILDREN_CONTENT__' => $__Footer__0_content])
-@endMarker('component', 'block-content-component-4')
+@include($__template__ . 'footer', ['__ONE_CHILDREN_CONTENT__' => $__Footer__0_content])
+@endMarker('component', 'block-content-component-3')
 @endblock

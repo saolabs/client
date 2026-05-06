@@ -1,5 +1,5 @@
 import { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { app } from "../hellpers/app";
+import { app } from "../helpers/app";
 import { Router } from "../routers";
 import { buildDefaultProviders, resolveProviderOrder } from "./providers";
 

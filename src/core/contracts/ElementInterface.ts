@@ -21,6 +21,7 @@ export interface HtmlInterface extends OneNodeInterface {
     element: HTMLElement;
     domChildren: Node[];
     [key: string]: any;
+    clearHTML(): void;
 }
 
 /** Text node wrapper */

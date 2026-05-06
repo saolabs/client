@@ -108,44 +108,48 @@ class HomeView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.html(`tasks-1`, "tasks", parentElement, {}, (parentElement) => [
-                this.html(`tasks-1-demo-1`, "demo", parentElement, { attrs: { ":users": { type: 'static', value: "users" } } })
-            ]),
-            this.html(`tasks-2`, "tasks", parentElement, { attrs: { "title": { type: 'static', value: "'Custom Task List'" } } }),
-            this.html(`projects-3`, "projects", parentElement,
-                { attrs: { ":projects": { type: 'static', value: "projects" } } },
-                (parentElement) => [
-                this.html(`projects-3-div-1`, "div", parentElement,
-                    { classes: [{ type: 'static', value: "header" }] },
-                    (parentElement) => [
-                    this.html(`projects-3-div-1-h2-1`, "h2", parentElement, {}, (parentElement) => [
-                        this.text('My Projects')
-                    ])
-                    ]),
-                this.html(`projects-3-div-2`, "div", parentElement,
-                    { classes: [{ type: 'static', value: "footer" }] },
-                    (parentElement) => [
-                    this.html(`projects-3-div-2-p-1`, "p", parentElement, {}, (parentElement) => [
-                        this.text('Total Projects: '),
-                        this.output(`projects-3-div-2-p-1-output-1`, parentElement, true, [], (parentElement) => App.Helper.count(projects))
-                    ])
-                    ]),
-                this.html(`projects-3-tasks-3`, "tasks", parentElement,
-                    { attrs: { ":owners": { type: 'static', value: "['Alice', 'Bob']" } } },
-                    (parentElement) => [
-                    this.html(`projects-3-tasks-3-div-1`, "div", parentElement,
+            this.include("component-1", __template__+'sessions.tasks', parentElement, [], (parentElement) => ({
+                    __ONE_CHILDREN_CONTENT__: (parentElement) => [
+                    this.include("component-1-component-1", __template__+'demo.fetch', parentElement, [], (parentElement) => ({"users": users}))
+                ]
+                })),
+            this.include("component-2", __template__+'sessions.tasks', parentElement, [], (parentElement) => ({"title": "Custom Task List"})),
+            this.include("component-3", __template__+'sessions.projects', parentElement, [], (parentElement) => ({
+                    "projects": projects,
+                    __ONE_CHILDREN_CONTENT__: (parentElement) => [
+                    this.html(`component-3-div-1`, "div", parentElement,
                         { classes: [{ type: 'static', value: "header" }] },
                         (parentElement) => [
-                        this.html(`projects-3-tasks-3-div-1-h3-1`, "h3", parentElement, {}, (parentElement) => [
-                            this.text('Task Owners')
+                        this.html(`component-3-div-1-h2-1`, "h2", parentElement, {}, (parentElement) => [
+                            this.text('My Projects')
                         ])
                         ]),
-                    this.html(`projects-3-tasks-3-demo-2`, "demo", parentElement, { attrs: { ":users": { type: 'static', value: "users" } } })
-                    ])
-                ]),
-            this.html(`counter-4`, "counter", parentElement, {}),
-            this.html(`demo-5`, "demo", parentElement, {}),
-            this.html(`alert-6`, "alert", parentElement, { attrs: { "type": { type: 'static', value: "success" }, "message": { type: 'static', value: "This is a custom alert component!" } } })
+                    this.html(`component-3-div-2`, "div", parentElement,
+                        { classes: [{ type: 'static', value: "footer" }] },
+                        (parentElement) => [
+                        this.html(`component-3-div-2-p-1`, "p", parentElement, {}, (parentElement) => [
+                            this.text('Total Projects: '),
+                            this.output(`component-3-div-2-p-1-output-1`, parentElement, true, [], (parentElement) => App.Helper.count(projects))
+                        ])
+                        ]),
+                    this.include("component-3-component-1", __template__+'sessions.tasks', parentElement, [], (parentElement) => ({
+                            "owners": ["Alice", "Bob"],
+                            __ONE_CHILDREN_CONTENT__: (parentElement) => [
+                            this.html(`component-3-component-1-div-1`, "div", parentElement,
+                                { classes: [{ type: 'static', value: "header" }] },
+                                (parentElement) => [
+                                this.html(`component-3-component-1-div-1-h3-1`, "h3", parentElement, {}, (parentElement) => [
+                                    this.text('Task Owners')
+                                ])
+                                ]),
+                            this.include("component-3-component-1-component-1", __template__+'demo.fetch', parentElement, [], (parentElement) => ({"users": users}))
+                        ]
+                        }))
+                ]
+                })),
+            this.include("component-4", 'sessions.tasks.count', parentElement, [], (parentElement) => ({})),
+            this.include("component-5", __template__+'demo.fetch', parentElement, [], (parentElement) => ({})),
+            this.include("component-6", __blade_custom_path__, parentElement, [], (parentElement) => ({"type": "success", "message": "This is a custom alert component!"}))
             ]);
             }
         });
