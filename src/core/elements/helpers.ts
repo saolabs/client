@@ -1,12 +1,12 @@
 import { BlockInterface, BlockOutletInterface } from "../contracts/BlockInterface";
-import { FragmentInterface, HtmlInterface, OutputInterface, OneChildrenFactoryOutput, OneElementChildren } from "../contracts/ElementInterface";
+import { FragmentInterface, HtmlInterface, OutputInterface, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface";
 import { ReactiveInterface } from "../contracts/ReactiveInterface";
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { OneObjectType } from "../types/utils";
+import { SaoObjectType } from "../types/utils";
 
-export function getOneObjectType(instance: any): OneObjectType | null {
-    if (instance && typeof instance === 'object' && 'oneType' in instance) {
-        return instance.oneType;
+export function getSaoObjectType(instance: any): SaoObjectType | null {
+    if (instance && typeof instance === 'object' && 'saoType' in instance) {
+        return instance.saoType;
     }
     return null;
 }
@@ -14,9 +14,9 @@ export function getOneObjectType(instance: any): OneObjectType | null {
 export function parseElementChildren(
     oneElement: HtmlInterface | ReactiveInterface | BlockOutletInterface | OutputInterface | FragmentInterface | ViewControllerInterface, 
     parentElement: HTMLElement,
-    children: OneChildrenFactoryOutput
-): OneElementChildren {
-    const parsedChildren: OneElementChildren = [];
+    children: SaoChildrenFactoryOutput
+): SaoElementChildren {
+    const parsedChildren: SaoElementChildren = [];
 
     if(!children || !Array.isArray(children)) {
         console.warn('Children factory returned invalid output (not an array):', children);
@@ -39,7 +39,7 @@ export function parseElementChildren(
             console.warn('Skipping invalid child:', child);
             return;
         } 
-        let childType: OneObjectType = getOneObjectType(child);
+        let childType: SaoObjectType = getSaoObjectType(child);
         if(!childType) {
             return;
         }

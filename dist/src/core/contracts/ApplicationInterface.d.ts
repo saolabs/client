@@ -7,7 +7,7 @@ import type { StorageServiceInterface } from "./StorageServiceInterface";
 import type { LoggerServiceInterface } from "./LoggerServiceInterface";
 import { APIClientInterface } from "./ApiInterface";
 import type { ServiceProviderInterface } from "./ServiceProviderInterface";
-import { OneObjectType } from "../types/utils";
+import { SaoObjectType } from "../types/utils";
 export interface ApplicationInterface {
     [key: string]: any;
     transient<T>(key: ServiceKey, value: any): this;
@@ -26,7 +26,7 @@ export interface ApplicationInterface {
     set<T = any>(name: string, method: T, isOne?: boolean): void;
     setMethod(name: string, method: Function, isOne?: boolean): void;
     get<T = any>(name: string): T;
-    oneType?: OneObjectType;
+    saoType?: SaoObjectType;
     isInitialized: boolean;
     isStarted: boolean;
     View: ViewManagerInterface;

@@ -35,7 +35,7 @@ export class ViewController {
     // ─── Constructor ────────────────────────────────────────────
     constructor(view, path = '', viewType = 'view', viewId = null) {
         // ─── Identity ───────────────────────────────────────────────
-        this.oneType = 'ViewController';
+        this.saoType = 'ViewController';
         // ─── View Hierarchy ─────────────────────────────────────────
         /** Parent view controller (for nested views) */
         this.parent = null;

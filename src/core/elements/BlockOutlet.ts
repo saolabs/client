@@ -4,10 +4,10 @@ import type { HtmlInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { generateUUID } from "../helpers/utils";
 import markerRegistry  from "../services/MarkerRegistry";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 
 export class BlockOutlet implements BlockOutletInterface {
-    oneType: OneObjectType = 'BlockOutlet';
+    saoType: SaoObjectType = 'BlockOutlet';
     id: string;
     name: string;
     openTag: Comment;
@@ -65,11 +65,11 @@ export class BlockOutlet implements BlockOutletInterface {
         this.parentElement = parentElement;
     }
 
-    get isOneElement(): boolean {
+    get isSaoElement(): boolean {
         return true;
     }
 
-    set isOneElement(value: boolean) {
+    set isSaoElement(value: boolean) {
         // No-op setter to satisfy OneElement interface
     }
 

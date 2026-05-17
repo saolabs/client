@@ -1,8 +1,8 @@
 import { InitMode } from "../contracts/common";
-import type { HtmlInterface, OneElementChildren } from "../contracts/ElementInterface";
+import type { HtmlInterface, SaoElementChildren } from "../contracts/ElementInterface";
 import type { ReactiveInterface, ReactiveChildrenFactory } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 /**
  * Reactive — a region in the DOM bounded by comment markers that
  * can re-render its content when reactive dependencies change.
@@ -19,7 +19,7 @@ import type { OneObjectType } from "../types/utils";
  */
 export declare class Reactive implements ReactiveInterface {
     static class: string;
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     id: string;
     type: string;
     openTag: Comment;
@@ -29,7 +29,7 @@ export declare class Reactive implements ReactiveInterface {
     parent: HtmlInterface | null;
     ctx: ViewControllerInterface;
     childrenFactory: ReactiveChildrenFactory;
-    children: OneElementChildren;
+    children: SaoElementChildren;
     private mounted;
     stateKeys: string[];
     unsubscribe: () => void;
@@ -71,7 +71,7 @@ export declare class Reactive implements ReactiveInterface {
     destroy(): void;
     get isOneReactive(): boolean;
     set isOneReactive(value: boolean);
-    set isOneElement(value: boolean);
-    get isOneElement(): boolean;
+    set isSaoElement(value: boolean);
+    get isSaoElement(): boolean;
 }
 //# sourceMappingURL=Reactive.d.ts.map

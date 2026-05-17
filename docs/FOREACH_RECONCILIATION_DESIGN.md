@@ -348,7 +348,7 @@ Nếu developer không dùng `@key`:
 
 ## 6. Comparison với các Framework khác
 
-| Feature | React | Vue | Svelte | **OneView (đề xuất)** |
+| Feature | React | Vue | Svelte | **SaoView (đề xuất)** |
 |---------|-------|-----|--------|----------------------|
 | Key syntax | `key={id}` | `:key="id"` | `{#each items as item (item.id)}` | `@key($item['id'])` |
 | Required? | No (warning) | No (warning) | No | No (auto-detect + warning) |
@@ -356,7 +356,7 @@ Nếu developer không dùng `@key`:
 | Virtual DOM | Yes | Yes | No | **No** (direct DOM) |
 | DOM moves | Via reconciler | Via patch | `insertBefore` | **`insertBefore`** (giống Svelte) |
 
-OneView gần nhất với Svelte vì cả hai đều:
+SaoView gần nhất với Svelte vì cả hai đều:
 - Không dùng Virtual DOM
 - Compile-time → biết trước structure
 - DOM moves trực tiếp qua `insertBefore`

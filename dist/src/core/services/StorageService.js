@@ -24,7 +24,7 @@ export class StorageService {
     static removeInstance(key = 'default') {
         StorageService.instances.delete(key);
     }
-    constructor(storageKey = 'oneview_storage') {
+    constructor(storageKey = 'saoview_storage') {
         this.data = {};
         this.listeners = new Map();
         this.storageKey = storageKey;

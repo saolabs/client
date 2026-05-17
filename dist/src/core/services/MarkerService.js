@@ -2,7 +2,7 @@ import { app } from "../hellpers/app";
 import { generateUUID } from "../hellpers/utils";
 import { MarkerRegistry } from "./MarkerRegistry";
 /**
- * OneMarker Model - Represents a custom marker element
+ * SaoMarker Model - Represents a custom marker element
  * Supports both:
  * - Generic markup: <tag>...</tag> or <!--tag-->...<!--/tag-->
  * - Registry tags: <!--o:r:id-->...<!--/o:r:id-->
@@ -263,7 +263,7 @@ export class MarkerModel {
      */
     __sync() {
         // Placeholder for sync logic
-        // In V1, this uses oms.find() which requires OneMarkerService
+        // In V1, this uses oms.find() which requires SaoMarkerService
         return false;
     }
     /**
@@ -332,7 +332,7 @@ export class MarkerModel {
     }
 }
 /**
- * OneMarkerCollection - Collection of OneMarkerModel instances
+ * SaoMarkerCollection - Collection of SaoMarkerModel instances
  * Provides array-like operations with type safety
  */
 export class MarkerCollection {
@@ -719,5 +719,5 @@ export class MarkerService {
     }
 }
 MarkerService.class = 'HydrationMarker';
-export const OneMarker = app(MarkerService);
+export const SaoMarker = app(MarkerService);
 //# sourceMappingURL=MarkerService.js.map

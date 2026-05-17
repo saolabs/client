@@ -16,11 +16,11 @@ export declare function isHTMLElement(value: any): boolean;
 export declare function isNode(value: any): boolean;
 export declare function isCommentNode(value: any): boolean;
 export declare function isTextNode(value: any): boolean;
-export declare function isOneElement(value: any): boolean;
+export declare function isSaoElement(value: any): boolean;
 export declare function isOneHtml(value: any): boolean;
 export declare function isOneText(value: any): boolean;
 export declare function isOneNativeElement(value: any): boolean;
 export declare function isOneReactive(value: any): boolean;
-export declare function isOneFragment(value: any): boolean;
+export declare function isSaoFragment(value: any): boolean;
 export declare function isOneBlock(value: any): boolean;
 //# sourceMappingURL=utils.d.ts.map

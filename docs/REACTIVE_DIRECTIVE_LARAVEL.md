@@ -2,7 +2,7 @@
 
 ## Tổng quan
 
-Các directive `@startReactive` và `@endReactive` được OneView compiler tự động chèn vào blade template để đánh dấu các vùng reactive — những đoạn HTML phụ thuộc vào state variables và cần được hydrate/re-render phía client.
+Các directive `@startReactive` và `@endReactive` được SaoView compiler tự động chèn vào blade template để đánh dấu các vùng reactive — những đoạn HTML phụ thuộc vào state variables và cần được hydrate/re-render phía client.
 
 Khi blade render, các directive này sẽ gọi helper method để in ra HTML marker (comment hoặc attribute) giúp JS runtime biết vùng nào cần theo dõi và cập nhật khi state thay đổi.
 
@@ -111,7 +111,7 @@ Wrapping **inline** (cùng dòng):
 
 ### 3.1. Đăng ký Blade Directives
 
-Trong `AppServiceProvider` hoặc `OneViewServiceProvider`:
+Trong `AppServiceProvider` hoặc `SaoViewServiceProvider`:
 
 ```php
 <?php
@@ -121,7 +121,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Blade;
 
-class OneViewServiceProvider extends ServiceProvider
+class SaoViewServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
@@ -141,7 +141,7 @@ class OneViewServiceProvider extends ServiceProvider
 ```php
 <?php
 
-namespace App\OneView;
+namespace App\SaoView;
 
 class ReactiveHelper
 {
@@ -186,19 +186,19 @@ class ReactiveHelper
 
 ### 3.3. Inject `$__helper` vào View
 
-Trong `OneViewServiceProvider` hoặc `ViewServiceProvider`:
+Trong `SaoViewServiceProvider` hoặc `ViewServiceProvider`:
 
 ```php
 <?php
 
 namespace App\Providers;
 
-use App\OneView\ReactiveHelper;
+use App\SaoView\ReactiveHelper;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Blade;
 
-class OneViewServiceProvider extends ServiceProvider
+class SaoViewServiceProvider extends ServiceProvider
 {
     public function register(): void
     {

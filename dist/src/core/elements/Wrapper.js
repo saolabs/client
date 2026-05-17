@@ -10,7 +10,7 @@ import { InitModes } from "../contracts/common";
  */
 export class Wrapper {
     constructor({ ctx, initMode = InitModes.CREATE, parentElement = null, childrenFactory }) {
-        this.oneType = 'Wrapper';
+        this.saoType = 'Wrapper';
         this.nodes = [];
         /** Tracked child element wrappers (Html, Output, Reactive, TextElement, etc.) */
         this.children = [];
@@ -80,16 +80,16 @@ export class Wrapper {
         this.closeTag.remove();
         this.parent = null;
     }
-    get isOneElement() {
+    get isSaoElement() {
         return true;
     }
-    set isOneElement(value) {
+    set isSaoElement(value) {
         // No-op setter to satisfy the Interface; this property is always true for Fragment elements
     }
-    get isOneFragment() {
+    get isSaoFragment() {
         return true;
     }
-    set isOneFragment(value) {
+    set isSaoFragment(value) {
         // No-op setter to satisfy the Interface; this property is always true for Fragment elements
     }
 }

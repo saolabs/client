@@ -30,7 +30,7 @@ import { OOTEnum } from '../types/utils';
 // ─── Application ────────────────────────────────────────────────
 export class Application {
     constructor() {
-        this.oneType = OOTEnum.APPLICATION;
+        this.saoType = OOTEnum.APPLICATION;
         /** Factory bindings — mỗi lần make() gọi factory tạo instance mới */
         this.bindings = new Map();
         /** Singleton instances — tạo một lần, reuse */

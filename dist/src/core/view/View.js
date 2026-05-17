@@ -1,6 +1,6 @@
 import { ViewController } from "./ViewController";
 /**
- * View — the base class for all views in OneView.
+ * View — the base class for all views in SaoView.
  *
  * A View is the unit that the user writes. It contains:
  *   - User-defined properties (reactive state, computed values)
@@ -63,10 +63,10 @@ export class View {
     get $state() {
         return this.__ctrl__.states;
     }
-    get oneType() {
+    get saoType() {
         return 'View';
     }
-    set oneType(value) {
+    set saoType(value) {
         // No-op setter to satisfy the Interface; this property is always 'View'
     }
     get parent() {

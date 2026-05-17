@@ -1,9 +1,9 @@
 import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import type { FragmentInterface, HtmlInterface, OneChildrenFactory, OneElementEventHandler, OneNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface } from "../contracts/ElementInterface";
+import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface } from "../contracts/ElementInterface";
 import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig } from "../contracts/ViewControllerInterface";
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 import { ViewState } from "./ViewState";
 import { LoopContext } from "./LoopContext";
 import { Component } from "../elements/Component";
@@ -12,7 +12,7 @@ import { SectionContentRenderer, SectionContentType, SectionInterface, SectionIt
 import { InitMode } from "../contracts/common";
 import { BlockOutlet } from "../elements";
 import { ComponentInterface } from "../contracts/ComponentInterface";
-type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | OneNodeInterface;
+type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | SaoNodeInterface;
 /**
  * ViewController — the brain behind a View.
  *
@@ -35,7 +35,7 @@ type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | Tex
  *   this.__ctrl__.__foreach(items, (item, key, index, loop) => [...])
  */
 export declare class ViewController implements ViewControllerInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     viewId: string;
     path: string;
     viewType: ViewType;
@@ -74,7 +74,7 @@ export declare class ViewController implements ViewControllerInterface {
     private renderFactory;
     /** Compiled prerender factory — produces the prerender element tree */
     private prerenderFactory;
-    childrenFactory: OneChildrenFactory | null;
+    childrenFactory: SaoChildrenFactory | null;
     /** Stored render output for lifecycle management */
     renderOutput: any;
     /** Stored prerender output for hydration or caching */
@@ -182,7 +182,7 @@ export declare class ViewController implements ViewControllerInterface {
      *   - Object with handler + params: { handler: fn, params: [...] }
      *   - Object with string handler (method name on view): { handler: 'handleClick' }
      */
-    addEventListener(element: HTMLElement, event: string, handlers: OneElementEventHandler): void;
+    addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler): void;
     /**
      * Schedule a reactive region for re-render.
      * Multiple calls in the same frame are batched into a single RAF.
@@ -206,13 +206,13 @@ export declare class ViewController implements ViewControllerInterface {
     useBlock(id: string | null | undefined, name: string, parent: HtmlInterface): BlockOutlet;
     yield(id: string, name: string, defaultValue?: any, parentElement?: HtmlInterface | null): YieldInterface;
     yieldContent(name: string, defaultValue?: any): any;
-    wrapper(factory: OneChildrenFactory): WrapperInterface;
-    fragment(id: string | null | undefined, parentElement: HtmlInterface | null, childrenFactory: OneChildrenFactory): FragmentInterface;
+    wrapper(factory: SaoChildrenFactory): WrapperInterface;
+    fragment(id: string | null | undefined, parentElement: HtmlInterface | null, childrenFactory: SaoChildrenFactory): FragmentInterface;
     /**
      * Template and Directive Helpers
      * These methods are called by the compiled output for loops, conditionals, and other directives.
      */
-    html(id: string | null | undefined, tagName: string, parentElement: HtmlInterface | null, config: any, childrenFactory?: OneChildrenFactory): OneNodeInterface;
+    html(id: string | null | undefined, tagName: string, parentElement: HtmlInterface | null, config: any, childrenFactory?: SaoChildrenFactory): SaoNodeInterface;
     reactive(id: string | null, type: string, parentReactive: ReactiveInterface | null, parentElement: HtmlInterface | null, stateKeys: string[], childrenFactory: ReactiveChildrenFactory): ReactiveInterface;
     output(id: string | null, parent: HtmlInterface | null, isEscapeHTML?: boolean, stateKeys?: string[], contentFactory?: () => string): OutputInterface;
     text(text: string): Text;

@@ -1,6 +1,6 @@
 /**
- * OneView Plugins
- * Extension system for OneView framework
+ * SaoView Plugins
+ * Extension system for SaoView framework
  */
 
 export interface PluginOptions {

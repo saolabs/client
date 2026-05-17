@@ -5,7 +5,7 @@ import type { ReactiveInterface } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { generateUUID } from "../helpers/utils";
 import markerRegistry from "../services/MarkerRegistry";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 import { Fragment } from "./Fragment";
 /**
  * Block — a named mounting slot used in layout views.
@@ -26,7 +26,7 @@ import { Fragment } from "./Fragment";
  *   4. Browser back → BlockManager restores cached content without re-render
  */
 export class Block implements BlockInterface {
-    oneType: OneObjectType = 'Block';
+    saoType: SaoObjectType = 'Block';
     id: string;
     name: string;
     ctx: ViewControllerInterface;
@@ -41,7 +41,7 @@ export class Block implements BlockInterface {
     parentElement: HtmlInterface | null = null;
 
     public readonly isOneBlock = true;
-    public readonly isOneElement = false;
+    public readonly isSaoElement = false;
     
     constructor({
         ctx,

@@ -1,12 +1,12 @@
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 import type { ViewControllerInterface } from "./ViewControllerInterface";
-import type { HtmlInterface, OneChildrenFactoryOutput, OneElementChildren, OneNodeInterface } from "./ElementInterface";
+import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren, SaoNodeInterface } from "./ElementInterface";
 
 // ─── Reactive Interface ──────────────────────────────────────────
 
 /** Reactive region bounded by comment markers — re-renders when deps change */
-export interface ReactiveInterface extends OneNodeInterface {
-    oneType: OneObjectType;
+export interface ReactiveInterface extends SaoNodeInterface {
+    saoType: SaoObjectType;
     id: string;
     type: string;
     ctx: ViewControllerInterface;
@@ -15,24 +15,24 @@ export interface ReactiveInterface extends OneNodeInterface {
     parentReactive: ReactiveInterface | null;
     openTag: Comment;
     closeTag: Comment;
-    children: OneElementChildren;
+    children: SaoElementChildren;
     unsubscribe: () => void;
     childrenFactory: ReactiveChildrenFactory;
     setChildrenFactory(factory: ReactiveChildrenFactory): void;
     setStateKeys(stateKeys: string[]): void;
     render(): void;
     destroy(): void;
-    isOneElement: boolean;
+    isSaoElement: boolean;
     isOneReactive: boolean;
 }
 
 // ─── Reactive Types ──────────────────────────────────────────────
 
 /** Function called by Reactive to produce DOM content between markers */
-export type ReactiveRenderFn = (ctx: ViewControllerInterface, parentElement: HtmlInterface | null) => OneChildrenFactoryOutput;
+export type ReactiveRenderFn = (ctx: ViewControllerInterface, parentElement: HtmlInterface | null) => SaoChildrenFactoryOutput;
 
 /** Factory function for reactive children rendering */
-export type ReactiveChildrenFactory = (parentReactive: ReactiveInterface, parentElement: HtmlInterface | null) => OneChildrenFactoryOutput;
+export type ReactiveChildrenFactory = (parentReactive: ReactiveInterface, parentElement: HtmlInterface | null) => SaoChildrenFactoryOutput;
 
 /** Reactive configuration */
 export type ReactiveConfig = {

@@ -54,8 +54,8 @@ type RenderPageViewError = {
 
 type RenderPageViewResult = RenderPageViewSuccess | RenderPageViewError;
 
-function isRenderableObject(result: unknown): result is { oneType: string } {
-    return typeof result === 'object' && result !== null && 'oneType' in result;
+function isRenderableObject(result: unknown): result is { saoType: string } {
+    return typeof result === 'object' && result !== null && 'saoType' in result;
 }
 
 export class ViewManager implements ViewManagerInterface {
@@ -271,7 +271,7 @@ export class ViewManager implements ViewManagerInterface {
     }
 
     private getRenderResultType(result: unknown): OOTEnum {
-        return isRenderableObject(result) ? result.oneType as OOTEnum : OOTEnum.UNKNOWN;
+        return isRenderableObject(result) ? result.saoType as OOTEnum : OOTEnum.UNKNOWN;
     }
 
 

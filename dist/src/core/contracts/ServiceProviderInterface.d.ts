@@ -1,8 +1,8 @@
-import { OneObjectType } from "../types/utils";
+import { SaoObjectType } from "../types/utils";
 import type { ApplicationInterface } from "./ApplicationInterface";
 /** Service Provider — register() đăng ký, boot() khởi động */
 export interface ServiceProviderInterface {
-    oneType?: OneObjectType;
+    saoType?: SaoObjectType;
     name: string;
     dependsOn?: string[];
     initApplication?(App?: ApplicationInterface): void;

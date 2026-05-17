@@ -1,11 +1,11 @@
-import type { OneElementChildren, OneObjectType } from "../types/utils";
+import type { SaoElementChildren, SaoObjectType } from "../types/utils";
 import type { ViewControllerInterface } from "./ViewControllerInterface";
-import type { HtmlInterface, FragmentInterface, OneChildrenFactoryOutput, OneNodeInterface } from "./ElementInterface";
+import type { HtmlInterface, FragmentInterface, SaoChildrenFactoryOutput, SaoNodeInterface } from "./ElementInterface";
 import { InitMode } from "./common";
 
 export type SectionItemType = 'static' | 'dynamic' | 'async' | 'reactive';
 export type SectionContentType = 'text' | 'html'
-export type SectionContentRenderer = (parentElement?: HtmlInterface | null | undefined) => string | OneElementChildren;
+export type SectionContentRenderer = (parentElement?: HtmlInterface | null | undefined) => string | SaoElementChildren;
 export type SectionConstruvtorArgs = {
     ctx?: ViewControllerInterface | null;
     name: string;

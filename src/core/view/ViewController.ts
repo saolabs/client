@@ -1,11 +1,11 @@
 import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import type { FragmentInterface, HtmlInterface, OneChildrenFactory, OneElementEventHandler, OneNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface } from "../contracts/ElementInterface";
+import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface } from "../contracts/ElementInterface";
 import type { LoopContextInterface } from "../contracts/LoopContextInterface";
 import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig } from "../contracts/ViewControllerInterface";
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface";
 import type { ViewStateInterface } from "../contracts/ViewStateInterface";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 import { ViewState } from "./ViewState";
 import { LoopContext } from "./LoopContext";
 import { Reactive } from "../elements/Reactive";
@@ -24,7 +24,7 @@ import { YieldElement } from "../elements/Yield";
 import { app } from "../helpers/app";
 import { ComponentInterface } from "../contracts/ComponentInterface";
 
-type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | OneNodeInterface;
+type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | SaoNodeInterface;
 
 /**
  * ViewController — the brain behind a View.
@@ -50,7 +50,7 @@ type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | Tex
 export class ViewController implements ViewControllerInterface {
 
     // ─── Identity ───────────────────────────────────────────────
-    oneType: OneObjectType = 'ViewController';
+    saoType: SaoObjectType = 'ViewController';
     public viewId: string;
     public path: string;
     public viewType: ViewType;
@@ -103,7 +103,7 @@ export class ViewController implements ViewControllerInterface {
     /** Compiled prerender factory — produces the prerender element tree */
     private prerenderFactory: ViewRenderFactory | null = null;
 
-    public childrenFactory: OneChildrenFactory | null = null;
+    public childrenFactory: SaoChildrenFactory | null = null;
 
     /** Stored render output for lifecycle management */
     public renderOutput: any = null;
@@ -423,7 +423,7 @@ export class ViewController implements ViewControllerInterface {
      *   - Object with handler + params: { handler: fn, params: [...] }
      *   - Object with string handler (method name on view): { handler: 'handleClick' }
      */
-    addEventListener(element: HTMLElement, event: string, handlers: OneElementEventHandler): void {
+    addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler): void {
         for (const h of handlers) {
             let fn: EventListener;
 
@@ -605,7 +605,7 @@ export class ViewController implements ViewControllerInterface {
         return this.App.View?.yieldContent?.(name, defaultValue) ?? defaultValue;
     }
 
-    wrapper(factory: OneChildrenFactory): WrapperInterface {
+    wrapper(factory: SaoChildrenFactory): WrapperInterface {
         const callingMethod = this.callingMethod;
         let key: 'preloadElement' | 'mainElement' = callingMethod === 'prerender' ? 'preloadElement' : 'mainElement';
         let wrapper = this.wrapperInstance;
@@ -620,7 +620,7 @@ export class ViewController implements ViewControllerInterface {
     }
 
 
-    fragment(id: string | null = null, parentElement: HtmlInterface | null, childrenFactory: OneChildrenFactory): FragmentInterface {
+    fragment(id: string | null = null, parentElement: HtmlInterface | null, childrenFactory: SaoChildrenFactory): FragmentInterface {
         if (!id) {
             id = `fr-${generateUUID(5)}`;
         }
@@ -643,7 +643,7 @@ export class ViewController implements ViewControllerInterface {
      * These methods are called by the compiled output for loops, conditionals, and other directives.
      */
 
-    html(id: string | null = null, tagName: string, parentElement: HtmlInterface | null, config: any, childrenFactory?: OneChildrenFactory): OneNodeInterface {
+    html(id: string | null = null, tagName: string, parentElement: HtmlInterface | null, config: any, childrenFactory?: SaoChildrenFactory): SaoNodeInterface {
         if (!id) {
             id = `el-${tagName}-${generateUUID(5)}`;
         }

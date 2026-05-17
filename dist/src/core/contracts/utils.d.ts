@@ -1,6 +1,6 @@
 export type { LoopContextInterface } from "./LoopContextInterface";
 export type { ViewStateInterface, StateManagerInterface, StateListener, MultiKeyStateListener, StateItem } from "./ViewStateInterface";
-export type { OneNodeInterface, HtmlInterface, TextInterface, OutputInterface, FragmentInterface, OneElementConfig, HtmlElementConfig, OneElementEventHandler, OneElementChildren, OneChildrenFactoryOutput, OneChildrenFactory } from "./ElementInterface";
+export type { SaoNodeInterface, HtmlInterface, TextInterface, OutputInterface, FragmentInterface, SaoElementConfig, HtmlElementConfig, SaoElementEventHandler, SaoElementChildren, SaoChildrenFactoryOutput, SaoChildrenFactory } from "./ElementInterface";
 export type { ReactiveInterface, ReactiveRenderFn, ReactiveChildrenFactory, ReactiveConfig } from "./ReactiveInterface";
 export type { BlockInterface, BlockOutletInterface, BlockManagerInterface, BlockRenderFactory } from "./BlockInterface";
 export type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig } from "./ViewControllerInterface";

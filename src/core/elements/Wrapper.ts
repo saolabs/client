@@ -1,11 +1,11 @@
 import { InitMode, InitModes } from "../contracts/common";
-import type { FragmentInterface, HtmlInterface, OneChildrenFactory, OneChildrenFactoryOutput, OneElementChildren, WrapperInterface } from "../contracts/ElementInterface";
+import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElementChildren, WrapperInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { app } from "../helpers/app";
 import { generateUUID } from "../helpers/utils";
 import { MarkerRegistryService } from "../services";
 import { MarkerService } from "../services/MarkerService";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 
 /**
  * Wrapper — renders multiple root nodes into a parent without a wrapping tag.
@@ -17,13 +17,13 @@ import type { OneObjectType } from "../types/utils";
  * similar to Reactive but without the reactivity overhead.
  */
 export class Wrapper implements WrapperInterface {
-    oneType: OneObjectType = 'Wrapper';
+    saoType: SaoObjectType = 'Wrapper';
     public parent: HtmlInterface | null;
     public nodes: Node[] = [];
     /** Tracked child element wrappers (Html, Output, Reactive, TextElement, etc.) */
-    public children: OneElementChildren = [];
+    public children: SaoElementChildren = [];
     private ctx: ViewControllerInterface;
-    private childrenFactory: OneChildrenFactory;
+    private childrenFactory: SaoChildrenFactory;
     public openTag: Comment;
     public closeTag: Comment;
     public id: string; // Unique ID for debugging and marker registry
@@ -40,7 +40,7 @@ export class Wrapper implements WrapperInterface {
         ctx: ViewControllerInterface,
         initMode?: InitMode,
         parentElement?: HtmlInterface | null,
-        childrenFactory: OneChildrenFactory
+        childrenFactory: SaoChildrenFactory
     }) {
         this.ctx = ctx;
         this.parent = parentElement;
@@ -92,7 +92,7 @@ export class Wrapper implements WrapperInterface {
 
     }
 
-    setChildrenFactory(factory: OneChildrenFactory): void {
+    setChildrenFactory(factory: SaoChildrenFactory): void {
         this.childrenFactory = factory;
     }
 
@@ -151,17 +151,17 @@ export class Wrapper implements WrapperInterface {
         this.parent = null;
     }
 
-    get isOneElement(): boolean {
+    get isSaoElement(): boolean {
         return true;
     }
-    set isOneElement(value: boolean) {
+    set isSaoElement(value: boolean) {
         // No-op setter to satisfy the Interface; this property is always true for Fragment elements
     }
 
-    get isOneFragment(): boolean {
+    get isSaoFragment(): boolean {
         return true;
     }
-    set isOneFragment(value: boolean) {
+    set isSaoFragment(value: boolean) {
         // No-op setter to satisfy the Interface; this property is always true for Fragment elements
     }
 }

@@ -1,13 +1,13 @@
 import { InitMode, InitModes } from "../contracts/common";
 import { ComponentInterface } from "../contracts/ComponentInterface";
-import { HtmlInterface, OneChildrenFactory } from "../contracts/ElementInterface";
+import { HtmlInterface, SaoChildrenFactory } from "../contracts/ElementInterface";
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { ViewInterface } from "../contracts/ViewInterface";
 import { generateUUID } from "../helpers/utils";
-import { OneObjectType } from "../types/utils";
+import { SaoObjectType } from "../types/utils";
 
 export class Component implements ComponentInterface {
-    oneType: OneObjectType = 'Component';
+    saoType: SaoObjectType = 'Component';
     ctx: ViewControllerInterface;
     parent: HtmlInterface | null;
     domChildren: Node[] = []; // For compatibility with HtmlInterface; Component itself doesn't have a single root element
@@ -99,10 +99,10 @@ export class Component implements ComponentInterface {
     destroy(): void {
         // To be implemented by specific components
     }
-    get isOneElement(): boolean {
+    get isSaoElement(): boolean {
         return true;
     }
-    set isOneElement(value: boolean) {
+    set isSaoElement(value: boolean) {
         // No-op, just for type compatibility
     }
     get isOneComponent(): boolean {

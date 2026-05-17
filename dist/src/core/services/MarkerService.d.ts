@@ -1,6 +1,6 @@
 import { MarkerFilter, MarkerRecord, RegistryIDOrAttributes } from "../contracts/MarkerInterface";
 /**
- * OneMarker Model - Represents a custom marker element
+ * SaoMarker Model - Represents a custom marker element
  * Supports both:
  * - Generic markup: <tag>...</tag> or <!--tag-->...<!--/tag-->
  * - Registry tags: <!--o:r:id-->...<!--/o:r:id-->
@@ -134,7 +134,7 @@ export declare class MarkerModel {
     remove(): void;
 }
 /**
- * OneMarkerCollection - Collection of OneMarkerModel instances
+ * SaoMarkerCollection - Collection of SaoMarkerModel instances
  * Provides array-like operations with type safety
  */
 export declare class MarkerCollection {
@@ -295,5 +295,5 @@ export declare class MarkerService {
      */
     toModel(tag: MarkerRecord): MarkerModel;
 }
-export declare const OneMarker: MarkerService;
+export declare const SaoMarker: MarkerService;
 //# sourceMappingURL=MarkerService.d.ts.map

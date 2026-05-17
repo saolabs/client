@@ -1,6 +1,6 @@
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 import type { ViewControllerInterface } from "./ViewControllerInterface";
-import type { HtmlInterface, FragmentInterface, OneChildrenFactoryOutput, OneNodeInterface } from "./ElementInterface";
+import type { HtmlInterface, FragmentInterface, SaoChildrenFactoryOutput, SaoNodeInterface } from "./ElementInterface";
 import { InitMode } from "./common";
 export type BlockConstructorParams = {
     ctx: ViewControllerInterface;
@@ -11,7 +11,7 @@ export type BlockConstructorParams = {
     initMode?: InitMode;
 };
 export interface BlockInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     /** Unique block slot name (e.g. 'content', 'sidebar') */
     name: string;
     id: string;
@@ -22,7 +22,7 @@ export interface BlockInterface {
     fragment: FragmentInterface | null;
     parentElement: HtmlInterface | null;
     domChildren: Node[];
-    isOneElement: boolean;
+    isSaoElement: boolean;
     isOneBlock: boolean;
     initMode?: InitMode;
     /** Initialize the block (e.g. during hydration) */
@@ -41,8 +41,8 @@ export interface BlockInterface {
     setParentElement(parentElement: HtmlInterface | null): void;
     contentRenderFactory: BlockRenderFactory | null;
 }
-export interface BlockOutletInterface extends OneNodeInterface {
-    oneType: OneObjectType;
+export interface BlockOutletInterface extends SaoNodeInterface {
+    saoType: SaoObjectType;
     id: string;
     name: string;
     parent: HtmlInterface | null;
@@ -51,7 +51,7 @@ export interface BlockOutletInterface extends OneNodeInterface {
     parentElement: HtmlInterface | null;
     ctx: ViewControllerInterface;
     initMode: InitMode;
-    isOneElement: boolean;
+    isSaoElement: boolean;
     isOneBlockOutlet: boolean;
     /** Render the outlet's markers into the parent element */
     render(): any;
@@ -63,5 +63,5 @@ export interface BlockOutletInterface extends OneNodeInterface {
 }
 export interface BlockManagerInterface {
 }
-export type BlockRenderFactory = (parentElement: HtmlInterface) => OneChildrenFactoryOutput;
+export type BlockRenderFactory = (parentElement: HtmlInterface) => SaoChildrenFactoryOutput;
 //# sourceMappingURL=BlockInterface.d.ts.map

@@ -2,9 +2,9 @@ import type { BlockOutletInterface } from "../contracts/BlockInterface";
 import { InitMode } from "../contracts/common";
 import type { HtmlInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 export declare class BlockOutlet implements BlockOutletInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     id: string;
     name: string;
     openTag: Comment;
@@ -26,8 +26,8 @@ export declare class BlockOutlet implements BlockOutletInterface {
     start(): void;
     stop(): void;
     setParentElement(parentElement: HtmlInterface | null): void;
-    get isOneElement(): boolean;
-    set isOneElement(value: boolean);
+    get isSaoElement(): boolean;
+    set isSaoElement(value: boolean);
     get isOneBlockOutlet(): boolean;
     set isOneBlockOutlet(value: boolean);
 }

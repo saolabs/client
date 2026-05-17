@@ -17,8 +17,8 @@ import markerRegistry from "../services/MarkerRegistry";
  */
 export class Reactive {
     constructor({ type = 'reactive', id = null, ctx, parentElement = null, parentReactive = null, stateKeys = [], childrenFactory = () => [], initMode = InitModes.CREATE, }) {
-        this.oneType = 'Reactive';
-        this.parent = null; // Alias for parentReactive to satisfy OneNodeInterface
+        this.saoType = 'Reactive';
+        this.parent = null; // Alias for parentReactive to satisfy SaoNodeInterface
         this.children = [];
         this.mounted = false;
         this.unsubscribe = () => { };
@@ -188,10 +188,10 @@ export class Reactive {
     set isOneReactive(value) {
         // No-op setter to satisfy the Interface; this property is always true for Reactive elements
     }
-    set isOneElement(value) {
+    set isSaoElement(value) {
         // No-op setter to satisfy the Interface; Reactive is a type of OneElement
     }
-    get isOneElement() {
+    get isSaoElement() {
         return true;
     }
 }

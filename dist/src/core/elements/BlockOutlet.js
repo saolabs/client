@@ -2,7 +2,7 @@ import { generateUUID } from "../hellpers/utils";
 import markerRegistry from "../services/MarkerRegistry";
 export class BlockOutlet {
     constructor({ ctx, parentElement = null, name, id = null, initMode = 'create' }) {
-        this.oneType = 'BlockOutlet';
+        this.saoType = 'BlockOutlet';
         this.parent = null;
         this.parentElement = null;
         this.initMode = 'create';
@@ -43,10 +43,10 @@ export class BlockOutlet {
         this.parent = parentElement;
         this.parentElement = parentElement;
     }
-    get isOneElement() {
+    get isSaoElement() {
         return true;
     }
-    set isOneElement(value) {
+    set isSaoElement(value) {
         // No-op setter to satisfy OneElement interface
     }
     get isOneBlockOutlet() {

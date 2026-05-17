@@ -1,21 +1,21 @@
 import { ESK, InitMode, InitModes } from "../contracts/common";
-import type { HtmlInterface, OneChildrenFactory, OneChildrenFactoryOutput, OneElementChildren, OneElementConfig } from "../contracts/ElementInterface";
+import type { HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElementChildren, SaoElementConfig } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
 import { hasData } from "../helpers/utils";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 
 export class Html implements HtmlInterface {
-    oneType: OneObjectType = 'Html';
+    saoType: SaoObjectType = 'Html';
     public element: HTMLElement;
     public parent: HtmlInterface | null;
     private tagName: string;
-    private config: OneElementConfig;
+    private config: SaoElementConfig;
     private ctx: ViewControllerInterface | ViewManagerInterface;
-    private children: OneElementChildren = [];
+    private children: SaoElementChildren = [];
 
     public domChildren: Node[] = []; // For compatibility with HtmlInterface; Html itself doesn't have a single root element
-    private childrenFactory: OneChildrenFactory | null = null;
+    private childrenFactory: SaoChildrenFactory | null = null;
     private abortController: AbortController = new AbortController();
 
     /** All state subscriptions for reactive bindings — cleanup on destroy */
@@ -37,8 +37,8 @@ export class Html implements HtmlInterface {
         parentElement?: HtmlInterface | null,
         tagName?: string,
         element?: HTMLElement | null,
-        config?: OneElementConfig,
-        childrenFactory?: OneChildrenFactory | null,
+        config?: SaoElementConfig,
+        childrenFactory?: SaoChildrenFactory | null,
         initMode?: InitMode;
     }) {
 
@@ -78,7 +78,7 @@ export class Html implements HtmlInterface {
         this.initialize();
     }
 
-    updateConfig(newConfig: Partial<OneElementConfig>): void {
+    updateConfig(newConfig: Partial<SaoElementConfig>): void {
         if(hasData(newConfig)){
             this.config = { ...this.config, ...newConfig };
         }
@@ -257,7 +257,7 @@ export class Html implements HtmlInterface {
     setParent(parent: HtmlInterface | null): void {
         this.parent = parent;
     }
-    setChildrenFactory(factory: OneChildrenFactory): void {
+    setChildrenFactory(factory: SaoChildrenFactory): void {
         this.childrenFactory = factory;
     }
 
@@ -269,7 +269,7 @@ export class Html implements HtmlInterface {
         if (this.isSingleElement()) {
             return this.element;
         }
-        let children: OneChildrenFactoryOutput = [];
+        let children: SaoChildrenFactoryOutput = [];
         if (this.childrenFactory) {
             // Compiled output uses (parentElement) => [...] — pass `this` as parentElement
             children = this.childrenFactory(this);
@@ -357,10 +357,10 @@ export class Html implements HtmlInterface {
         }
     }
 
-    get isOneElement(): boolean {
+    get isSaoElement(): boolean {
         return true;
     }
-    set isOneElement(value: boolean) {
+    set isSaoElement(value: boolean) {
         // No-op setter to satisfy the Interface; this property is always true for Html elements
     }
 

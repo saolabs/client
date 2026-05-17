@@ -1,5 +1,5 @@
 /**
- * Router — SPA Router cho OneView v3.
+ * Router — SPA Router cho SaoView v3.
  *
  * Port từ core/Router nhưng nhẹ hơn (~400 dòng thay vì 960),
  * tích hợp trực tiếp với ViewManager mới.

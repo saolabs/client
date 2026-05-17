@@ -1,6 +1,6 @@
-# OneView Runtime Architecture
+# SaoView Runtime Architecture
 
-> Tài liệu kỹ thuật mô tả kiến trúc runtime của OneView — từ bootstrap, routing, mount view, đến start reactivity.
+> Tài liệu kỹ thuật mô tả kiến trúc runtime của SaoView — từ bootstrap, routing, mount view, đến start reactivity.
 
 ---
 
@@ -22,7 +22,7 @@
 
 ## 1. Tổng quan kiến trúc
 
-OneView là SPA framework xây dựng element tree trực tiếp (không dùng Virtual DOM). Mỗi view được compile từ file `.one` (Blade-like template) thành TypeScript/JavaScript class, khi runtime sẽ tạo cây DOM elements có reactive updates.
+SaoView là SPA framework xây dựng element tree trực tiếp (không dùng Virtual DOM). Mỗi view được compile từ file `.one` (Blade-like template) thành TypeScript/JavaScript class, khi runtime sẽ tạo cây DOM elements có reactive updates.
 
 ### Luồng chính
 
@@ -438,11 +438,11 @@ ctrl.destroy()                // Abort events, destroy tree, fire onDestroy
 
 ## 6. Element Tree — Cây phần tử
 
-OneView build cây phần tử trực tiếp — mỗi node tương ứng 1 DOM element hoặc 1 vùng reactive.
+SaoView build cây phần tử trực tiếp — mỗi node tương ứng 1 DOM element hoặc 1 vùng reactive.
 
 ### 6.1. Các loại Element
 
-| Class | oneType | DOM Output | Mô tả |
+| Class | saoType | DOM Output | Mô tả |
 |-------|---------|-----------|--------|
 | **Wrapper** | `'Wrapper'` | `<!--wrapper-start-->...<!--wrapper-end-->` | Root container cho view, wrap nhiều siblings |
 | **Fragment** | `'Fragment'` | `<!--fragment-start-->...<!--fragment-end-->` | Nhóm nhiều nodes không cần wrapper tag |
@@ -849,7 +849,7 @@ class MyView extends View {
 Mỗi file `.one` được compile thành:
 
 ```typescript
-import { Application, View, ViewController, app } from 'oneview';
+import { Application, View, ViewController, app } from 'saoview';
 
 // ─── Constants ──────────────────────
 const __VIEW_PATH__ = 'counter';

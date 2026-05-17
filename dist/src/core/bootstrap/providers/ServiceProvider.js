@@ -24,13 +24,13 @@ import { OOTEnum } from "../../types/utils";
  */
 export class ServiceProvider {
     constructor(application) {
-        this.oneType = OOTEnum.SERVICE_PROVIDER;
+        this.saoType = OOTEnum.SERVICE_PROVIDER;
         this.app = application ?? app();
         this.initApplication();
     }
     initApplication(App) {
-        if (!this.app || typeof this.app !== 'object' || this.app.oneType !== OOTEnum.APPLICATION) {
-            this.app = (App && App.oneType === OOTEnum.APPLICATION) ? App : app();
+        if (!this.app || typeof this.app !== 'object' || this.app.saoType !== OOTEnum.APPLICATION) {
+            this.app = (App && App.saoType === OOTEnum.APPLICATION) ? App : app();
         }
     }
     /** Override để đăng ký services vào container */

@@ -1,3 +1,3 @@
-import { HtmlInterface, OneElementChildren } from "./ElementInterface";
+import { HtmlInterface, SaoElementChildren } from "./ElementInterface";
 import { ViewControllerInterface } from "./utils";
 

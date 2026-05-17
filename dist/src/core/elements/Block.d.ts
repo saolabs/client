@@ -2,7 +2,7 @@ import type { BlockInterface, BlockRenderFactory } from "../contracts/BlockInter
 import { InitMode } from "../contracts/common";
 import type { FragmentInterface, HtmlInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 /**
  * Block — a named mounting slot used in layout views.
  *
@@ -22,7 +22,7 @@ import type { OneObjectType } from "../types/utils";
  *   4. Browser back → BlockManager restores cached content without re-render
  */
 export declare class Block implements BlockInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     id: string;
     name: string;
     ctx: ViewControllerInterface;
@@ -35,7 +35,7 @@ export declare class Block implements BlockInterface {
     initMode?: InitMode | undefined;
     parentElement: HtmlInterface | null;
     readonly isOneBlock = true;
-    readonly isOneElement = false;
+    readonly isSaoElement = false;
     constructor({ ctx, name, viewId, contentRenderFactory, id, initMode }: {
         ctx: ViewControllerInterface;
         name: string;

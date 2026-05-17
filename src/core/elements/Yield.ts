@@ -1,16 +1,18 @@
 import { InitMode, InitModes } from "../contracts/common";
-import { HtmlInterface, OneChildrenFactoryOutput, YieldInterface } from "../contracts/ElementInterface";
+import { HtmlInterface, SaoChildrenFactoryOutput, YieldInterface } from "../contracts/ElementInterface";
+import { MarkerModelInterface } from "../contracts/MarkerInterface";
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { generateUUID } from "../helpers/utils";
-import { MarkerModel, OneMarker } from "../services/MarkerService";
-import { OneObjectType } from "../types/utils";
+import { MarkerModel } from "../services/MarkerModel";
+import { SaoMarker } from "../services/MarkerService";
+import { SaoObjectType } from "../types/utils";
 
 export class YieldElement implements YieldInterface{
-    oneType: OneObjectType = "Yield";
+    saoType: SaoObjectType = "Yield";
     ctx: ViewControllerInterface;
     name: string
     id: string;
-    contentFactory: () => OneChildrenFactoryOutput = () => [];
+    contentFactory: () => SaoChildrenFactoryOutput = () => [];
     openTag!: Comment;
     closeTag!: Comment;
     initMode: InitMode = InitModes.CREATE
@@ -24,7 +26,7 @@ export class YieldElement implements YieldInterface{
         this.id = id && id.length > 0 ? id : generateUUID();
         this.defaultValue = defaultValue;
         
-        const yeildMarker: MarkerModel | null = (this.initMode === InitModes.HYDRATE) ? OneMarker.first('yield', this.id) : null;
+        const yeildMarker: MarkerModelInterface | null = (this.initMode === InitModes.HYDRATE) ? SaoMarker.first('yield', this.id) : null;
         if(yeildMarker){
             this.openTag = yeildMarker.openTag;
             this.closeTag = yeildMarker.closeTag;
@@ -35,16 +37,16 @@ export class YieldElement implements YieldInterface{
         
     }
     private createMarkers(){
-        const key = OneMarker.addRegistry('yield', this.id, {name: this.name});
-        this.openTag = OneMarker.createOpenMarker('yield', this.id);
-        this.closeTag = OneMarker.createCloseMarker('yield', this.id);
+        const key = SaoMarker.addRegistry('yield', this.id, {name: this.name});
+        this.openTag = SaoMarker.createOpenMarker('yield', this.id);
+        this.closeTag = SaoMarker.createCloseMarker('yield', this.id);
     }
 
     setParentElement(parent: HtmlInterface | null): void {
         this.parent = parent;
     }
 
-    setContentFactory(factory: () => OneChildrenFactoryOutput): void {
+    setContentFactory(factory: () => SaoChildrenFactoryOutput): void {
         this.contentFactory = factory;
     }
 
@@ -63,8 +65,8 @@ export class YieldElement implements YieldInterface{
         this.parent = null;
     }
 
-    get isOneElement(): boolean { return true; }
-    set isOneElement(_: boolean) {}
+    get isSaoElement(): boolean { return true; }
+    set isSaoElement(_: boolean) {}
     get isOneYield(): boolean { return true; }
     set isOneYield(_: boolean) {}
 }

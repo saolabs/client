@@ -1,6 +1,6 @@
 import type { HtmlInterface, TextInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { OneObjectType } from "../types/utils";
+import { SaoObjectType } from "../types/utils";
 /**
  * TextElement — wraps a DOM Text node.
  *
@@ -9,7 +9,7 @@ import { OneObjectType } from "../types/utils";
  * no DOM removal/insertion needed.
  */
 export declare class TextElement implements TextInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     element: Text;
     parent: HtmlInterface | null;
     private ctx;
@@ -38,8 +38,8 @@ export declare class TextElement implements TextInterface {
     destroy(): void;
     get text(): string;
     set text(newText: string);
-    get isOneElement(): boolean;
-    set isOneElement(value: boolean);
+    get isSaoElement(): boolean;
+    set isSaoElement(value: boolean);
     get isOneText(): boolean;
     set isOneText(value: boolean);
 }

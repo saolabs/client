@@ -1,10 +1,10 @@
 import { InitMode } from "../contracts/common";
-import type { HtmlInterface, OneChildrenFactory, OneElementConfig } from "../contracts/ElementInterface";
+import type { HtmlInterface, SaoChildrenFactory, SaoElementConfig } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 export declare class Html implements HtmlInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     element: HTMLElement;
     parent: HtmlInterface | null;
     private tagName;
@@ -23,11 +23,11 @@ export declare class Html implements HtmlInterface {
         parentElement?: HtmlInterface | null;
         tagName?: string;
         element?: HTMLElement | null;
-        config?: OneElementConfig;
-        childrenFactory?: OneChildrenFactory | null;
+        config?: SaoElementConfig;
+        childrenFactory?: SaoChildrenFactory | null;
         initMode?: InitMode;
     });
-    updateConfig(newConfig: Partial<OneElementConfig>): void;
+    updateConfig(newConfig: Partial<SaoElementConfig>): void;
     private initialize;
     private initializeAttributes;
     private initializeClasses;
@@ -35,7 +35,7 @@ export declare class Html implements HtmlInterface {
     private initializeEvents;
     setParentElement(parent: HtmlInterface | null): void;
     setParent(parent: HtmlInterface | null): void;
-    setChildrenFactory(factory: OneChildrenFactory): void;
+    setChildrenFactory(factory: SaoChildrenFactory): void;
     isSingleElement(): boolean;
     render(): HTMLElement;
     /** Start reactive bindings + children (Phase 2 lifecycle) */
@@ -44,8 +44,8 @@ export declare class Html implements HtmlInterface {
     stop(): void;
     remove(): void;
     destroy(): void;
-    get isOneElement(): boolean;
-    set isOneElement(value: boolean);
+    get isSaoElement(): boolean;
+    set isSaoElement(value: boolean);
     get isOneHtml(): boolean;
     set isOneHtml(value: boolean);
 }

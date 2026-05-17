@@ -1,9 +1,9 @@
 import type { ViewType } from "../contracts/ViewControllerInterface";
 import type { ViewInterface, ViewLifecycleHooks } from "../contracts/ViewInterface";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 import { ViewController } from "./ViewController";
 /**
- * View — the base class for all views in OneView.
+ * View — the base class for all views in SaoView.
  *
  * A View is the unit that the user writes. It contains:
  *   - User-defined properties (reactive state, computed values)
@@ -53,8 +53,8 @@ export declare class View implements ViewInterface, ViewLifecycleHooks {
     get __(): ViewController;
     /** Shortcut to ViewState */
     get $state(): any;
-    get oneType(): OneObjectType;
-    set oneType(value: OneObjectType);
+    get saoType(): SaoObjectType;
+    set saoType(value: SaoObjectType);
     get parent(): ViewInterface | null;
     get children(): ViewInterface[];
     get superView(): ViewInterface | null;

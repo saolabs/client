@@ -72,8 +72,8 @@ export function isCommentNode(value) {
 export function isTextNode(value) {
     return value instanceof Text;
 }
-export function isOneElement(value) {
-    return value && typeof value === 'object' && 'isOneElement' in value && value.isOneElement === true;
+export function isSaoElement(value) {
+    return value && typeof value === 'object' && 'isSaoElement' in value && value.isSaoElement === true;
 }
 export function isOneHtml(value) {
     return value && typeof value === 'object' && 'isOneHtml' in value && value.isOneHtml === true;
@@ -87,8 +87,8 @@ export function isOneNativeElement(value) {
 export function isOneReactive(value) {
     return value && typeof value === 'object' && 'isOneReactive' in value && value.isOneReactive === true;
 }
-export function isOneFragment(value) {
-    return value && typeof value === 'object' && 'isOneFragment' in value && value.isOneFragment === true;
+export function isSaoFragment(value) {
+    return value && typeof value === 'object' && 'isSaoFragment' in value && value.isSaoFragment === true;
 }
 export function isOneBlock(value) {
     return value && typeof value === 'object' && 'isOneBlock' in value && value.isOneBlock === true;

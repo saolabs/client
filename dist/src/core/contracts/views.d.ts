@@ -1,8 +1,8 @@
-import { HtmlInterface, OneElementChildren } from "./ElementInterface";
+import { HtmlInterface, SaoElementChildren } from "./ElementInterface";
 import { ViewControllerInterface } from "./utils";
 export type SectionItemType = 'static' | 'dynamic' | 'async' | 'reactive';
 export type SectionContentType = 'text' | 'html';
-export type SectionContentRenderer = (parentElement?: HtmlInterface | null | undefined) => string | OneElementChildren;
+export type SectionContentRenderer = (parentElement?: HtmlInterface | null | undefined) => string | SaoElementChildren;
 export type SectionConstruvtorArgs = {
     ctx?: ViewControllerInterface | null;
     name: string;

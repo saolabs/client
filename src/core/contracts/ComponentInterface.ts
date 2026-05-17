@@ -1,4 +1,4 @@
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 import type { ViewControllerInterface } from "./ViewControllerInterface";
 import type { ViewInterface } from "./ViewInterface";
 import type { HtmlInterface } from "./ElementInterface";
@@ -6,7 +6,7 @@ import type { HtmlInterface } from "./ElementInterface";
 // ─── Component Interface ─────────────────────────────────────────
 
 export interface ComponentInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     id: string;
     ctx: ViewControllerInterface;
     viewRef: ViewInterface | null;
@@ -20,7 +20,7 @@ export interface ComponentInterface {
     render(): void;
     destroy(): void;
     setParent(parent: HtmlInterface | null): void;
-    isOneElement: boolean;
+    isSaoElement: boolean;
     isOneComponent: boolean;
     [key: string]: any;
 }

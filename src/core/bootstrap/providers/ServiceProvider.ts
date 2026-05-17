@@ -1,7 +1,7 @@
 import { ApplicationInterface } from "../../contracts/ApplicationInterface";
 import { ServiceProviderInterface } from "../../contracts/utils";
 import { app } from "../../helpers/app";
-import { OneObjectType, OOTEnum } from "../../types/utils";
+import { SaoObjectType, OOTEnum } from "../../types/utils";
 import { NamedServiceProvider } from "./provider-order";
 
 /**
@@ -27,7 +27,7 @@ import { NamedServiceProvider } from "./provider-order";
  * }
  */
 export abstract class ServiceProvider implements ServiceProviderInterface {
-    readonly oneType: OneObjectType = OOTEnum.SERVICE_PROVIDER;
+    readonly saoType: SaoObjectType = OOTEnum.SERVICE_PROVIDER;
     abstract readonly name: string;
     readonly dependsOn?: string[];
     protected app: ApplicationInterface;
@@ -38,8 +38,8 @@ export abstract class ServiceProvider implements ServiceProviderInterface {
     }
 
     initApplication(App?: ApplicationInterface): void {
-        if (!this.app || typeof this.app !== 'object' || this.app.oneType !== OOTEnum.APPLICATION) {
-            this.app = (App && App.oneType === OOTEnum.APPLICATION) ? App : app<ApplicationInterface>();
+        if (!this.app || typeof this.app !== 'object' || this.app.saoType !== OOTEnum.APPLICATION) {
+            this.app = (App && App.saoType === OOTEnum.APPLICATION) ? App : app<ApplicationInterface>();
         }
     }
 

@@ -11,7 +11,7 @@ import { generateUUID } from "../hellpers/utils";
  */
 export class Fragment {
     constructor({ ctx, id = null, initMode = InitModes.CREATE, parentElement = null, childrenFactory }) {
-        this.oneType = 'Fragment';
+        this.saoType = 'Fragment';
         this.nodes = [];
         /** Tracked child element wrappers (Html, Output, Reactive, TextElement, etc.) */
         this.children = [];
@@ -117,16 +117,16 @@ export class Fragment {
         this.closeTag.remove();
         this.parent = null;
     }
-    get isOneElement() {
+    get isSaoElement() {
         return true;
     }
-    set isOneElement(value) {
+    set isSaoElement(value) {
         // No-op setter to satisfy the Interface; this property is always true for Fragment elements
     }
-    get isOneFragment() {
+    get isSaoFragment() {
         return true;
     }
-    set isOneFragment(value) {
+    set isSaoFragment(value) {
         // No-op setter to satisfy the Interface; this property is always true for Fragment elements
     }
 }

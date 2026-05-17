@@ -1,5 +1,5 @@
 import type { BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import type { HtmlInterface, HtmlElementConfig, OneChildrenFactory } from "../contracts/ElementInterface";
+import type { HtmlInterface, HtmlElementConfig, SaoChildrenFactory } from "../contracts/ElementInterface";
 import type { ReactiveChildrenFactory } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { ViewController } from "../view";

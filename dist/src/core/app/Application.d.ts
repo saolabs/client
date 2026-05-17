@@ -36,9 +36,9 @@ import type { StoreServiceInterface } from '../contracts/StoreServiceInterface';
 import type { StorageServiceInterface } from '../contracts/StorageServiceInterface';
 import type { LoggerServiceInterface } from '../contracts/LoggerServiceInterface';
 import { APIClientInterface } from '../contracts/ApiInterface';
-import { OneObjectType } from '../types/utils';
+import { SaoObjectType } from '../types/utils';
 export declare class Application implements ApplicationInterface {
-    readonly oneType: OneObjectType;
+    readonly saoType: SaoObjectType;
     isInitialized: boolean;
     isStarted: boolean;
     View: ViewManagerInterface;

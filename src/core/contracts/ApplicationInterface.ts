@@ -9,7 +9,7 @@ import type { StorageServiceInterface } from "./StorageServiceInterface";
 import type { LoggerServiceInterface } from "./LoggerServiceInterface";
 import { APIClientInterface } from "./ApiInterface";
 import type { ServiceProviderInterface } from "./ServiceProviderInterface";
-import { OneObjectType } from "../types/utils";
+import { SaoObjectType } from "../types/utils";
 
 export interface ApplicationInterface {
     [key: string]: any;
@@ -30,7 +30,7 @@ export interface ApplicationInterface {
     setMethod(name: string, method: Function, isOne?: boolean): void;
     get<T = any>(name: string): T;
 
-    oneType?: OneObjectType;
+    saoType?: SaoObjectType;
 
     // Service properties — set during bootstrap via App.set()
     isInitialized: boolean;

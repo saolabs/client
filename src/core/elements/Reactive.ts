@@ -1,10 +1,10 @@
 import { InitMode, InitModes } from "../contracts/common";
-import type { HtmlInterface, OneChildrenFactoryOutput, OneElementChildren } from "../contracts/ElementInterface";
+import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface";
 import type { ReactiveInterface, ReactiveChildrenFactory, ReactiveRenderFn } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { generateUUID } from "../helpers/utils";
 import markerRegistry from "../services/MarkerRegistry";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 
 /**
  * Reactive — a region in the DOM bounded by comment markers that 
@@ -22,18 +22,18 @@ import type { OneObjectType } from "../types/utils";
  */
 export class Reactive implements ReactiveInterface {
     static class = 'Reactive';
-    oneType: OneObjectType = 'Reactive';
+    saoType: SaoObjectType = 'Reactive';
     public id: string; // Unique ID for debugging and marker registry
     public type: string; // Custom type for different reactive behaviors (e.g. 'if', 'list')
     public openTag: Comment;
     public closeTag: Comment;
     public parentElement: HtmlInterface | null;
     public parentReactive: ReactiveInterface | null;
-    public parent: HtmlInterface | null = null; // Alias for parentReactive to satisfy OneNodeInterface
+    public parent: HtmlInterface | null = null; // Alias for parentReactive to satisfy SaoNodeInterface
 
     public ctx: ViewControllerInterface;
     public childrenFactory: ReactiveChildrenFactory;
-    public children: OneElementChildren = [];
+    public children: SaoElementChildren = [];
     private mounted: boolean = false;
     public stateKeys: string[];
     public unsubscribe: () => void = () => {};
@@ -119,7 +119,7 @@ export class Reactive implements ReactiveInterface {
         }
 
         // Produce children
-        const output: OneChildrenFactoryOutput = this.childrenFactory(this, this.parentElement);
+        const output: SaoChildrenFactoryOutput = this.childrenFactory(this, this.parentElement);
 
         // Insert children between markers
         for (const child of output) {
@@ -244,10 +244,10 @@ export class Reactive implements ReactiveInterface {
     set isOneReactive(value: boolean) {
         // No-op setter to satisfy the Interface; this property is always true for Reactive elements
     }
-    set isOneElement(value: boolean) {
+    set isSaoElement(value: boolean) {
         // No-op setter to satisfy the Interface; Reactive is a type of OneElement
     }
-    get isOneElement(): boolean {
+    get isSaoElement(): boolean {
         return true;
     }
 }

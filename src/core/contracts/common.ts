@@ -4,13 +4,13 @@ export enum InitModes {
     HYDRATE = 'hydrate'
 }
 /**
- * Common types and utilities for OneView contracts
- * This file defines shared types and enums used across OneView's contracts, such as initialization modes and system keys for HTML elements.
+ * Common types and utilities for SaoView contracts
+ * This file defines shared types and enums used across SaoView's contracts, such as initialization modes and system keys for HTML elements.
  * 
  * Key exports:
  */
 /**
- * System keys for HTML elements used by OneView.
+ * System keys for HTML elements used by SaoView.
  * These keys are used to store metadata on HTML elements, such as IDs and view information.
  * @name ESK (Element System Keys)
  * @enum {string}

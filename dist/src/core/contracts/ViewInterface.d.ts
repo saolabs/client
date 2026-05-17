@@ -1,8 +1,8 @@
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 import type { ViewControllerInterface, ViewType } from "./ViewControllerInterface";
 import type { FragmentInterface } from "./ElementInterface";
 export interface ViewInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     __ctrl__: ViewControllerInterface;
     path: string;
     viewType: ViewType;

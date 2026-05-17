@@ -194,7 +194,7 @@ sequenceDiagram
     
     PC->>PC: extendView('layouts.main')
     Note over PC: Trả về LayoutView
-    PC-->>VM: return LayoutView (oneType = 'View')
+    PC-->>VM: return LayoutView (saoType = 'View')
     
     Note over VM: Nhận resultType = VIEW → đệ quy
     VM->>VM: renderPageView(layoutView) [renderLevel+1]
@@ -205,7 +205,7 @@ sequenceDiagram
     LC->>LC: useBlock('ob-content', 'content', parent)
     Note over LC: Tạo BlockOutlet, đăng ký vào BlockManager
     LC->>BM: BlockManager.addOutlet(key, outlet)
-    LC-->>VM: return Wrapper (oneType = 'Wrapper')
+    LC-->>VM: return Wrapper (saoType = 'Wrapper')
     
     Note over VM: resultType = WRAPPER → dừng đệ quy
     VM-->>VM: RenderPageViewSuccess {view: page, superView: layout, finalView: layout}

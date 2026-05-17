@@ -1,7 +1,7 @@
 import { CollectionProxyInterface, HelperInterface } from "../contracts/HelperInterface";
 import { ApplicationInterface } from "../contracts/ApplicationInterface";
 /**
- * HelperService — PHP-compatible helper functions for OneView runtime.
+ * HelperService — PHP-compatible helper functions for SaoView runtime.
  *
  * The compiler converts PHP function calls → `App.Helper.xxx()`.
  * This class provides JavaScript implementations of those PHP functions

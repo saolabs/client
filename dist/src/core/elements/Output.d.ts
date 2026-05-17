@@ -1,7 +1,7 @@
 import { InitMode } from "../contracts/common";
 import type { HtmlInterface, OutputInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 /**
  * Output — reactive text output between comment markers.
  *
@@ -12,7 +12,7 @@ import type { OneObjectType } from "../types/utils";
  * Update: Khi stateKeys thay đổi → re-evaluate contentFactory → update textContent
  */
 export declare class Output implements OutputInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     ctx: ViewControllerInterface;
     parent: HtmlInterface | null;
     openTag: Comment;
@@ -61,8 +61,8 @@ export declare class Output implements OutputInterface {
      * Destroy — cleanup everything.
      */
     destroy(): void;
-    get isOneElement(): boolean;
-    set isOneElement(_: boolean);
+    get isSaoElement(): boolean;
+    set isSaoElement(_: boolean);
     get isOneOutput(): boolean;
     set isOneOutput(_: boolean);
 }

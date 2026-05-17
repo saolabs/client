@@ -2,7 +2,7 @@ import { InitModes } from "../contracts/common";
 import { generateUUID } from "../hellpers/utils";
 export class Component {
     constructor({ ctx, parent = null, id = null, stateKeys = [], data = {}, dataFactory = null, path = null, type = 'default', condition = null, initMode = InitModes.CREATE, }) {
-        this.oneType = 'Component';
+        this.saoType = 'Component';
         this.domChildren = []; // For compatibility with HtmlInterface; Component itself doesn't have a single root element
         this.viewRef = null;
         this.path = null; // For dynamic imports
@@ -56,10 +56,10 @@ export class Component {
     destroy() {
         // To be implemented by specific components
     }
-    get isOneElement() {
+    get isSaoElement() {
         return true;
     }
-    set isOneElement(value) {
+    set isSaoElement(value) {
         // No-op, just for type compatibility
     }
     get isOneComponent() {

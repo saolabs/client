@@ -2,7 +2,7 @@ import { ESK, InitModes } from "../contracts/common";
 import { hasData } from "../hellpers/utils";
 export class Html {
     constructor({ ctx, id = null, parentElement = null, tagName = 'div', element = null, config = {}, childrenFactory = null, initMode = InitModes.CREATE, }) {
-        this.oneType = 'Html';
+        this.saoType = 'Html';
         this.children = [];
         this.domChildren = []; // For compatibility with HtmlInterface; Html itself doesn't have a single root element
         this.childrenFactory = null;
@@ -283,10 +283,10 @@ export class Html {
             this.element.innerHTML = '';
         }
     }
-    get isOneElement() {
+    get isSaoElement() {
         return true;
     }
-    set isOneElement(value) {
+    set isSaoElement(value) {
         // No-op setter to satisfy the Interface; this property is always true for Html elements
     }
     get isOneHtml() {

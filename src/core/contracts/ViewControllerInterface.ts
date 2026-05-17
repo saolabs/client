@@ -1,7 +1,7 @@
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 import type { ViewInterface, ViewRenderFactory } from "./ViewInterface";
 import type { ViewStateInterface } from "./ViewStateInterface";
-import type { HtmlInterface, FragmentInterface, OneElementEventHandler, OneElementChildren, OneChildrenFactory, WrapperInterface } from "./ElementInterface";
+import type { HtmlInterface, FragmentInterface, SaoElementEventHandler, SaoElementChildren, SaoChildrenFactory, WrapperInterface } from "./ElementInterface";
 import type { ReactiveInterface } from "./ReactiveInterface";
 import type { BlockInterface } from "./BlockInterface";
 import type { LoopContextInterface } from "./LoopContextInterface";
@@ -12,7 +12,7 @@ import { SectionInterface } from "../contracts/SectionInterface";
 export type ViewType = 'view' | 'layout' | 'component' | 'template';
 
 export interface ViewControllerInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     view: ViewInterface;
     viewId: string;
     path: string;
@@ -34,11 +34,11 @@ export interface ViewControllerInterface {
     blocks: Map<string, BlockInterface>;
     urlPath: string | null;
     isActive: boolean;
-    childrenFactory: OneChildrenFactory | null;
+    childrenFactory: SaoChildrenFactory | null;
 
-    wrapper: (factory: OneChildrenFactory) => WrapperInterface;
+    wrapper: (factory: SaoChildrenFactory) => WrapperInterface;
 
-    addEventListener(element: HTMLElement, event: string, handlers: OneElementEventHandler): void;
+    addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler): void;
     /** Called by reactive system to schedule an update */
     scheduleUpdate(reactive: ReactiveInterface): void;
     /** Lifecycle */

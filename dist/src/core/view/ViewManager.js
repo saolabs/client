@@ -25,7 +25,7 @@ import { InitModes } from "../contracts/common";
 import { OOTEnum } from "../types/utils";
 import { app } from "../hellpers/app";
 function isRenderableObject(result) {
-    return typeof result === 'object' && result !== null && 'oneType' in result;
+    return typeof result === 'object' && result !== null && 'saoType' in result;
 }
 export class ViewManager {
     constructor(app) {
@@ -205,7 +205,7 @@ export class ViewManager {
         };
     }
     getRenderResultType(result) {
-        return isRenderableObject(result) ? result.oneType : OOTEnum.UNKNOWN;
+        return isRenderableObject(result) ? result.saoType : OOTEnum.UNKNOWN;
     }
     async callViewRenderFactory(view, method = 'render', data = {}, mountRoot = null, initMode = InitModes.CREATE, cache = false, renderLevel = 0) {
         const ctrl = view.__ctrl__;

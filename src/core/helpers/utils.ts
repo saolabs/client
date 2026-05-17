@@ -80,8 +80,8 @@ export function isTextNode(value: any): boolean {
     return value instanceof Text;
 }
 
-export function isOneElement(value: any): boolean {
-    return value && typeof value === 'object' && 'isOneElement' in value && value.isOneElement === true;
+export function isSaoElement(value: any): boolean {
+    return value && typeof value === 'object' && 'isSaoElement' in value && value.isSaoElement === true;
 }
 
 export function isOneHtml(value: any): boolean {
@@ -100,8 +100,8 @@ export function isOneReactive(value: any): boolean {
     return value && typeof value === 'object' && 'isOneReactive' in value && value.isOneReactive === true;
 }
 
-export function isOneFragment(value: any): boolean {
-    return value && typeof value === 'object' && 'isOneFragment' in value && value.isOneFragment === true;
+export function isSaoFragment(value: any): boolean {
+    return value && typeof value === 'object' && 'isSaoFragment' in value && value.isSaoFragment === true;
 }
 
 export function isOneBlock(value: any): boolean {

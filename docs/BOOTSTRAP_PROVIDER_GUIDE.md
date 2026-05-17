@@ -1,6 +1,6 @@
-# Bootstrap & Service Provider Guide — OneView v1.1
+# Bootstrap & Service Provider Guide — SaoView v1.1
 
-Hệ thống khởi tạo ứng dụng OneView: DI container + dependency-aware provider pattern (giống Laravel).
+Hệ thống khởi tạo ứng dụng SaoView: DI container + dependency-aware provider pattern (giống Laravel).
 
 ---
 
@@ -63,7 +63,7 @@ index.ts                            ← Public: App, app, Application
 ## 2. Luồng khởi tạo hoàn chỉnh
 
 ```
-import { App } from 'oneview'
+import { App } from 'saoview'
        │
        │  ① Module load
        ▼
@@ -140,7 +140,7 @@ import { App } from 'oneview'
 
 ```ts
 // src/one/hellpers/app.ts — singleton duy nhất
-import { app } from 'oneview';
+import { app } from 'saoview';
 
 app()              // → Application instance
 app('View')        // → app.make('View')   — resolve service
@@ -405,7 +405,7 @@ class AuthServiceProvider extends ServiceProvider {
 ```
 
 ```ts
-// OneView TypeScript
+// SaoView TypeScript
 class AuthServiceProvider extends ServiceProvider {
     readonly name = 'auth';
     readonly dependsOn = ['core', 'api'];
@@ -420,7 +420,7 @@ class AuthServiceProvider extends ServiceProvider {
 }
 ```
 
-| Laravel | OneView |
+| Laravel | SaoView |
 |:--|:--|
 | `extends ServiceProvider` | `extends ServiceProvider` |
 | `$this->app` | `this.app` |
@@ -500,7 +500,7 @@ App.start({
 
 ```ts
 // providers/AuthServiceProvider.ts
-import { ServiceProvider, PROVIDER_NAMES } from 'oneview';
+import { ServiceProvider, PROVIDER_NAMES } from 'saoview';
 
 export class AuthServiceProvider extends ServiceProvider {
     readonly name = 'auth';
@@ -632,7 +632,7 @@ Cần dependency order?
 Dùng constant tránh typo, có IDE autocomplete:
 
 ```ts
-import { PROVIDER_NAMES } from 'oneview';
+import { PROVIDER_NAMES } from 'saoview';
 
 PROVIDER_NAMES.CORE    // 'core'
 PROVIDER_NAMES.VIEW    // 'view'

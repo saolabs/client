@@ -1,7 +1,7 @@
 import { InitMode } from "../contracts/common";
-import type { FragmentInterface, HtmlInterface, OneChildrenFactory, OneElementChildren } from "../contracts/ElementInterface";
+import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoElementChildren } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 /**
  * Fragment — renders multiple root nodes into a parent without a wrapping tag.
  *
@@ -12,11 +12,11 @@ import type { OneObjectType } from "../types/utils";
  * similar to Reactive but without the reactivity overhead.
  */
 export declare class Fragment implements FragmentInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     parent: HtmlInterface | null;
     nodes: Node[];
     /** Tracked child element wrappers (Html, Output, Reactive, TextElement, etc.) */
-    children: OneElementChildren;
+    children: SaoElementChildren;
     private ctx;
     private childrenFactory;
     openTag: Comment;
@@ -29,11 +29,11 @@ export declare class Fragment implements FragmentInterface {
         id?: string | null;
         initMode?: InitMode;
         parentElement?: HtmlInterface | null;
-        childrenFactory: OneChildrenFactory;
+        childrenFactory: SaoChildrenFactory;
     });
     setParentElement(parent: HtmlInterface | null): void;
     render(): void;
-    setChildrenFactory(factory: OneChildrenFactory): void;
+    setChildrenFactory(factory: SaoChildrenFactory): void;
     /** Hydrate lifecycle — reattach event listeners or perform other setup */
     hydrate(): void;
     /** Start lifecycle — recursively activate children's reactive subscriptions */
@@ -43,9 +43,9 @@ export declare class Fragment implements FragmentInterface {
     /** Remove all nodes between markers from the DOM */
     clear(): void;
     destroy(): void;
-    get isOneElement(): boolean;
-    set isOneElement(value: boolean);
-    get isOneFragment(): boolean;
-    set isOneFragment(value: boolean);
+    get isSaoElement(): boolean;
+    set isSaoElement(value: boolean);
+    get isSaoFragment(): boolean;
+    set isSaoFragment(value: boolean);
 }
 //# sourceMappingURL=Fragment.d.ts.map

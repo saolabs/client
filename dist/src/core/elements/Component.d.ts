@@ -3,9 +3,9 @@ import { ComponentInterface } from "../contracts/ComponentInterface";
 import { HtmlInterface } from "../contracts/ElementInterface";
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { ViewInterface } from "../contracts/ViewInterface";
-import { OneObjectType } from "../types/utils";
+import { SaoObjectType } from "../types/utils";
 export declare class Component implements ComponentInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     ctx: ViewControllerInterface;
     parent: HtmlInterface | null;
     domChildren: Node[];
@@ -54,8 +54,8 @@ export declare class Component implements ComponentInterface {
     stop(): void;
     render(): void;
     destroy(): void;
-    get isOneElement(): boolean;
-    set isOneElement(value: boolean);
+    get isSaoElement(): boolean;
+    set isSaoElement(value: boolean);
     get isOneComponent(): boolean;
     set isOneComponent(value: boolean);
 }

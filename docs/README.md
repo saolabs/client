@@ -53,4 +53,4 @@ const state = new ViewState({
 
 ---
 
-*Tài liệu này được tách từ OneView V2 để phục vụ Saola Client ecosystem.*
+*Tài liệu này được tách từ SaoView V2 để phục vụ Saola Client ecosystem.*

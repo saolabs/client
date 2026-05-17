@@ -37,12 +37,12 @@ import type { StoreServiceInterface } from '../contracts/StoreServiceInterface';
 import type { StorageServiceInterface } from '../contracts/StorageServiceInterface';
 import type { LoggerServiceInterface } from '../contracts/LoggerServiceInterface';
 import { APIClientInterface } from '../contracts/ApiInterface';
-import { OneObjectType, OOTEnum } from '../types/utils';
+import { SaoObjectType, OOTEnum } from '../types/utils';
 
 // ─── Application ────────────────────────────────────────────────
 
 export class Application implements ApplicationInterface {
-    readonly oneType: OneObjectType = OOTEnum.APPLICATION;
+    readonly saoType: SaoObjectType = OOTEnum.APPLICATION;
     // Service properties — set during bootstrap via App.set()
     declare isInitialized: boolean;
     declare isStarted: boolean;

@@ -1,13 +1,13 @@
 import { InitMode } from "../contracts/common";
-import { HtmlInterface, OneChildrenFactoryOutput, YieldInterface } from "../contracts/ElementInterface";
+import { HtmlInterface, SaoChildrenFactoryOutput, YieldInterface } from "../contracts/ElementInterface";
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { OneObjectType } from "../types/utils";
+import { SaoObjectType } from "../types/utils";
 export declare class YieldElement implements YieldInterface {
-    oneType: OneObjectType;
+    saoType: SaoObjectType;
     ctx: ViewControllerInterface;
     name: string;
     id: string;
-    contentFactory: () => OneChildrenFactoryOutput;
+    contentFactory: () => SaoChildrenFactoryOutput;
     openTag: Comment;
     closeTag: Comment;
     initMode: InitMode;
@@ -23,11 +23,11 @@ export declare class YieldElement implements YieldInterface {
     });
     private createMarkers;
     setParentElement(parent: HtmlInterface | null): void;
-    setContentFactory(factory: () => OneChildrenFactoryOutput): void;
+    setContentFactory(factory: () => SaoChildrenFactoryOutput): void;
     render(): void;
     destroy(): void;
-    get isOneElement(): boolean;
-    set isOneElement(_: boolean);
+    get isSaoElement(): boolean;
+    set isSaoElement(_: boolean);
     get isOneYield(): boolean;
     set isOneYield(_: boolean);
 }

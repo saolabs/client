@@ -1,6 +1,6 @@
 import { ApplicationInterface } from "../../contracts/ApplicationInterface";
 import { ServiceProviderInterface } from "../../contracts/utils";
-import { OneObjectType } from "../../types/utils";
+import { SaoObjectType } from "../../types/utils";
 /**
  * Base class cho Service Provider — API giống Laravel.
  *
@@ -24,7 +24,7 @@ import { OneObjectType } from "../../types/utils";
  * }
  */
 export declare abstract class ServiceProvider implements ServiceProviderInterface {
-    readonly oneType: OneObjectType;
+    readonly saoType: SaoObjectType;
     abstract readonly name: string;
     readonly dependsOn?: string[];
     protected app: ApplicationInterface;

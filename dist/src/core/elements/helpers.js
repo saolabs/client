@@ -1,6 +1,6 @@
-export function getOneObjectType(instance) {
-    if (instance && typeof instance === 'object' && 'oneType' in instance) {
-        return instance.oneType;
+export function getSaoObjectType(instance) {
+    if (instance && typeof instance === 'object' && 'saoType' in instance) {
+        return instance.saoType;
     }
     return null;
 }
@@ -26,7 +26,7 @@ export function parseElementChildren(oneElement, parentElement, children) {
             console.warn('Skipping invalid child:', child);
             return;
         }
-        let childType = getOneObjectType(child);
+        let childType = getSaoObjectType(child);
         if (!childType) {
             return;
         }

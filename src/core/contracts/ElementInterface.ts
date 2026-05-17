@@ -1,23 +1,23 @@
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 import type { ViewControllerInterface } from "./ViewControllerInterface";
 import type { ReactiveInterface } from "./ReactiveInterface";
 
 // ─── Element Interfaces ──────────────────────────────────────────
 
 /** Base for any renderable node in the tree */
-export interface OneNodeInterface {
-    oneType: OneObjectType;
+export interface SaoNodeInterface {
+    saoType: SaoObjectType;
     parent: HtmlInterface | null;
     render(): void;
     destroy(): void;
-    isOneElement: boolean;
+    isSaoElement: boolean;
     setParentElement(parent: HtmlInterface | null): void;
     [key: string]: any;
 
 }
 
 /** Native HTML element wrapper */
-export interface HtmlInterface extends OneNodeInterface {
+export interface HtmlInterface extends SaoNodeInterface {
     element: HTMLElement;
     domChildren: Node[];
     [key: string]: any;
@@ -25,7 +25,7 @@ export interface HtmlInterface extends OneNodeInterface {
 }
 
 /** Text node wrapper */
-export interface TextInterface extends OneNodeInterface {
+export interface TextInterface extends SaoNodeInterface {
     element: Text;
     text: string;
 
@@ -34,7 +34,7 @@ export interface TextInterface extends OneNodeInterface {
     update(newText: string): void;
 }
 
-export interface OutputInterface extends OneNodeInterface {
+export interface OutputInterface extends SaoNodeInterface {
     ctx: ViewControllerInterface;
     parent: HtmlInterface | null;
     stateKeys: string[];
@@ -44,12 +44,12 @@ export interface OutputInterface extends OneNodeInterface {
     [key: string]: any;
 }
 
-export interface YieldInterface extends OneNodeInterface {
+export interface YieldInterface extends SaoNodeInterface {
     ctx: ViewControllerInterface;
     parent: HtmlInterface | null;
     name: string;
-    contentFactory: () => OneChildrenFactoryOutput;
-    setContentFactory(factory: () => OneChildrenFactoryOutput): void;
+    contentFactory: () => SaoChildrenFactoryOutput;
+    setContentFactory(factory: () => SaoChildrenFactoryOutput): void;
     openTag: Comment;
     closeTag: Comment;
     domChildren: Node[];
@@ -57,14 +57,14 @@ export interface YieldInterface extends OneNodeInterface {
 }
 
 /** Fragment — renders multiple root nodes into a parent without a wrapping tag */
-export interface FragmentInterface extends OneNodeInterface {
+export interface FragmentInterface extends SaoNodeInterface {
     nodes: Node[];
     domChildren: Node[];
     [key: string]: any;
 
 }
 /** Wrapper — renders multiple root nodes into a parent without a wrapping tag */
-export interface WrapperInterface extends OneNodeInterface {
+export interface WrapperInterface extends SaoNodeInterface {
     nodes: Node[];
     domChildren: Node[];
     [key: string]: any;
@@ -72,7 +72,7 @@ export interface WrapperInterface extends OneNodeInterface {
 
 // ─── Element Config Types ────────────────────────────────────────
 
-export type OneElementConfig = {
+export type SaoElementConfig = {
     attrs?: {
         [key: string]: {
             type: 'value' | 'binding';
@@ -90,7 +90,7 @@ export type OneElementConfig = {
         }
     },
     events?: {
-        [key: string]: OneElementEventHandler;
+        [key: string]: SaoElementEventHandler;
     },
     classes?: {
         [className: string]: {
@@ -116,7 +116,7 @@ export type OneElementConfig = {
     [key: string]: any;
 }
 
-export type HtmlElementConfig = OneElementConfig & {
+export type HtmlElementConfig = SaoElementConfig & {
     ctx: ViewControllerInterface;
     parentElement?: HtmlInterface | null;
     parent?: HtmlInterface | null;
@@ -124,7 +124,7 @@ export type HtmlElementConfig = OneElementConfig & {
 
 // ─── Event Handler ──────────────────────────────────────────────
 
-export type OneElementEventHandler = Array<{
+export type SaoElementEventHandler = Array<{
     handler: string | ((event: Event) => any);
     params?: (any | ((event: Event) => any[]))[];
 } | ((event: Event) => any)>;
@@ -132,10 +132,10 @@ export type OneElementEventHandler = Array<{
 // ─── Children Types ─────────────────────────────────────────────
 
 /** All possible rendered child node types */
-export type OneElementChildren = Array<HtmlInterface | ReactiveInterface | TextInterface | FragmentInterface | HTMLElement | SVGElement | DocumentFragment | Text | Comment>;
+export type SaoElementChildren = Array<WrapperInterface | HtmlInterface | ReactiveInterface | TextInterface | FragmentInterface | HTMLElement | SVGElement | DocumentFragment | Text | Comment>;
 
 /** What a children factory can return (before mounting) */
-export type OneChildrenFactoryOutput = Array<HtmlInterface | ReactiveInterface | TextInterface | FragmentInterface | string | number | HTMLElement | SVGElement | DocumentFragment | Text | Comment>;
+export type SaoChildrenFactoryOutput = Array<WrapperInterface | HtmlInterface | ReactiveInterface | TextInterface | FragmentInterface | string | number | HTMLElement | SVGElement | DocumentFragment | Text | Comment>;
 
 /** Factory function that produces children given parent element */
-export type OneChildrenFactory = (parentElement: HtmlInterface | null) => OneChildrenFactoryOutput;
+export type SaoChildrenFactory = (parentElement: HtmlInterface | null) => SaoChildrenFactoryOutput;

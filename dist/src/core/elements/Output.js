@@ -11,7 +11,7 @@ import { escapeHTML, generateUUID } from "../hellpers/utils";
  */
 export class Output {
     constructor({ ctx, id = null, parent = null, stateKeys = [], contentFactory = () => '', isEscapeHTML = true, initMode = InitModes.CREATE }) {
-        this.oneType = 'Output';
+        this.saoType = 'Output';
         this.domChildren = []; // For compatibility with HtmlInterface; Output itself doesn't have a single root element
         this.textNode = null;
         this.unsubscribe = null;
@@ -113,8 +113,8 @@ export class Output {
         this.parent = null;
     }
     // ─── OneElement markers ─────────────────────────────
-    get isOneElement() { return true; }
-    set isOneElement(_) { }
+    get isSaoElement() { return true; }
+    set isSaoElement(_) { }
     get isOneOutput() { return true; }
     set isOneOutput(_) { }
 }

@@ -1,4 +1,4 @@
-export type OneObjectType = 'Application' | 'App' | 'ServiceProvider' | 'Html' | 'Reactive' | 'TextElement' | 'Fragment' | 'Wrapper' | 'Block' | 'BlockOutlet' | 'Output' | 'ViewController' | 'View' | 'Service' | 'Router' | 'App' | 'Component' | 'Unknown' | 'Yield' | '' | null;
+export type SaoObjectType = 'Application' | 'App' | 'ServiceProvider' | 'Html' | 'Reactive' | 'TextElement' | 'Fragment' | 'Wrapper' | 'Block' | 'BlockOutlet' | 'Output' | 'ViewController' | 'View' | 'Service' | 'Router' | 'App' | 'Component' | 'Unknown' | 'Yield' | '' | null;
 export declare enum OOTEnum {
     APPLICATION = "Application",
     HTML = "Html",
@@ -19,7 +19,7 @@ export declare enum OOTEnum {
     UNKNOWN = "Unknown",
     YIELD = "Yield"
 }
-export type { OneElementConfig, HtmlElementConfig, OneElementEventHandler, OneElementChildren, OneChildrenFactoryOutput, OneChildrenFactory } from "../contracts/ElementInterface";
+export type { SaoElementConfig, HtmlElementConfig, SaoElementEventHandler, SaoElementChildren, SaoChildrenFactoryOutput, SaoChildrenFactory } from "../contracts/ElementInterface";
 export type { ReactiveRenderFn, ReactiveChildrenFactory, ReactiveConfig } from "../contracts/ReactiveInterface";
 export type { BlockRenderFactory } from "../contracts/BlockInterface";
 export type { ViewRenderFactory, ViewConstructor, ViewLifecycleHooks } from "../contracts/ViewInterface";

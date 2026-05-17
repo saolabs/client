@@ -1,8 +1,8 @@
 import { InitMode, InitModes } from "../contracts/common";
-import type { FragmentInterface, HtmlInterface, OneChildrenFactory, OneChildrenFactoryOutput, OneElementChildren } from "../contracts/ElementInterface";
+import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { generateUUID } from "../helpers/utils";
-import type { OneObjectType } from "../types/utils";
+import type { SaoObjectType } from "../types/utils";
 
 /**
  * Fragment — renders multiple root nodes into a parent without a wrapping tag.
@@ -14,13 +14,13 @@ import type { OneObjectType } from "../types/utils";
  * similar to Reactive but without the reactivity overhead.
  */
 export class Fragment implements FragmentInterface {
-    oneType: OneObjectType = 'Fragment';
+    saoType: SaoObjectType = 'Fragment';
     public parent: HtmlInterface | null;
     public nodes: Node[] = [];
     /** Tracked child element wrappers (Html, Output, Reactive, TextElement, etc.) */
-    public children: OneElementChildren = [];
+    public children: SaoElementChildren = [];
     private ctx: ViewControllerInterface;
-    private childrenFactory: OneChildrenFactory;
+    private childrenFactory: SaoChildrenFactory;
     public openTag: Comment;
     public closeTag: Comment;
     public id: string; // Unique ID for debugging and marker registry
@@ -39,7 +39,7 @@ export class Fragment implements FragmentInterface {
         id?: string | null, 
         initMode?: InitMode, 
         parentElement?: HtmlInterface | null, 
-        childrenFactory: OneChildrenFactory
+        childrenFactory: SaoChildrenFactory
     }) {
         this.ctx = ctx;
         this.parent = parentElement;
@@ -61,7 +61,7 @@ export class Fragment implements FragmentInterface {
         parentEl.appendChild(this.openTag);
 
         // Build children — compiled output uses (parentElement) => [...] signature
-        const output: OneChildrenFactoryOutput = this.childrenFactory(this.parent);
+        const output: SaoChildrenFactoryOutput = this.childrenFactory(this.parent);
 
         for (const child of output) {
             if (typeof child === 'string' || typeof child === 'number') {
@@ -93,7 +93,7 @@ export class Fragment implements FragmentInterface {
         parentEl.appendChild(this.closeTag);
     }
 
-    setChildrenFactory(factory: OneChildrenFactory): void {
+    setChildrenFactory(factory: SaoChildrenFactory): void {
         this.childrenFactory = factory;
     }
 
@@ -152,17 +152,17 @@ export class Fragment implements FragmentInterface {
         this.parent = null;
     }
 
-    get isOneElement(): boolean {
+    get isSaoElement(): boolean {
         return true;
     }
-    set isOneElement(value: boolean) {
+    set isSaoElement(value: boolean) {
         // No-op setter to satisfy the Interface; this property is always true for Fragment elements
     }
 
-    get isOneFragment(): boolean {
+    get isSaoFragment(): boolean {
         return true;
     }
-    set isOneFragment(value: boolean) {
+    set isSaoFragment(value: boolean) {
         // No-op setter to satisfy the Interface; this property is always true for Fragment elements
     }
 }

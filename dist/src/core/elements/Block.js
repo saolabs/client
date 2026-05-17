@@ -20,14 +20,14 @@ import markerRegistry from "../services/MarkerRegistry";
  */
 export class Block {
     constructor({ ctx, name, viewId = null, contentRenderFactory = (parentElement) => [], id = null, initMode = 'create' }) {
-        this.oneType = 'Block';
+        this.saoType = 'Block';
         this.viewId = null;
         this.fragment = null;
         this.contentRenderFactory = null;
         this.domChildren = [];
         this.parentElement = null;
         this.isOneBlock = true;
-        this.isOneElement = false;
+        this.isSaoElement = false;
         this.id = `${this.viewId}-${id ?? generateUUID(10)}`; // Unique ID for debugging
         this.ctx = ctx;
         this.name = name;

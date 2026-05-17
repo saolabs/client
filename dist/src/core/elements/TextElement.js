@@ -8,7 +8,7 @@ import { escapeHTML } from "../hellpers/utils";
  */
 export class TextElement {
     constructor({ ctx, parent = null, stateKeys = [], generateText = () => '', isEscapeHTML = true }) {
-        this.oneType = 'TextElement';
+        this.saoType = 'TextElement';
         this.statekeys = [];
         this.unsubscribe = null;
         this.generateText = () => this._text;
@@ -78,10 +78,10 @@ export class TextElement {
     set text(newText) {
         this.update(newText);
     }
-    get isOneElement() {
+    get isSaoElement() {
         return true;
     }
-    set isOneElement(value) {
+    set isSaoElement(value) {
         // No-op setter to satisfy the Interface; this property is always true for Text elements
     }
     get isOneText() {

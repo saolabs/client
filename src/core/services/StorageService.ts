@@ -47,7 +47,7 @@ export class StorageService {
     private listeners = new Map<string, StorageEventCallback[]>();
     private supported: boolean;
 
-    constructor(storageKey: string = 'oneview_storage') {
+    constructor(storageKey: string = 'saoview_storage') {
         this.storageKey = storageKey;
         this.supported = typeof localStorage !== 'undefined';
         if (this.supported) this.load();

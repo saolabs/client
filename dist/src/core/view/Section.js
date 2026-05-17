@@ -3,7 +3,7 @@ export class Section {
         this.ctx = null;
         this.subscribeFn = null;
         this.unsubscribeFn = null;
-        this.content = null; // Can be string or OneElementChildren depending on contentType
+        this.content = null; // Can be string or SaoElementChildren depending on contentType
         this.parentElement = null; // For dynamic/reactive sections that need a parent element reference
         this.isStarted = false; // Flag to indicate if this section is static (renders once) or dynamic/reactive (renders on state change)
         this.ctx = ctx ?? null;

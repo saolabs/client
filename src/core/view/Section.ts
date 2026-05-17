@@ -13,7 +13,7 @@ export class Section implements SectionInterface {
     subscribeFn: (() => void) | null = null;
     unsubscribeFn: (() => void) | null = null;
 
-    content: any = null; // Can be string or OneElementChildren depending on contentType
+    content: any = null; // Can be string or SaoElementChildren depending on contentType
 
     parentElement: HtmlInterface | undefined | null = null; // For dynamic/reactive sections that need a parent element reference
 

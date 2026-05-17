@@ -1,9 +1,9 @@
 import { InitModes } from "../contracts/common";
 import { generateUUID } from "../hellpers/utils";
-import { OneMarker } from "../services/MarkerService";
+import { SaoMarker } from "../services/MarkerService";
 export class YieldElement {
     constructor({ ctx, name = '', initMode = InitModes.CREATE, id = null, defaultValue = '' }) {
-        this.oneType = "Yield";
+        this.saoType = "Yield";
         this.contentFactory = () => [];
         this.initMode = InitModes.CREATE;
         this.domChildren = [];
@@ -14,7 +14,7 @@ export class YieldElement {
         this.initMode = initMode;
         this.id = id && id.length > 0 ? id : generateUUID();
         this.defaultValue = defaultValue;
-        const yeildMarker = (this.initMode === InitModes.HYDRATE) ? OneMarker.first('yield', this.id) : null;
+        const yeildMarker = (this.initMode === InitModes.HYDRATE) ? SaoMarker.first('yield', this.id) : null;
         if (yeildMarker) {
             this.openTag = yeildMarker.openTag;
             this.closeTag = yeildMarker.closeTag;
@@ -25,9 +25,9 @@ export class YieldElement {
         }
     }
     createMarkers() {
-        const key = OneMarker.addRegistry('yield', this.id, { name: this.name });
-        this.openTag = OneMarker.createOpenMarker('yield', this.id);
-        this.closeTag = OneMarker.createCloseMarker('yield', this.id);
+        const key = SaoMarker.addRegistry('yield', this.id, { name: this.name });
+        this.openTag = SaoMarker.createOpenMarker('yield', this.id);
+        this.closeTag = SaoMarker.createCloseMarker('yield', this.id);
     }
     setParentElement(parent) {
         this.parent = parent;
@@ -48,8 +48,8 @@ export class YieldElement {
         this.domChildren = [];
         this.parent = null;
     }
-    get isOneElement() { return true; }
-    set isOneElement(_) { }
+    get isSaoElement() { return true; }
+    set isSaoElement(_) { }
     get isOneYield() { return true; }
     set isOneYield(_) { }
 }
