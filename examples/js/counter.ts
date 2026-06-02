@@ -189,31 +189,31 @@ class CounterView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement: any) => [
-            this.html(`div-1`, "div", parentElement,
+            this.html(`d69e6b1d`, "div", parentElement,
                 { classes: [{ type: 'static', value: "counter-component" }] },
                 (parentElement: any) => [
-                this.html(`div-1-h4-1`, "h4", parentElement, {}, (parentElement: any) => [
+                this.html(`beab9ba1`, "h4", parentElement, {}, (parentElement: any) => [
                     this.text('Count: '),
-                    this.html(`div-1-h4-1-span-1`, "span", parentElement,
+                    this.html(`1eafe912`, "span", parentElement,
                         { attrs: { "id": { type: 'static', value: "counter-value" }, "data-count": { type: 'binding', value: `${count}`, factory: () => `${count}`, stateKeys: ["count"] } } },
                         (parentElement: any) => [
-                        this.output(`div-1-h4-1-span-1-output-1`, parentElement, true, ["count"], (parentElement: any) => count)
+                        this.output(`5ff3bd35`, parentElement, true, ["count"], (parentElement: any) => count)
                         ])
                 ]),
-                this.html(`div-1-div-2`, "div", parentElement,
+                this.html(`fccc82c8`, "div", parentElement,
                     { classes: [{ type: 'static', value: "btn-group" }] },
                     (parentElement: any) => [
-                    this.html(`div-1-div-2-button-1`, "button", parentElement,
+                    this.html(`aa23a7be`, "button", parentElement,
                         { classes: [{ type: 'static', value: "btn" }, { type: 'static', value: "btn-primary" }], events: { click: [{"handler":"decrement","params":[]}] } },
                         (parentElement: any) => [
                         this.text('-')
                         ]),
-                    this.html(`div-1-div-2-button-2`, "button", parentElement,
+                    this.html(`9ac7c16c`, "button", parentElement,
                         { classes: [{ type: 'static', value: "btn" }, { type: 'static', value: "btn-primary" }], events: { click: [{"handler":"increment","params":[]}] } },
                         (parentElement: any) => [
                         this.text('+')
                         ]),
-                    this.html(`div-1-div-2-button-3`, "button", parentElement,
+                    this.html(`f4cc6573`, "button", parentElement,
                         { classes: [{ type: 'static', value: "btn" }, { type: 'static', value: "btn-primary" }], events: { click: [{"handler":"reset","params":[]}] } },
                         (parentElement: any) => [
                         this.text('Reset')

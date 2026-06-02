@@ -135,20 +135,20 @@ class AwaitView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             this.block('block-content', 'content', (parentElement) => [
-            this.html(`block-content-div-1`, "div", parentElement, {}, (parentElement) => [
-                this.reactive(`block-content-div-1-rc-if-1`, "if", parentReactive, parentElement, [], (parentReactive, parentElement) => {
+            this.html(`e085b222`, "div", parentElement, {}, (parentElement) => [
+                this.reactive(`97d74020`, "if", parentReactive, parentElement, [], (parentReactive, parentElement) => {
                     const reactiveContents = [];
                     if (user) {
                         reactiveContents.push(
-                        this.html(`block-content-div-1-rc-if-1-case_1-h1-1`, "h1", parentElement, {}, (parentElement) => [
+                        this.html(`31dfc4e0`, "h1", parentElement, {}, (parentElement) => [
                             this.text('Welcome '),
-                            this.output(`block-content-div-1-rc-if-1-case_1-h1-1-output-1`, parentElement, true, [], (parentElement) => user.name)
+                            this.output(`79b5b43f`, parentElement, true, [], (parentElement) => user.name)
                         ])
                         );
                     }
                     else {
                         reactiveContents.push(
-                        this.html(`block-content-div-1-rc-if-1-case_2-p-1`, "p", parentElement, {}, (parentElement) => [
+                        this.html(`b1b84f18`, "p", parentElement, {}, (parentElement) => [
                             this.text('Please login first')
                         ])
                         );
@@ -156,20 +156,20 @@ class AwaitView extends View {
                     return reactiveContents;
                 })
             ]),
-            this.html(`block-content-div-2`, "div", parentElement, {}, (parentElement) => [
-                this.html(`block-content-div-2-button-1`, "button", parentElement,
+            this.html(`d30ec74f`, "div", parentElement, {}, (parentElement) => [
+                this.html(`225bae8d`, "button", parentElement,
                     { events: { click: [{"handler":"doAction","params":["login"]}] } },
                     (parentElement) => [
                     this.text('Login')
                     ]),
-                this.html(`block-content-div-2-button-2`, "button", parentElement,
+                this.html(`b284f53d`, "button", parentElement,
                     { events: { click: [{"handler":"doAction","params":["incrementCounter"]}] } },
                     (parentElement) => [
                     this.text('Increment Counter')
                     ]),
-                this.html(`block-content-div-2-p-3`, "p", parentElement, {}, (parentElement) => [
+                this.html(`732603d4`, "p", parentElement, {}, (parentElement) => [
                     this.text('Counter: '),
-                    this.output(`block-content-div-2-p-3-output-1`, parentElement, true, [], (parentElement) => counter)
+                    this.output(`e10fbb5c`, parentElement, true, [], (parentElement) => counter)
                 ])
             ])
             ]);

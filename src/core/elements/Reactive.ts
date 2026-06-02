@@ -1,9 +1,12 @@
 import { InitMode, InitModes } from "../contracts/common";
 import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface";
+import { MarkerModelInterface } from "../contracts/MarkerInterface";
 import type { ReactiveInterface, ReactiveChildrenFactory, ReactiveRenderFn } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { generateUUID } from "../helpers/utils";
+import { MarkerModel } from "../services/MarkerModel";
 import markerRegistry from "../services/MarkerRegistry";
+import { MarkerService, SaoMarker } from "../services/MarkerService";
 import type { SaoObjectType } from "../types/utils";
 
 /**
@@ -36,8 +39,9 @@ export class Reactive implements ReactiveInterface {
     public children: SaoElementChildren = [];
     private mounted: boolean = false;
     public stateKeys: string[];
-    public unsubscribe: () => void = () => {};
+    public unsubscribe: () => void = () => { };
     private _isStarted = false;
+    marker: MarkerModelInterface | null = null;
 
 
 
@@ -65,19 +69,42 @@ export class Reactive implements ReactiveInterface {
         this.ctx = ctx;
         this.parentElement = parentElement;
         this.parentReactive = parentReactive;
-        this.id = `${ctx.viewId}-${id || generateUUID(5)}`;
+        this.id = id ? id : `${ctx.viewId}-${generateUUID(5)}`;
         this.type = type;
         this.childrenFactory = childrenFactory;
         this.stateKeys = stateKeys;
         this.initMode = initMode;
-        markerRegistry.register('reactive', this.id, {
-            type: this.type,
-            stateKeys: this.stateKeys,
-            viewID: this.ctx.viewId,
-        });
 
-        this.openTag = markerRegistry.createMarkerStart('reactive', this.id);
-        this.closeTag = markerRegistry.createMarkerEnd('reactive', this.id);
+        if (this.initMode === InitModes.CREATE) {
+            markerRegistry.register('reactive', this.id, {
+                type: this.type,
+                stateKeys: this.stateKeys,
+                viewID: this.ctx.viewId,
+            });
+
+            this.openTag = markerRegistry.createMarkerStart('reactive', this.id);
+            this.closeTag = markerRegistry.createMarkerEnd('reactive', this.id);
+        }
+        else {
+            const marker = SaoMarker.first('reactive', this.id);
+            if (marker) {
+                this.marker = marker;
+                this.openTag = marker.openTag;
+                this.closeTag = marker.closeTag;
+            } else {
+                this.openTag = markerRegistry.createMarkerStart('reactive', this.id);
+                this.closeTag = markerRegistry.createMarkerEnd('reactive', this.id);
+                this.marker = new MarkerModel({
+                    tagName: 's:r',
+                    name: 'reactive',
+                    markerID: this.id,
+                    openTag: this.openTag,
+                    closeTag: this.closeTag,
+                    attributes: {},
+                    children: []
+                });
+            }
+        }
     }
 
     setParentElement(parent: HtmlInterface | null): void {
@@ -208,7 +235,7 @@ export class Reactive implements ReactiveInterface {
 
         if (this.unsubscribe) {
             this.unsubscribe();
-            this.unsubscribe = () => {};
+            this.unsubscribe = () => { };
         }
 
         // Recursively stop children

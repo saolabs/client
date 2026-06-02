@@ -108,22 +108,22 @@ class TestYieldLayoutView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.html(`div-1`, "div", parentElement,
+            this.html(`d69e6b1d`, "div", parentElement,
                 { classes: [{ type: 'static', value: "app-layout" }] },
                 (parentElement) => [
-                this.html(`div-1-header-1`, "header", parentElement, {}, (parentElement) => [
-                    this.html(`div-1-header-1-h1-1`, "h1", parentElement, {}, (parentElement) => [
+                this.html(`b4c38ce1`, "header", parentElement, {}, (parentElement) => [
+                    this.html(`a5affa9a`, "h1", parentElement, {}, (parentElement) => [
                         this.text('@yield(\'title\', \'Default Title\')')
                     ]),
-                    this.html(`div-1-header-1-nav-2`, "nav", parentElement, {}, (parentElement) => [
+                    this.html(`dc5dcde4`, "nav", parentElement, {}, (parentElement) => [
                         this.text('@yield(\'nav\')')
                     ])
                 ]),
-                this.html(`div-1-main-2`, "main", parentElement, {}, (parentElement) => [
-                    this.yield("div-1-main-2-yield-1", "content", null, parentElement)
+                this.html(`338c536e`, "main", parentElement, {}, (parentElement) => [
+                    this.yield(`efa5f298`, "content", null, parentElement)
                 ]),
-                this.html(`div-1-footer-3`, "footer", parentElement, {}, (parentElement) => [
-                    this.yield("div-1-footer-3-yield-1", "footer", '<p>Default Footer</p>', parentElement)
+                this.html(`04d65fe4`, "footer", parentElement, {}, (parentElement) => [
+                    this.yield(`71c047e9`, "footer", '<p>Default Footer</p>', parentElement)
                 ])
                 ])
             ]);

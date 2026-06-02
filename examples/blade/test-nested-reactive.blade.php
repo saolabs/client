@@ -10,126 +10,126 @@
 @const([$count, $setCount] = useState(0))
 @const([$showDetails, $setShowDetails] = useState(true))
 @wrapper
-<div @class([$__VIEW_ID__ . '-div-1', 'nested-reactive-demo'])>
+<div @class([$__VIEW_ID__ . '-d69e6b1d', 'nested-reactive-demo'])>
     {{-- Level 1: @if with output --}}
-    <h2 @class([$__VIEW_ID__ . '-div-1-h2-1'])>Total items: @startMarker('output', 'div-1-h2-1-output-1'){{ count($items) }}@endMarker('output', 'div-1-h2-1-output-1')</h2>
-    <p @class([$__VIEW_ID__ . '-div-1-p-2'])>Status: @startMarker('output', 'div-1-p-2-output-1'){{ $status }}@endMarker('output', 'div-1-p-2-output-1')</p>
+    <h2 @class([$__VIEW_ID__ . '-9d70118d'])>Total items: @startMarker('output', '57d9b60b'){{ count($items) }}@endMarker('output', '57d9b60b')</h2>
+    <p @class([$__VIEW_ID__ . '-96323a6c'])>Status: @startMarker('output', '4ed23a9a'){{ $status }}@endMarker('output', '4ed23a9a')</p>
 
     {{-- Level 1: @if block → Level 2: @foreach → Level 3: @if + output --}}
-    @startMarker('reactive', 'div-1-rc-if-1', ['stateKey' => ['showDetails'], 'type' => 'if'])
+    @startMarker('reactive', '8304c314', ['stateKey' => ['showDetails'], 'type' => 'if'])
     @if($showDetails)
-        <div @class([$__VIEW_ID__ . '-div-1-rc-if-1-case_1-div-1', 'details-panel'])>
-            <h3 @class([$__VIEW_ID__ . '-div-1-rc-if-1-case_1-div-1-h3-1'])>Item Details (count: @startMarker('output', 'div-1-rc-if-1-case_1-div-1-h3-1-output-1'){{ $count }}@endMarker('output', 'div-1-rc-if-1-case_1-div-1-h3-1-output-1'))</h3>
-            @startMarker('reactive', 'div-1-rc-if-1-case_1-div-1-foreach-1', ['stateKey' => ['items'], 'type' => 'foreach'])
+        <div @class([$__VIEW_ID__ . '-c0d851d9', 'details-panel'])>
+            <h3 @class([$__VIEW_ID__ . '-e240b46f'])>Item Details (count: @startMarker('output', 'a4ea9243'){{ $count }}@endMarker('output', 'a4ea9243'))</h3>
+            @startMarker('reactive', '902f863d', ['stateKey' => ['items'], 'type' => 'foreach'])
             @foreach($items as $item)
-                <div @class([$__VIEW_ID__ . "-div-1-rc-if-1-case_1-div-1-foreach-1-{$loop->index}-div-1", 'item-card']) @attr(['data-id' => $item->id])>
-                    <strong @class([$__VIEW_ID__ . "-div-1-rc-if-1-case_1-div-1-foreach-1-{$loop->index}-div-1-strong-1"])>{{ $item->name }}</strong> - ${{ $item->price }}
+                <div @class([$__VIEW_ID__ . "-b694ec4d-{$loop->index}", 'item-card']) @attr(['data-id' => $item->id])>
+                    <strong @class([$__VIEW_ID__ . "-09a1f0cb-{$loop->index}"])>{{ $item->name }}</strong> - ${{ $item->price }}
 
                     {{-- Level 3: nested @if inside @foreach inside @if --}}
-                    @startMarker('reactive', 'div-1-rc-if-1-case_1-div-1-foreach-1-div-1-rc-if-1', ['stateKey' => [], 'type' => 'if'])
+                    @startMarker('reactive', "cd817d05-{$loop->index}", ['stateKey' => [], 'type' => 'if'])
                     @if($item->price > 2)
-                        <span @class([$__VIEW_ID__ . "-div-1-rc-if-1-case_1-div-1-foreach-1-{$loop->index}-div-1-rc-if-1-case_1-span-1", 'badge', 'expensive'])>Expensive</span>
+                        <span @class([$__VIEW_ID__ . "-3c490cef-{$loop->index}", 'badge', 'expensive'])>Expensive</span>
                     @else
-                        <span @class([$__VIEW_ID__ . "-div-1-rc-if-1-case_1-div-1-foreach-1-{$loop->index}-div-1-rc-if-1-case_2-span-1", 'badge', 'cheap'])>Affordable</span>
+                        <span @class([$__VIEW_ID__ . "-5ba7666b-{$loop->index}", 'badge', 'cheap'])>Affordable</span>
                     @endif
-                    @endMarker('reactive', 'div-1-rc-if-1-case_1-div-1-foreach-1-div-1-rc-if-1')
+                    @endMarker('reactive', "cd817d05-{$loop->index}")
 
                     {{-- Level 3: nested @foreach inside @foreach (tags) --}}
-                    <div @class([$__VIEW_ID__ . "-div-1-rc-if-1-case_1-div-1-foreach-1-{$loop->index}-div-1-div-2", 'tags'])>
+                    <div @class([$__VIEW_ID__ . "-096ac143-{$loop->index}", 'tags'])>
                         @foreach($item->tags as $tag)
-                            <span @class([$__VIEW_ID__ . "-div-1-rc-if-1-case_1-div-1-foreach-1-{$loop->index}-div-1-div-2-foreach-1-{$loop->index}-span-1", 'tag'])>{{ $tag }}</span>
+                            <span @class([$__VIEW_ID__ . "-69ab6ad3-{$loop->index}-{$loop->index}", 'tag'])>{{ $tag }}</span>
                         @endforeach
                     </div>
                 </div>
             @endforeach
-            @endMarker('reactive', 'div-1-rc-if-1-case_1-div-1-foreach-1')
+            @endMarker('reactive', '902f863d')
         </div>
     @else
-        <p @class([$__VIEW_ID__ . '-div-1-rc-if-1-case_2-p-1'])>Details hidden. Click to show.</p>
+        <p @class([$__VIEW_ID__ . '-f08cfbae'])>Details hidden. Click to show.</p>
     @endif
-    @endMarker('reactive', 'div-1-rc-if-1')
+    @endMarker('reactive', '8304c314')
 
     {{-- Level 1: @switch block --}}
-    @startMarker('reactive', 'div-1-rc-switch-2', ['stateKey' => ['status'], 'type' => 'switch'])
+    @startMarker('reactive', '87da1671', ['stateKey' => ['status'], 'type' => 'switch'])
     @switch($status)
         @case('active')
-            <div @class([$__VIEW_ID__ . '-div-1-rc-switch-2-case_1-div-1', 'status-active'])>
-                <p @class([$__VIEW_ID__ . '-div-1-rc-switch-2-case_1-div-1-p-1'])>System is active</p>
+            <div @class([$__VIEW_ID__ . '-17b81f01', 'status-active'])>
+                <p @class([$__VIEW_ID__ . '-d566c824'])>System is active</p>
                 {{-- Level 2: @for inside @switch --}}
-                @startMarker('reactive', 'div-1-rc-switch-2-case_1-div-1-for-1', ['stateKey' => ['count'], 'type' => 'for'])
+                @startMarker('reactive', 'fecf94b7', ['stateKey' => ['count'], 'type' => 'for'])
                 @for($i = 0; $i < $count; $i++)
-                    <div @class([$__VIEW_ID__ . "-div-1-rc-switch-2-case_1-div-1-for-1-{$i}-div-1", 'counter-item'])>
+                    <div @class([$__VIEW_ID__ . "-c89d0a72-{$i}", 'counter-item'])>
                         Item #{{ $i + 1 }}
-                        @startMarker('reactive', 'div-1-rc-switch-2-case_1-div-1-for-1-div-1-rc-if-1', ['stateKey' => [], 'type' => 'if'])
+                        @startMarker('reactive', "308be5af-{$i}", ['stateKey' => [], 'type' => 'if'])
                         @if($i % 2 === 0)
-                            <span @class([$__VIEW_ID__ . "-div-1-rc-switch-2-case_1-div-1-for-1-{$i}-div-1-rc-if-1-case_1-span-1"])>(even)</span>
+                            <span @class([$__VIEW_ID__ . "-2dbe1b86-{$i}"])>(even)</span>
                         @else
-                            <span @class([$__VIEW_ID__ . "-div-1-rc-switch-2-case_1-div-1-for-1-{$i}-div-1-rc-if-1-case_2-span-1"])>(odd)</span>
+                            <span @class([$__VIEW_ID__ . "-85813a75-{$i}"])>(odd)</span>
                         @endif
-                        @endMarker('reactive', 'div-1-rc-switch-2-case_1-div-1-for-1-div-1-rc-if-1')
+                        @endMarker('reactive', "308be5af-{$i}")
                     </div>
                 @endfor
-                @endMarker('reactive', 'div-1-rc-switch-2-case_1-div-1-for-1')
+                @endMarker('reactive', 'fecf94b7')
             </div>
             @break
         @case('inactive')
-            <div @class([$__VIEW_ID__ . '-div-1-rc-switch-2-case_2-div-1', 'status-inactive'])>
-                <p @class([$__VIEW_ID__ . '-div-1-rc-switch-2-case_2-div-1-p-1'])>System is inactive</p>
+            <div @class([$__VIEW_ID__ . '-5e0e01f9', 'status-inactive'])>
+                <p @class([$__VIEW_ID__ . '-ff6f5732'])>System is inactive</p>
             </div>
             @break
         @default
-            <div @class([$__VIEW_ID__ . '-div-1-rc-switch-2-case_3-div-1', 'status-unknown'])>
-                <p @class([$__VIEW_ID__ . '-div-1-rc-switch-2-case_3-div-1-p-1'])>Unknown status: @startMarker('output', 'div-1-rc-switch-2-case_3-div-1-p-1-output-1'){{ $status }}@endMarker('output', 'div-1-rc-switch-2-case_3-div-1-p-1-output-1')</p>
+            <div @class([$__VIEW_ID__ . '-e624844c', 'status-unknown'])>
+                <p @class([$__VIEW_ID__ . '-a9edb396'])>Unknown status: @startMarker('output', '12037c02'){{ $status }}@endMarker('output', '12037c02')</p>
             </div>
     @endswitch
-    @endMarker('reactive', 'div-1-rc-switch-2')
+    @endMarker('reactive', '87da1671')
 
     {{-- Level 1: @foreach with complex nesting --}}
-    <div @class([$__VIEW_ID__ . '-div-1-div-3', 'category-groups'])>
-        @startMarker('reactive', 'div-1-div-3-foreach-1', ['stateKey' => ['items'], 'type' => 'foreach'])
+    <div @class([$__VIEW_ID__ . '-6b7c3ec4', 'category-groups'])>
+        @startMarker('reactive', '9e7541ab', ['stateKey' => ['items'], 'type' => 'foreach'])
         @foreach($items as $key => $item)
-            <div @class([$__VIEW_ID__ . "-div-1-div-3-foreach-1-{$loop->index}-div-1", 'group'])>
-                <h4 @class([$__VIEW_ID__ . "-div-1-div-3-foreach-1-{$loop->index}-div-1-h4-1"])>[{{ $key }}] {{ $item->name }} ({{ $item->category }})</h4>
+            <div @class([$__VIEW_ID__ . "-a5dc4800-{$loop->index}", 'group'])>
+                <h4 @class([$__VIEW_ID__ . "-257a304c-{$loop->index}"])>[{{ $key }}] {{ $item->name }} ({{ $item->category }})</h4>
 
                 {{-- Level 2: @switch inside @foreach --}}
-                @startMarker('reactive', 'div-1-div-3-foreach-1-div-1-rc-switch-1', ['stateKey' => [], 'type' => 'switch'])
+                @startMarker('reactive', "be70c31c-{$loop->index}", ['stateKey' => [], 'type' => 'switch'])
                 @switch($item->category)
                     @case('fruit')
-                        <span @class([$__VIEW_ID__ . "-div-1-div-3-foreach-1-{$loop->index}-div-1-rc-switch-1-case_1-span-1", 'icon'])>🍎</span>
+                        <span @class([$__VIEW_ID__ . "-6c67bd33-{$loop->index}", 'icon'])>🍎</span>
                         @break
                     @case('vegetable')
-                        <span @class([$__VIEW_ID__ . "-div-1-div-3-foreach-1-{$loop->index}-div-1-rc-switch-1-case_2-span-1", 'icon'])>🥦</span>
+                        <span @class([$__VIEW_ID__ . "-75a19431-{$loop->index}", 'icon'])>🥦</span>
                         @break
                 @endswitch
-                @endMarker('reactive', 'div-1-div-3-foreach-1-div-1-rc-switch-1')
+                @endMarker('reactive', "be70c31c-{$loop->index}")
 
                 {{-- Level 2: @if with nested @foreach --}}
-                @startMarker('reactive', 'div-1-div-3-foreach-1-div-1-rc-if-2', ['stateKey' => [], 'type' => 'if'])
+                @startMarker('reactive', "6600da4e-{$loop->index}", ['stateKey' => [], 'type' => 'if'])
                 @if(count($item->tags) > 1)
-                    <ul @class([$__VIEW_ID__ . "-div-1-div-3-foreach-1-{$loop->index}-div-1-rc-if-2-case_1-ul-1"])>
+                    <ul @class([$__VIEW_ID__ . "-887408bb-{$loop->index}"])>
                         @foreach($item->tags as $idx => $tag)
-                            <li @class([$__VIEW_ID__ . "-div-1-div-3-foreach-1-{$loop->index}-div-1-rc-if-2-case_1-ul-1-foreach-1-{$loop->index}-li-1"])>
+                            <li @class([$__VIEW_ID__ . "-51b02d05-{$loop->index}-{$loop->index}"])>
                                 Tag {{ $idx }}: {{ $tag }}
-                                @startMarker('reactive', 'div-1-div-3-foreach-1-div-1-rc-if-2-case_1-ul-1-foreach-1-li-1-rc-if-1', ['stateKey' => [], 'type' => 'if'])
+                                @startMarker('reactive', "809bb5e9-{$loop->index}-{$loop->index}", ['stateKey' => [], 'type' => 'if'])
                                 @if($tag === 'sweet')
-                                    <em @class([$__VIEW_ID__ . "-div-1-div-3-foreach-1-{$loop->index}-div-1-rc-if-2-case_1-ul-1-foreach-1-{$loop->index}-li-1-rc-if-1-case_1-em-1"])> ← popular!</em>
+                                    <em @class([$__VIEW_ID__ . "-27607e6e-{$loop->index}-{$loop->index}"])> ← popular!</em>
                                 @endif
-                                @endMarker('reactive', 'div-1-div-3-foreach-1-div-1-rc-if-2-case_1-ul-1-foreach-1-li-1-rc-if-1')
+                                @endMarker('reactive', "809bb5e9-{$loop->index}-{$loop->index}")
                             </li>
                         @endforeach
                     </ul>
                 @else
-                    <p @class([$__VIEW_ID__ . "-div-1-div-3-foreach-1-{$loop->index}-div-1-rc-if-2-case_2-p-1"])>Only one tag: {{ $item->tags[0] }}</p>
+                    <p @class([$__VIEW_ID__ . "-89200765-{$loop->index}"])>Only one tag: {{ $item->tags[0] }}</p>
                 @endif
-                @endMarker('reactive', 'div-1-div-3-foreach-1-div-1-rc-if-2')
+                @endMarker('reactive', "6600da4e-{$loop->index}")
             </div>
         @endforeach
-        @endMarker('reactive', 'div-1-div-3-foreach-1')
+        @endMarker('reactive', '9e7541ab')
     </div>
 
     {{-- Include with state vars --}}
-    @startMarker('component', 'div-1-component-1')
+    @startMarker('component', '64cf91d6')
     @include('components.item-card', ['items'=> $items, 'count'=> $count])
-    @endMarker('component', 'div-1-component-1')
+    @endMarker('component', '64cf91d6')
 </div>
 @endWrapper

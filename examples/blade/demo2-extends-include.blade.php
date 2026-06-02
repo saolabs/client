@@ -18,52 +18,52 @@
 
 @extends($__layout__ . 'base')
 @block('content')
-    @startMarker('component', 'block-content-component-1')
+    @startMarker('component', '501029e0')
     @include($__template__ . 'header')
-    @endMarker('component', 'block-content-component-1')
-    <div @class([$__VIEW_ID__ . '-block-content-div-1', 'demo', 'active'=> $status]) @attr(['dataCount'=> count($demoList), 'dataUserName'=> $user->name])>
-        <h1 @class([$__VIEW_ID__ . '-block-content-div-1-h1-1'])>Hello, @startMarker('output', 'block-content-div-1-h1-1-output-1'){{ $user->name }}@endMarker('output', 'block-content-div-1-h1-1-output-1')!</h1>
-        <p @class([$__VIEW_ID__ . '-block-content-div-1-p-2'])>Your email is <span @class([$__VIEW_ID__ . '-block-content-div-1-p-2-span-1'])>@startMarker('output', 'block-content-div-1-p-2-span-1-output-1'){{ $user->email }}@endMarker('output', 'block-content-div-1-p-2-span-1-output-1')</span>.</p>
+    @endMarker('component', '501029e0')
+    <div @class([$__VIEW_ID__ . '-e085b222', 'demo', 'active'=> $status]) @attr(['dataCount'=> count($demoList), 'dataUserName'=> $user->name])>
+        <h1 @class([$__VIEW_ID__ . '-06fe9377'])>Hello, @startMarker('output', '34dcf3fa'){{ $user->name }}@endMarker('output', '34dcf3fa')!</h1>
+        <p @class([$__VIEW_ID__ . '-f0393273'])>Your email is <span @class([$__VIEW_ID__ . '-d17cd335'])>@startMarker('output', '8615be57'){{ $user->email }}@endMarker('output', '8615be57')</span>.</p>
 
-        <button @class([$__VIEW_ID__ . '-block-content-div-1-button-3'])>Toggle Status: @startMarker('output', 'block-content-div-1-button-3-output-1'){{ $status ? 'On' : 'Off' }}@endMarker('output', 'block-content-div-1-button-3-output-1')</button>
+        <button @class([$__VIEW_ID__ . '-21f51b84'])>Toggle Status: @startMarker('output', 'a24990ac'){{ $status ? 'On' : 'Off' }}@endMarker('output', 'a24990ac')</button>
 
-        <h2 @class([$__VIEW_ID__ . '-block-content-div-1-h2-4'])>Posts:</h2>
-        <ul @class([$__VIEW_ID__ . '-block-content-div-1-ul-5'])>
-            @startMarker('reactive', 'block-content-div-1-ul-5-rc-if-1', ['stateKey' => ['posts'], 'type' => 'if'])
+        <h2 @class([$__VIEW_ID__ . '-7a87cfa0'])>Posts:</h2>
+        <ul @class([$__VIEW_ID__ . '-7ad81052'])>
+            @startMarker('reactive', '40a9567d', ['stateKey' => ['posts'], 'type' => 'if'])
             @if(count($posts) === 0)
-                <li @class([$__VIEW_ID__ . '-block-content-div-1-ul-5-rc-if-1-case_1-li-1'])>No posts available.</li>
+                <li @class([$__VIEW_ID__ . '-091f500d'])>No posts available.</li>
             @else
-                @startMarker('reactive', 'block-content-div-1-ul-5-rc-if-1-case_2-foreach-1', ['stateKey' => ['posts'], 'type' => 'foreach'])
+                @startMarker('reactive', 'f47cbfd6', ['stateKey' => ['posts'], 'type' => 'foreach'])
                 @foreach($posts as $post)
-                    <li @class([$__VIEW_ID__ . "-block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-{$loop->index}-li-1"])>
-                        <h3 @class([$__VIEW_ID__ . "-block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-{$loop->index}-li-1-h3-1"])>{{ $post->title }}</h3>
-                        <p @class([$__VIEW_ID__ . "-block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-{$loop->index}-li-1-p-2"])>{{ $post->content }}</p>
+                    <li @class([$__VIEW_ID__ . "-bce9cd15-{$loop->index}"])>
+                        <h3 @class([$__VIEW_ID__ . "-54dc212f-{$loop->index}"])>{{ $post->title }}</h3>
+                        <p @class([$__VIEW_ID__ . "-a90ddb5d-{$loop->index}"])>{{ $post->content }}</p>
                     </li>
                 @endforeach
-                @endMarker('reactive', 'block-content-div-1-ul-5-rc-if-1-case_2-foreach-1')
+                @endMarker('reactive', 'f47cbfd6')
             @endif
-            @endMarker('reactive', 'block-content-div-1-ul-5-rc-if-1')
+            @endMarker('reactive', '40a9567d')
         </ul>
-        <div @class([$__VIEW_ID__ . '-block-content-div-1-div-6', 'while-loop-demo'])>
-            @startMarker('while', 'block-content-div-1-div-6-while-1', ['start' => $i, 'end' => 5])
+        <div @class([$__VIEW_ID__ . '-0158164e', 'while-loop-demo'])>
+            @startMarker('while', 'c8bde4a7', ['start' => $i, 'end' => 5])
             @while($i < 5)
-                <p @class([$__VIEW_ID__ . "-block-content-div-1-div-6-while-1-{$i}-p-1"])>Counter: {{ $i }}</p>
+                <p @class([$__VIEW_ID__ . "-03ca1bcb-{$i}"])>Counter: {{ $i }}</p>
                 @exec($i++)
             @endwhile
-            @endMarker('while', 'block-content-div-1-div-6-while-1')
+            @endMarker('while', 'c8bde4a7')
         </div>
 
     </div>
-    @startMarker('component', 'block-content-component-2')
+    @startMarker('component', '142a7e71')
     @include($__template__ . 'post-list', ['posts' => $posts, 'name' => "test"])
-    @endMarker('component', 'block-content-component-2')
-    @startMarker('component', 'block-content-component-3')
+    @endMarker('component', '142a7e71')
+    @startMarker('component', 'cf91f6e1')
     @exec($__env->startSection($__ONE_COMPONENT_REGISTRY__['Footer'].'_0'))
-@startMarker('component', 'block-content-component-3-component-1')
+@startMarker('component', '2084c3f0')
 @include($__template__ . 'post-list', ['posts' => $posts, 'name' => "test"])
-@endMarker('component', 'block-content-component-3-component-1')
+@endMarker('component', '2084c3f0')
 @exec($__env->stopSection())
 @exec($__Footer__0_content = $__env->yieldContent($__ONE_COMPONENT_REGISTRY__['Footer'].'_0'))
 @include($__template__ . 'footer', ['__ONE_CHILDREN_CONTENT__' => $__Footer__0_content])
-@endMarker('component', 'block-content-component-3')
+@endMarker('component', 'cf91f6e1')
 @endblock

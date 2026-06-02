@@ -1,11 +1,14 @@
 import { InitMode, InitModes } from "../contracts/common";
-import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElementChildren, WrapperInterface } from "../contracts/ElementInterface";
+import type { DOMElement, FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElement, SaoElementChildren, WrapperInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { app } from "../helpers/app";
 import { generateUUID } from "../helpers/utils";
+import { mountElementList } from "../helpers/view";
 import { MarkerRegistryService } from "../services";
 import { MarkerService } from "../services/MarkerService";
 import type { SaoObjectType } from "../types/utils";
+import { Html } from "./Html";
+import { TextElement } from "./TextElement";
 
 /**
  * Wrapper — renders multiple root nodes into a parent without a wrapping tag.
@@ -50,7 +53,7 @@ export class Wrapper implements WrapperInterface {
 
         this.init();
         const registry = app<MarkerRegistryService>("Registry");
-        if(this.initMode === InitModes.HYDRATE){
+        if (this.initMode === InitModes.HYDRATE) {
             const markerService: MarkerService = app<MarkerService>(MarkerService);
             const viewMarker = markerService.first('view', this.id);
             if (viewMarker) {
@@ -60,7 +63,7 @@ export class Wrapper implements WrapperInterface {
                 this.openTag = registry.createMarkerStart('view', this.id);
                 this.closeTag = registry.createMarkerEnd('view', this.id);
                 console.warn(`Wrapper hydration failed: no marker found for view ID ${this.id}`);
-                
+
             }
         }
         else {
@@ -70,26 +73,35 @@ export class Wrapper implements WrapperInterface {
 
     }
 
-    init(){
-        
+    init() {
+
     }
 
 
     setParentElement(parent: HtmlInterface | null): void {
         this.parent = parent;
     }
-    render(): void {
-        
-        
+    render(): SaoElementChildren {
+        this.children = [];
+        const children = this.childrenFactory(this.parent);
+        this.children = children.map((child: SaoElement | DOMElement | string | number) => {
+            if (typeof child === 'string' || typeof child === 'number') {
+                return new TextElement({ ctx: this.ctx, parent: this.parent, stateKeys: [], generateText: () => String(child) });
+            }
+            return child;
+        });
+        return this.children;
+    }
+    appendTo(parent: HtmlInterface): void {
+        this.parent = parent;
+        this.parent.appendElement(this.openTag);
+        mountElementList(this.parent, this.render());
+        this.parent.appendElement(this.closeTag);
     }
 
     mountTo(parent: HtmlInterface): void {
-        if(this.parent){
-            this.parent.clearHTML();
-        }
-        this.parent = parent;
         parent.clearHTML();
-
+        this.appendTo(parent);
     }
 
     setChildrenFactory(factory: SaoChildrenFactory): void {

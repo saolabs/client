@@ -110,13 +110,13 @@ class TestFetchDynamicView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.html(`div-1`, "div", parentElement, {}, (parentElement) => [
-                this.html(`div-1-h2-1`, "h2", parentElement, {}, (parentElement) => [
+            this.html(`d69e6b1d`, "div", parentElement, {}, (parentElement) => [
+                this.html(`9d70118d`, "h2", parentElement, {}, (parentElement) => [
                     this.text('Items')
                 ]),
                 this.__foreach(items, (item, __loopKey, __loopIndex, __loop) => [
-                        this.html(`div-1-foreach-1-${__loopIndex + 1}-p-1`, "p", parentElement, {}, (parentElement) => [
-                            this.output(`div-1-foreach-1-${__loopIndex + 1}-p-1-output-1`, parentElement, true, [], (parentElement) => item.name)
+                        this.html(`c88c9722-${__loopIndex + 1}`, "p", parentElement, {}, (parentElement) => [
+                            this.output(`bae8de25-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => item.name)
                         ])
                 ])
             ])

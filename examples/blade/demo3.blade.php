@@ -2,7 +2,7 @@
 
 @useState($isOpen, false)
 @wrapper
-<div @class([$__VIEW_ID__ . '-div-1', 'demo3-component'])>
-    Status: @startMarker('output', 'div-1-output-1'){{ $isOpen ? 'Open' : 'Closed' }}@endMarker('output', 'div-1-output-1')
+<div @class([$__VIEW_ID__ . '-d69e6b1d', 'demo3-component'])>
+    Status: @startMarker('output', 'fd128df1'){{ $isOpen ? 'Open' : 'Closed' }}@endMarker('output', 'fd128df1')
 </div>
 @endWrapper

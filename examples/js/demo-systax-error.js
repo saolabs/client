@@ -111,11 +111,11 @@ class DemoSystaxErrorView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.html(`h1-1`, "h1", parentElement, {}, (parentElement) => [
-                this.output(`h1-1-output-1`, parentElement, true, [], (parentElement) => title)
+            this.html(`bca678f9`, "h1", parentElement, {}, (parentElement) => [
+                this.output(`d11262e8`, parentElement, true, [], (parentElement) => title)
             ]),
-            this.html(`p-2`, "p", parentElement, {}, (parentElement) => [
-                this.output(`p-2-output-1`, parentElement, true, [], (parentElement) => content)
+            this.html(`3d142d4a`, "p", parentElement, {}, (parentElement) => [
+                this.output(`6139101f`, parentElement, true, [], (parentElement) => content)
             ])
             ]);
             }

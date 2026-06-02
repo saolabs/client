@@ -30,137 +30,137 @@
 @const($MAX_COUNT = 10)
 @let($n = 0)
 @wrapper
-<div @class([$__VIEW_ID__ . '-div-1', 'input-demo'])>
-        <h2 @class([$__VIEW_ID__ . '-div-1-h2-1'])>Input State Demo</h2>
-        <div @class([$__VIEW_ID__ . '-div-1-div-2', 'users'])>
-            <h3 @class([$__VIEW_ID__ . '-div-1-div-2-h3-1'])>Users</h3>
-            <ul @class([$__VIEW_ID__ . '-div-1-div-2-ul-2'])>
+<div @class([$__VIEW_ID__ . '-d69e6b1d', 'input-demo'])>
+        <h2 @class([$__VIEW_ID__ . '-9d70118d'])>Input State Demo</h2>
+        <div @class([$__VIEW_ID__ . '-fccc82c8', 'users'])>
+            <h3 @class([$__VIEW_ID__ . '-bb95914d'])>Users</h3>
+            <ul @class([$__VIEW_ID__ . '-fabeb0e6'])>
                 @foreach($users as $user)
-                    <li @class([$__VIEW_ID__ . "-div-1-div-2-ul-2-foreach-1-{$loop->index}-li-1"])>{{ $user->name }} ({{ $user->email }})</li>
+                    <li @class([$__VIEW_ID__ . "-51785291-{$loop->index}"])>{{ $user->name }} ({{ $user->email }})</li>
                 @endforeach
             </ul>
         </div>
-        <div @class([$__VIEW_ID__ . '-div-1-div-3', 'posts'])>
-            <h3 @class([$__VIEW_ID__ . '-div-1-div-3-h3-1'])>Posts</h3>
-            <ul @class([$__VIEW_ID__ . '-div-1-div-3-ul-2'])>
+        <div @class([$__VIEW_ID__ . '-6b7c3ec4', 'posts'])>
+            <h3 @class([$__VIEW_ID__ . '-3c11cc9f'])>Posts</h3>
+            <ul @class([$__VIEW_ID__ . '-03a5e96a'])>
                 @foreach($posts as $post)
-                    <li @class([$__VIEW_ID__ . "-div-1-div-3-ul-2-foreach-1-{$loop->index}-li-1"])><strong @class([$__VIEW_ID__ . "-div-1-div-3-ul-2-foreach-1-{$loop->index}-li-1-strong-1"])>{{ $post->title }}</strong>: {{ $post->content }}</li>
+                    <li @class([$__VIEW_ID__ . "-4f286c4f-{$loop->index}"])><strong @class([$__VIEW_ID__ . "-b2511220-{$loop->index}"])>{{ $post->title }}</strong>: {{ $post->content }}</li>
                 @endforeach
             </ul>
         </div>
     </div>
-    <div @class([$__VIEW_ID__ . '-div-2', 'todos-demo'])>
-        <h2 @class([$__VIEW_ID__ . '-div-2-h2-1'])>Todos</h2>
-        <ul @class([$__VIEW_ID__ . '-div-2-ul-2'])>
-            @startMarker('reactive', 'div-2-ul-2-foreach-1', ['stateKey' => ['todos'], 'type' => 'foreach'])
+    <div @class([$__VIEW_ID__ . '-eced4db6', 'todos-demo'])>
+        <h2 @class([$__VIEW_ID__ . '-e2fbe38d'])>Todos</h2>
+        <ul @class([$__VIEW_ID__ . '-bcf6c3a3'])>
+            @startMarker('reactive', '9605f90b', ['stateKey' => ['todos'], 'type' => 'foreach'])
             @foreach($todos as $todo)
-                <li @class([$__VIEW_ID__ . "-div-2-ul-2-foreach-1-{$loop->index}-li-1"])>
-                    <label @class([$__VIEW_ID__ . "-div-2-ul-2-foreach-1-{$loop->index}-li-1-label-1"])>
-                        <input @class([$__VIEW_ID__ . "-div-2-ul-2-foreach-1-{$loop->index}-li-1-label-1-input-1"]) @attr(['type' => 'checkbox']) @bind($todo->completed) @checked($todo->completed) />
+                <li @class([$__VIEW_ID__ . "-d8484f9d-{$loop->index}"])>
+                    <label @class([$__VIEW_ID__ . "-9d96460a-{$loop->index}"])>
+                        <input @class([$__VIEW_ID__ . "-f73b73c3-{$loop->index}"]) @attr(['type' => 'checkbox']) @bind($todo->completed) @checked($todo->completed) />
                         {{ $todo->task }}
                     </label>
 
                 </li>
             @endforeach
-            @endMarker('reactive', 'div-2-ul-2-foreach-1')
+            @endMarker('reactive', '9605f90b')
         </ul>
-        <div @class([$__VIEW_ID__ . '-div-2-div-3', 'is-edit-mode'])>
-            <input @class([$__VIEW_ID__ . '-div-2-div-3-input-1']) @attr(['type' => 'text', 'placeholder' => 'Nhập công việc mới']) @bind($newTodo) />
-            <button @class([$__VIEW_ID__ . '-div-2-div-3-button-2'])>+</button>
+        <div @class([$__VIEW_ID__ . '-a582380a', 'is-edit-mode'])>
+            <input @class([$__VIEW_ID__ . '-f4cf2d24']) @attr(['type' => 'text', 'placeholder' => 'Nhập công việc mới']) @bind($newTodo) />
+            <button @class([$__VIEW_ID__ . '-fecec939'])>+</button>
         </div>
     </div>
-    <div @class([$__VIEW_ID__ . '-div-3', 'products-demo'])>
-        <h2 @class([$__VIEW_ID__ . '-div-3-h2-1'])>Products @startMarker('output', 'div-3-h2-1-output-1'){{ count($products) }}@endMarker('output', 'div-3-h2-1-output-1')</h2>
-        @startMarker('reactive', 'div-3-rc-if-1', ['stateKey' => ['products'], 'type' => 'if'])
+    <div @class([$__VIEW_ID__ . '-559b51aa', 'products-demo'])>
+        <h2 @class([$__VIEW_ID__ . '-b2282b82'])>Products @startMarker('output', '4ec44176'){{ count($products) }}@endMarker('output', '4ec44176')</h2>
+        @startMarker('reactive', '6c1b628b', ['stateKey' => ['products'], 'type' => 'if'])
         @if(count($products) === 0)
-            <p @class([$__VIEW_ID__ . '-div-3-rc-if-1-case_1-p-1'])>No products available.</p>
+            <p @class([$__VIEW_ID__ . '-6fb21822'])>No products available.</p>
         @else
-            <ul @class([$__VIEW_ID__ . '-div-3-rc-if-1-case_2-ul-1'])>
-                @startMarker('reactive', 'div-3-rc-if-1-case_2-ul-1-foreach-1', ['stateKey' => ['products'], 'type' => 'foreach'])
+            <ul @class([$__VIEW_ID__ . '-e5c6fe78'])>
+                @startMarker('reactive', 'cbf33dd6', ['stateKey' => ['products'], 'type' => 'foreach'])
                 @foreach($products as $product)
-                    <li @class([$__VIEW_ID__ . "-div-3-rc-if-1-case_2-ul-1-foreach-1-{$loop->index}-li-1"])>
+                    <li @class([$__VIEW_ID__ . "-f5bde316-{$loop->index}"])>
                         {{ $product->name }} - ${{ $product->price }}
-                        @startMarker('reactive', 'div-3-rc-if-1-case_2-ul-1-foreach-1-li-1-rc-if-1', ['stateKey' => [], 'type' => 'if'])
+                        @startMarker('reactive', "5c1d8559-{$loop->index}", ['stateKey' => [], 'type' => 'if'])
                         @if($product->tags && count($product->tags) > 0)
-                            <div @class([$__VIEW_ID__ . "-div-3-rc-if-1-case_2-ul-1-foreach-1-{$loop->index}-li-1-rc-if-1-case_1-div-1", 'tags'])>
+                            <div @class([$__VIEW_ID__ . "-8b2a29e5-{$loop->index}", 'tags'])>
                                 @foreach($product->tags as $tag)
-                                    <span @class([$__VIEW_ID__ . "-div-3-rc-if-1-case_2-ul-1-foreach-1-{$loop->index}-li-1-rc-if-1-case_1-div-1-foreach-1-{$loop->index}-span-1", 'tag'])>{{ $tag }}</span>
+                                    <span @class([$__VIEW_ID__ . "-b82d8442-{$loop->index}-{$loop->index}", 'tag'])>{{ $tag }}</span>
                                 @endforeach
                             </div>
                         @endif
-                        @endMarker('reactive', 'div-3-rc-if-1-case_2-ul-1-foreach-1-li-1-rc-if-1')
+                        @endMarker('reactive', "5c1d8559-{$loop->index}")
                     </li>
                 @endforeach
-                @endMarker('reactive', 'div-3-rc-if-1-case_2-ul-1-foreach-1')
+                @endMarker('reactive', 'cbf33dd6')
             </ul>
         @endif
-        @endMarker('reactive', 'div-3-rc-if-1')
+        @endMarker('reactive', '6c1b628b')
     </div>
     {{-- for --}}
-    <div @class([$__VIEW_ID__ . '-div-4', 'for-loop'])>
-        <h2 @class([$__VIEW_ID__ . '-div-4-h2-1'])>Inventory (For Loop Demo)</h2>
-        <ul @class([$__VIEW_ID__ . '-div-4-ul-2'])>
-            @startMarker('reactive', 'div-4-ul-2-for-1', ['stateKey' => ['inventory'], 'type' => 'for'])
+    <div @class([$__VIEW_ID__ . '-3c2aeb7e', 'for-loop'])>
+        <h2 @class([$__VIEW_ID__ . '-93e3f970'])>Inventory (For Loop Demo)</h2>
+        <ul @class([$__VIEW_ID__ . '-073fbc1b'])>
+            @startMarker('reactive', '3ea87d0d', ['stateKey' => ['inventory'], 'type' => 'for'])
             @for($i = 0; $i < count($inventory); $i++)
-                <li @class([$__VIEW_ID__ . "-div-4-ul-2-for-1-{$i}-li-1"])>
-                    @startMarker('output', "div-4-ul-2-for-1-{$i}-li-1-output-1"){{ $inventory[$i]->name }}@endMarker('output', "div-4-ul-2-for-1-{$i}-li-1-output-1") - $@startMarker('output', "div-4-ul-2-for-1-{$i}-li-1-output-2"){{ $inventory[$i]->price }}@endMarker('output', "div-4-ul-2-for-1-{$i}-li-1-output-2")
-                    @startMarker('reactive', 'div-4-ul-2-for-1-li-1-rc-if-1', ['stateKey' => ['inventory'], 'type' => 'if'])
+                <li @class([$__VIEW_ID__ . "-44293bc7-{$i}"])>
+                    @startMarker('output', "88a7713e-{$i}"){{ $inventory[$i]->name }}@endMarker('output', "88a7713e-{$i}") - $@startMarker('output', "da4f77c1-{$i}"){{ $inventory[$i]->price }}@endMarker('output', "da4f77c1-{$i}")
+                    @startMarker('reactive', "e04813ce-{$i}", ['stateKey' => ['inventory'], 'type' => 'if'])
                     @if($inventory[$i]->tags && count($inventory[$i]->tags) > 0)
-                        <div @class([$__VIEW_ID__ . "-div-4-ul-2-for-1-{$i}-li-1-rc-if-1-case_1-div-1", 'tags'])>
-                            @startMarker('reactive', 'div-4-ul-2-for-1-li-1-rc-if-1-case_1-div-1-for-1', ['stateKey' => ['inventory'], 'type' => 'for'])
+                        <div @class([$__VIEW_ID__ . "-171b943a-{$i}", 'tags'])>
+                            @startMarker('reactive', "87621184-{$i}", ['stateKey' => ['inventory'], 'type' => 'for'])
                             @for($j = 0; $j < count($inventory[$i]->tags); $j++)
-                                <span @class([$__VIEW_ID__ . "-div-4-ul-2-for-1-{$i}-li-1-rc-if-1-case_1-div-1-for-1-{$j}-span-1", 'tag'])>@startMarker('output', "div-4-ul-2-for-1-{$i}-li-1-rc-if-1-case_1-div-1-for-1-{$j}-span-1-output-1"){{ $inventory[$i]->tags[$j] }}@endMarker('output', "div-4-ul-2-for-1-{$i}-li-1-rc-if-1-case_1-div-1-for-1-{$j}-span-1-output-1")</span>
+                                <span @class([$__VIEW_ID__ . "-8184c7f7-{$i}-{$j}", 'tag'])>@startMarker('output', "acfd5bfd-{$i}-{$j}"){{ $inventory[$i]->tags[$j] }}@endMarker('output', "acfd5bfd-{$i}-{$j}")</span>
                             @endfor
-                            @endMarker('reactive', 'div-4-ul-2-for-1-li-1-rc-if-1-case_1-div-1-for-1')
+                            @endMarker('reactive', "87621184-{$i}")
                         </div>
                     @endif
-                    @endMarker('reactive', 'div-4-ul-2-for-1-li-1-rc-if-1')
+                    @endMarker('reactive', "e04813ce-{$i}")
                 </li>
             @endfor
-            @endMarker('reactive', 'div-4-ul-2-for-1')
+            @endMarker('reactive', '3ea87d0d')
         </ul>
     </div>
     {{-- while --}}
-    <div @class([$__VIEW_ID__ . '-div-5', 'while-loop'])>
-        <h2 @class([$__VIEW_ID__ . '-div-5-h2-1'])>Catalog (While Loop Demo)</h2>
-        <ul @class([$__VIEW_ID__ . '-div-5-ul-2'])>
+    <div @class([$__VIEW_ID__ . '-f6964623', 'while-loop'])>
+        <h2 @class([$__VIEW_ID__ . '-16850172'])>Catalog (While Loop Demo)</h2>
+        <ul @class([$__VIEW_ID__ . '-dd6923de'])>
             @for($i = 0; $i < $MAX_COUNT; $i++)
-                @startMarker('reactive', 'div-5-ul-2-for-1-rc-if-1', ['stateKey' => ['catalog'], 'type' => 'if'])
+                @startMarker('reactive', "224ef3d8-{$i}", ['stateKey' => ['catalog'], 'type' => 'if'])
                 @if($i >= count($catalog))
                     @break
                 @endif
-                @endMarker('reactive', 'div-5-ul-2-for-1-rc-if-1')
-                <li @class([$__VIEW_ID__ . "-div-5-ul-2-for-1-{$i}-li-1"])>
-                    @startMarker('output', "div-5-ul-2-for-1-{$i}-li-1-output-1"){{ $catalog[$i]->name }}@endMarker('output', "div-5-ul-2-for-1-{$i}-li-1-output-1") - $@startMarker('output', "div-5-ul-2-for-1-{$i}-li-1-output-2"){{ $catalog[$i]->price }}@endMarker('output', "div-5-ul-2-for-1-{$i}-li-1-output-2")
-                    @startMarker('reactive', 'div-5-ul-2-for-1-li-1-rc-if-1', ['stateKey' => ['catalog'], 'type' => 'if'])
+                @endMarker('reactive', "224ef3d8-{$i}")
+                <li @class([$__VIEW_ID__ . "-11279227-{$i}"])>
+                    @startMarker('output', "f95db8df-{$i}"){{ $catalog[$i]->name }}@endMarker('output', "f95db8df-{$i}") - $@startMarker('output', "2fa1fe3e-{$i}"){{ $catalog[$i]->price }}@endMarker('output', "2fa1fe3e-{$i}")
+                    @startMarker('reactive', "dd829808-{$i}", ['stateKey' => ['catalog'], 'type' => 'if'])
                     @if($catalog[$i]->tags && count($catalog[$i]->tags) > 0)
-                        <div @class([$__VIEW_ID__ . "-div-5-ul-2-for-1-{$i}-li-1-rc-if-1-case_1-div-1", 'tags'])>
-                            @startMarker('reactive', 'div-5-ul-2-for-1-li-1-rc-if-1-case_1-div-1-for-1', ['stateKey' => ['catalog'], 'type' => 'for'])
+                        <div @class([$__VIEW_ID__ . "-1aa7593b-{$i}", 'tags'])>
+                            @startMarker('reactive', "3c930e17-{$i}", ['stateKey' => ['catalog'], 'type' => 'for'])
                             @for($j = 0; $j < count($catalog[$i]->tags); $j++)
-                                <span @class([$__VIEW_ID__ . "-div-5-ul-2-for-1-{$i}-li-1-rc-if-1-case_1-div-1-for-1-{$j}-span-1", 'tag'])>@startMarker('output', "div-5-ul-2-for-1-{$i}-li-1-rc-if-1-case_1-div-1-for-1-{$j}-span-1-output-1"){{ $catalog[$i]->tags[$j] }}@endMarker('output', "div-5-ul-2-for-1-{$i}-li-1-rc-if-1-case_1-div-1-for-1-{$j}-span-1-output-1")</span>
+                                <span @class([$__VIEW_ID__ . "-b5b8a19f-{$i}-{$j}", 'tag'])>@startMarker('output', "41c63ad1-{$i}-{$j}"){{ $catalog[$i]->tags[$j] }}@endMarker('output', "41c63ad1-{$i}-{$j}")</span>
                             @endfor
-                            @endMarker('reactive', 'div-5-ul-2-for-1-li-1-rc-if-1-case_1-div-1-for-1')
+                            @endMarker('reactive', "3c930e17-{$i}")
                         </div>
                     @endif
-                    @endMarker('reactive', 'div-5-ul-2-for-1-li-1-rc-if-1')
+                    @endMarker('reactive', "dd829808-{$i}")
                 </li>
             @endfor
         </ul>
         @exec($n = 0)
-        <h3 @class([$__VIEW_ID__ . '-div-5-h3-3'])>While Loop Example</h3>
-        <ul @class([$__VIEW_ID__ . '-div-5-ul-4'])>
-            @startMarker('while', 'div-5-ul-4-while-1', ['start' => $n])
+        <h3 @class([$__VIEW_ID__ . '-098c0117'])>While Loop Example</h3>
+        <ul @class([$__VIEW_ID__ . '-03dc9e8b'])>
+            @startMarker('while', '292d3fbb', ['start' => $n])
             @while($n < $MAX_COUNT)
-                <li @class([$__VIEW_ID__ . "-div-5-ul-4-while-1-{$n}-li-1"])>
+                <li @class([$__VIEW_ID__ . "-62fd1c37-{$n}"])>
                     Item #{{ $n + 1 }}
                 </li>
                 @exec($n++)
             @endwhile
-            @endMarker('while', 'div-5-ul-4-while-1')
+            @endMarker('while', '292d3fbb')
         </ul>
     </div>
-    @startMarker('component', 'component-1')
+    @startMarker('component', '68594f9a')
     @include('esamples/partial.sao', ['data'=> $products])
-    @endMarker('component', 'component-1')
+    @endMarker('component', '68594f9a')
     {{-- Level 1: @if block --}}
 @endWrapper

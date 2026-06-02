@@ -1,6 +1,7 @@
 import type { SaoObjectType } from "../types/utils";
 import type { ViewControllerInterface } from "./ViewControllerInterface";
 import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren, SaoNodeInterface } from "./ElementInterface";
+import { MarkerModelInterface } from "./MarkerInterface";
 
 // ─── Reactive Interface ──────────────────────────────────────────
 
@@ -24,6 +25,7 @@ export interface ReactiveInterface extends SaoNodeInterface {
     destroy(): void;
     isSaoElement: boolean;
     isOneReactive: boolean;
+    marker: MarkerModelInterface | null;
 }
 
 // ─── Reactive Types ──────────────────────────────────────────────

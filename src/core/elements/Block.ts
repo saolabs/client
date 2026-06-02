@@ -1,10 +1,13 @@
 import type { BlockInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import { InitMode } from "../contracts/common";
+import { InitMode, InitModes } from "../contracts/common";
 import type { FragmentInterface, HtmlInterface } from "../contracts/ElementInterface";
+import { MarkerModelInterface } from "../contracts/MarkerInterface";
 import type { ReactiveInterface } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { generateUUID } from "../helpers/utils";
+import { MarkerModel } from "../services/MarkerModel";
 import markerRegistry from "../services/MarkerRegistry";
+import { SaoMarker } from "../services/MarkerService";
 import type { SaoObjectType } from "../types/utils";
 import { Fragment } from "./Fragment";
 /**
@@ -35,14 +38,14 @@ export class Block implements BlockInterface {
     contentRenderFactory: BlockRenderFactory | null = null;
     openTag: Comment;
     closeTag: Comment;
-
+    marker: MarkerModelInterface | null = null;
     domChildren: Node[] = [];
     initMode?: InitMode | undefined;
     parentElement: HtmlInterface | null = null;
 
     public readonly isOneBlock = true;
     public readonly isSaoElement = false;
-    
+
     constructor({
         ctx,
         name,
@@ -58,15 +61,46 @@ export class Block implements BlockInterface {
         id?: string | null;
         initMode?: InitMode;
     }) {
-        this.id = `${this.viewId}-${id ?? generateUUID(10)}`; // Unique ID for debugging
+        this.id = id ?? generateUUID(10); // Unique ID for debugging
         this.ctx = ctx;
         this.name = name;
         this.viewId = viewId ?? ctx.viewId; // Associate block with current viewId
         this.initMode = initMode;
         this.contentRenderFactory = contentRenderFactory || ((parentElement: HtmlInterface) => []);
-        markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
-        this.openTag = markerRegistry.createMarkerStart('block', this.id);
-        this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
+        if (this.initMode === InitModes.HYDRATE) {
+            let marker = SaoMarker.first('block', this.id);
+            if (marker) {
+                this.marker = marker;
+                this.openTag = marker.openTag as Comment;
+                this.closeTag = marker.closeTag as Comment;
+            } else {
+                this.openTag = markerRegistry.createMarkerStart('block', this.id);
+                this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
+                markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
+                this.marker = new MarkerModel({
+                    tagName: "s:b",
+                    name: "block",
+                    markerID: this.id,
+                    openTag: this.openTag,
+                    closeTag: this.closeTag,
+                    children: [],
+                    attributes: {}
+                })
+            }
+        } else {
+            this.openTag = markerRegistry.createMarkerStart('block', this.id);
+            this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
+            markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
+            this.marker = new MarkerModel({
+                tagName: "s:b",
+                name: "block",
+                markerID: this.id,
+                openTag: this.openTag,
+                closeTag: this.closeTag,
+                children: [],
+                attributes: {}
+            })
+        }
 
     }
 
@@ -90,7 +124,7 @@ export class Block implements BlockInterface {
     }
 
     mount(mountCtx: ViewControllerInterface, parentElement: HtmlInterface): any {
-        if(this.fragment) {
+        if (this.fragment) {
             this.fragment.parent = parentElement;
             this.fragment.render();
         }
@@ -105,8 +139,8 @@ export class Block implements BlockInterface {
         // Update logic (e.g. re-render content on state change)
     }
 
-     /** Set the block's parent element (used for mounting) */
-     setParentElement(parentElement: HtmlInterface | null): void {
+    /** Set the block's parent element (used for mounting) */
+    setParentElement(parentElement: HtmlInterface | null): void {
         this.parentElement = parentElement;
     }
 

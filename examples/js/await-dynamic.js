@@ -111,25 +111,25 @@ class AwaitDynamicView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.html(`div-1`, "div", parentElement, {}, (parentElement) => [
-                this.reactive(`div-1-rc-if-1`, "if", parentReactive, parentElement, [], (parentReactive, parentElement) => {
+            this.html(`d69e6b1d`, "div", parentElement, {}, (parentElement) => [
+                this.reactive(`8304c314`, "if", parentReactive, parentElement, [], (parentReactive, parentElement) => {
                     const reactiveContents = [];
                     if (user) {
                         reactiveContents.push(
-                        this.html(`div-1-rc-if-1-case_1-h1-1`, "h1", parentElement, {}, (parentElement) => [
+                        this.html(`3a671613`, "h1", parentElement, {}, (parentElement) => [
                             this.text('Welcome '),
-                            this.output(`div-1-rc-if-1-case_1-h1-1-output-1`, parentElement, true, [], (parentElement) => user.name)
+                            this.output(`c50431c8`, parentElement, true, [], (parentElement) => user.name)
                         ]),
                         this.__foreach(postList, (post, __loopKey, __loopIndex, __loop) => [
-                                this.html(`div-1-rc-if-1-case_1-foreach-1-${__loopIndex + 1}-div-1`, "div", parentElement, {}, (parentElement) => [
-                                    this.output(`div-1-rc-if-1-case_1-foreach-1-${__loopIndex + 1}-div-1-output-1`, parentElement, true, [], (parentElement) => post.title)
+                                this.html(`ac013aeb-${__loopIndex + 1}`, "div", parentElement, {}, (parentElement) => [
+                                    this.output(`33b75e1c-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => post.title)
                                 ])
                         ])
                         );
                     }
                     else {
                         reactiveContents.push(
-                        this.html(`div-1-rc-if-1-case_2-p-1`, "p", parentElement, {}, (parentElement) => [
+                        this.html(`f08cfbae`, "p", parentElement, {}, (parentElement) => [
                             this.text('Please login first')
                         ])
                         );
@@ -137,13 +137,13 @@ class AwaitDynamicView extends View {
                     return reactiveContents;
                 })
             ]),
-            this.html(`div-2`, "div", parentElement, {}, (parentElement) => [
-                this.html(`div-2-button-1`, "button", parentElement,
+            this.html(`eced4db6`, "div", parentElement, {}, (parentElement) => [
+                this.html(`c480ac03`, "button", parentElement,
                     { events: { click: [{"handler":"doAction","params":["login"]}] } },
                     (parentElement) => [
                     this.text('Login')
                     ]),
-                this.html(`div-2-button-2`, "button", parentElement,
+                this.html(`300dfb10`, "button", parentElement,
                     { events: { click: [{"handler":"doAction","params":["fetchPosts"]}] } },
                     (parentElement) => [
                     this.text('Fetch Posts')

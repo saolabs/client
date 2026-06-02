@@ -165,51 +165,51 @@ class Demo2ExtendsIncludeView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             this.block('block-content', 'content', (parentElement) => [
-            this.include("block-content-component-1", __template__+'header', parentElement, [], (parentElement) => ({})),
-            this.html(`block-content-div-1`, "div", parentElement,
+            this.include(`501029e0`, __template__+'header', parentElement, [], (parentElement) => ({})),
+            this.html(`e085b222`, "div", parentElement,
                 { classes: [{ type: 'static', value: "demo" }, { type: 'binding', value: "active", factory: () => status, stateKeys: ["status"] }], attrs: { "dataCount": { type: 'binding', value: App.Helper.count(demoList), factory: () => App.Helper.count(demoList), stateKeys: [] }, "dataUserName": { type: 'binding', value: user.name, factory: () => user.name, stateKeys: ["user"] } } },
                 (parentElement) => [
-                this.html(`block-content-div-1-h1-1`, "h1", parentElement, {}, (parentElement) => [
+                this.html(`06fe9377`, "h1", parentElement, {}, (parentElement) => [
                     this.text('Hello, '),
-                    this.output(`block-content-div-1-h1-1-output-1`, parentElement, true, ["user"], (parentElement) => user.name),
+                    this.output(`34dcf3fa`, parentElement, true, ["user"], (parentElement) => user.name),
                     this.text('!')
                 ]),
-                this.html(`block-content-div-1-p-2`, "p", parentElement, {}, (parentElement) => [
+                this.html(`f0393273`, "p", parentElement, {}, (parentElement) => [
                     this.text('Your email is '),
-                    this.html(`block-content-div-1-p-2-span-1`, "span", parentElement, {}, (parentElement) => [
-                        this.output(`block-content-div-1-p-2-span-1-output-1`, parentElement, true, ["user"], (parentElement) => user.email)
+                    this.html(`d17cd335`, "span", parentElement, {}, (parentElement) => [
+                        this.output(`8615be57`, parentElement, true, ["user"], (parentElement) => user.email)
                     ]),
                     this.text('.')
                 ]),
-                this.html(`block-content-div-1-button-3`, "button", parentElement,
+                this.html(`21f51b84`, "button", parentElement,
                     { events: { click: [(event) => setStatus(!status)] } },
                     (parentElement) => [
                     this.text('Toggle Status: '),
-                    this.output(`block-content-div-1-button-3-output-1`, parentElement, true, ["status"], (parentElement) => status ? 'On' : 'Off')
+                    this.output(`a24990ac`, parentElement, true, ["status"], (parentElement) => status ? 'On' : 'Off')
                     ]),
-                this.html(`block-content-div-1-h2-4`, "h2", parentElement, {}, (parentElement) => [
+                this.html(`7a87cfa0`, "h2", parentElement, {}, (parentElement) => [
                     this.text('Posts:')
                 ]),
-                this.html(`block-content-div-1-ul-5`, "ul", parentElement, {}, (parentElement) => [
-                    this.reactive(`block-content-div-1-ul-5-rc-if-1`, "if", parentReactive, parentElement, ["posts"], (parentReactive, parentElement) => {
+                this.html(`7ad81052`, "ul", parentElement, {}, (parentElement) => [
+                    this.reactive(`40a9567d`, "if", parentReactive, parentElement, ["posts"], (parentReactive, parentElement) => {
                         const reactiveContents = [];
                         if (App.Helper.count(posts) === 0) {
                             reactiveContents.push(
-                            this.html(`block-content-div-1-ul-5-rc-if-1-case_1-li-1`, "li", parentElement, {}, (parentElement) => [
+                            this.html(`091f500d`, "li", parentElement, {}, (parentElement) => [
                                 this.text('No posts available.')
                             ])
                             );
                         }
                         else {
                             reactiveContents.push(
-                            this.reactive(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1`, "foreach", parentReactive, parentElement, ["posts"], (parentReactive, parentElement) => {
+                            this.reactive(`f47cbfd6`, "foreach", parentReactive, parentElement, ["posts"], (parentReactive, parentElement) => {
                                 return this.__foreach(posts, (post, __loopKey, __loopIndex, __loop) => [
-                                    this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement, {}, (parentElement) => [
-                                        this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-h3-1`, "h3", parentElement, {}, (parentElement) => [
-                                            this.output(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-h3-1-output-1`, parentElement, true, [], (parentElement) => post.title)
+                                    this.html(`bce9cd15-${__loopIndex + 1}`, "li", parentElement, {}, (parentElement) => [
+                                        this.html(`54dc212f-${__loopIndex + 1}`, "h3", parentElement, {}, (parentElement) => [
+                                            this.output(`b2ad0128-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => post.title)
                                         ]),
-                                        this.html(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-p-2`, "p", parentElement, {}, (parentElement) => [
-                                            this.output(`block-content-div-1-ul-5-rc-if-1-case_2-foreach-1-${__loopIndex + 1}-li-1-p-2-output-1`, parentElement, true, [], (parentElement) => post.content)
+                                        this.html(`a90ddb5d-${__loopIndex + 1}`, "p", parentElement, {}, (parentElement) => [
+                                            this.output(`f628c635-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => post.content)
                                         ])
                                     ])
                                 ])
@@ -219,7 +219,7 @@ class Demo2ExtendsIncludeView extends View {
                         return reactiveContents;
                     })
                 ]),
-                this.html(`block-content-div-1-div-6`, "div", parentElement,
+                this.html(`0158164e`, "div", parentElement,
                     { classes: [{ type: 'static', value: "while-loop-demo" }] },
                     (parentElement) => [
                     this.__while((loopCtx) => {
@@ -228,9 +228,9 @@ class Demo2ExtendsIncludeView extends View {
                         while (i < 5) {
                             loopCtx.setCurrentTimes(i);
                             __whileOutput.push(
-                                this.html(`block-content-div-1-div-6-while-1-${i}-p-1`, "p", parentElement, {}, (parentElement) => [
+                                this.html(`03ca1bcb-${i}`, "p", parentElement, {}, (parentElement) => [
                                     this.text('Counter: '),
-                                    this.output(`block-content-div-1-div-6-while-1-${i}-p-1-output-1`, parentElement, true, ["i"], (parentElement) => i)
+                                    this.output(`2a2319d8-${i}`, parentElement, true, ["i"], (parentElement) => i)
                                 ])
                             );
                                 i++;
@@ -239,10 +239,10 @@ class Demo2ExtendsIncludeView extends View {
                     }, 5)
                     ])
                 ]),
-            this.include("block-content-component-2", __template__+'post-list', parentElement, [], (parentElement) => ({"posts": posts, "name": "test"})),
-            this.include("block-content-component-3", __template__+'footer', parentElement, [], (parentElement) => ({
+            this.include(`142a7e71`, __template__+'post-list', parentElement, [], (parentElement) => ({"posts": posts, "name": "test"})),
+            this.include(`cf91f6e1`, __template__+'footer', parentElement, [], (parentElement) => ({
                     __ONE_CHILDREN_CONTENT__: (parentElement) => [
-                    this.include("block-content-component-3-component-1", __template__+'post-list', parentElement, [], (parentElement) => ({"posts": posts, "name": "test"}))
+                    this.include(`2084c3f0`, __template__+'post-list', parentElement, [], (parentElement) => ({"posts": posts, "name": "test"}))
                 ]
                 }))
             ]);

@@ -181,75 +181,75 @@ class TodoListView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.html(`div-1`, "div", parentElement,
+            this.html(`d69e6b1d`, "div", parentElement,
                 { classes: [{ type: 'static', value: "col-lg-6" }, { type: 'static', value: "mb-4" }], attrs: { "data-category": { type: 'static', value: "basic forms" } } },
                 (parentElement) => [
-                this.html(`div-1-div-1`, "div", parentElement,
+                this.html(`6add9c13`, "div", parentElement,
                     { classes: [{ type: 'static', value: "example-card" }] },
                     (parentElement) => [
-                    this.html(`div-1-div-1-div-1`, "div", parentElement,
+                    this.html(`1ae5e1b9`, "div", parentElement,
                         { classes: [{ type: 'static', value: "example-header" }] },
                         (parentElement) => [
-                        this.html(`div-1-div-1-div-1-h3-1`, "h3", parentElement, {}, (parentElement) => [
+                        this.html(`77c3ed9f`, "h3", parentElement, {}, (parentElement) => [
                             this.text('Todo List')
                         ]),
-                        this.html(`div-1-div-1-div-1-div-2`, "div", parentElement,
+                        this.html(`cabd5a56`, "div", parentElement,
                             { classes: [{ type: 'static', value: "example-tags" }] },
                             (parentElement) => [
-                            this.html(`div-1-div-1-div-1-div-2-span-1`, "span", parentElement,
+                            this.html(`9b0fa796`, "span", parentElement,
                                 { classes: [{ type: 'static', value: "tag" }, { type: 'static', value: "tag-basic" }] },
                                 (parentElement) => [
                                 this.text('Basic')
                                 ]),
-                            this.html(`div-1-div-1-div-1-div-2-span-2`, "span", parentElement,
+                            this.html(`466b2070`, "span", parentElement,
                                 { classes: [{ type: 'static', value: "tag" }, { type: 'static', value: "tag-forms" }] },
                                 (parentElement) => [
                                 this.text('Forms')
                                 ]),
-                            this.html(`div-1-div-1-div-1-div-2-span-3`, "span", parentElement,
+                            this.html(`6673d7ae`, "span", parentElement,
                                 { classes: [{ type: 'static', value: "tag" }, { type: 'static', value: "tag-list" }] },
                                 (parentElement) => [
                                 this.text('Lists')
                                 ])
                             ])
                         ]),
-                    this.html(`div-1-div-1-div-2`, "div", parentElement,
+                    this.html(`83c8d08a`, "div", parentElement,
                         { classes: [{ type: 'static', value: "example-description" }] },
                         (parentElement) => [
-                        this.html(`div-1-div-1-div-2-p-1`, "p", parentElement, {}, (parentElement) => [
+                        this.html(`d0080f1b`, "p", parentElement, {}, (parentElement) => [
                             this.text('Interactive todo list with add, toggle, and delete functionality.')
                         ])
                         ]),
-                    this.html(`div-1-div-1-div-3`, "div", parentElement,
+                    this.html(`2508bdea`, "div", parentElement,
                         { classes: [{ type: 'static', value: "example-demo" }] },
                         (parentElement) => [
-                        this.html(`div-1-div-1-div-3-div-1`, "div", parentElement,
+                        this.html(`bbe4ff8b`, "div", parentElement,
                             { classes: [{ type: 'static', value: "demo-container" }], attrs: { "id": { type: 'static', value: "todo-demo" } } },
                             (parentElement) => [
-                            this.html(`div-1-div-1-div-3-div-1-div-1`, "div", parentElement,
+                            this.html(`82a06ccf`, "div", parentElement,
                                 { classes: [{ type: 'static', value: "todo-app" }] },
                                 (parentElement) => [
-                                this.html(`div-1-div-1-div-3-div-1-div-1-div-1`, "div", parentElement,
+                                this.html(`ac52b657`, "div", parentElement,
                                     { classes: [{ type: 'static', value: "input-group" }, { type: 'static', value: "mb-3" }] },
                                     (parentElement) => [
-                                    this.html(`div-1-div-1-div-3-div-1-div-1-div-1-input-1`, "input", parentElement, { classes: [{ type: 'static', value: "form-control" }], attrs: { "type": { type: 'static', value: "text" }, "id": { type: 'static', value: "todo-input" }, "placeholder": { type: 'static', value: "Add new todo..." }, "bind": { type: 'static', value: true }, "newTodo": { type: 'static', value: true } }, events: { keydown: [{"handler":"addTodoByEnter","params":[() => event]}] } }),
-                                    this.html(`div-1-div-1-div-3-div-1-div-1-div-1-button-2`, "button", parentElement,
+                                    this.html(`aa5f582b`, "input", parentElement, { classes: [{ type: 'static', value: "form-control" }], attrs: { "type": { type: 'static', value: "text" }, "id": { type: 'static', value: "todo-input" }, "placeholder": { type: 'static', value: "Add new todo..." }, "bind": { type: 'static', value: true }, "newTodo": { type: 'static', value: true } }, events: { keydown: [{"handler":"addTodoByEnter","params":[() => event]}] } }),
+                                    this.html(`f9abb587`, "button", parentElement,
                                         { classes: [{ type: 'static', value: "btn" }, { type: 'static', value: "btn-primary" }], events: { click: [{"handler":"addTodo","params":[]}] } },
                                         (parentElement) => [
                                         this.text('Add')
                                         ])
                                     ]),
-                                this.html(`div-1-div-1-div-3-div-1-div-1-ul-2`, "ul", parentElement,
+                                this.html(`4611f5bf`, "ul", parentElement,
                                     { classes: [{ type: 'static', value: "list-unstyled" }], attrs: { "id": { type: 'static', value: "todo-list" } } },
                                     (parentElement) => [
-                                    this.reactive(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1`, "foreach", parentReactive, parentElement, ["todos"], (parentReactive, parentElement) => {
+                                    this.reactive(`1b9d8409`, "foreach", parentReactive, parentElement, ["todos"], (parentReactive, parentElement) => {
                                         return this.__foreach(todos, (todo, __loopKey, __loopIndex, __loop) => [
-                                            this.html(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement,
+                                            this.html(`cfcc0d01-${__loopIndex + 1}`, "li", parentElement,
                                                 { classes: [{ type: 'static', value: "todo-item" }, { type: 'static', value: "{{" }, { type: 'static', value: "$todo->completed" }, { type: 'static', value: "?" }, { type: 'static', value: "'completed'" }, { type: 'static', value: ":" }, { type: 'static', value: "''" }, { type: 'static', value: "}}" }] },
                                                 (parentElement) => [
-                                                this.html(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex + 1}-li-1-input-1`, "input", parentElement, { attrs: { "type": { type: 'static', value: "checkbox" }, "checked": { type: 'static', value: true }, "todo": { type: 'static', value: true }, "completed": { type: 'static', value: true } }, events: { change: [{"handler":"toggleTodo","params":[todo.id]}] } }),
-                                                this.output(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex + 1}-li-1-output-1`, parentElement, true, [], (parentElement) => todo.text),
-                                                this.html(`div-1-div-1-div-3-div-1-div-1-ul-2-foreach-1-${__loopIndex + 1}-li-1-button-2`, "button", parentElement,
+                                                this.html(`1c9bd3d5-${__loopIndex + 1}`, "input", parentElement, { attrs: { "type": { type: 'static', value: "checkbox" }, "checked": { type: 'static', value: true }, "todo": { type: 'static', value: true }, "completed": { type: 'static', value: true } }, events: { change: [{"handler":"toggleTodo","params":[todo.id]}] } }),
+                                                this.output(`a5cbb2ad-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => todo.text),
+                                                this.html(`57d15225-${__loopIndex + 1}`, "button", parentElement,
                                                     { classes: [{ type: 'static', value: "btn" }, { type: 'static', value: "btn-sm" }, { type: 'static', value: "btn-outline-danger" }], events: { click: [{"handler":"deleteTodo","params":[todo.id]}] } },
                                                     (parentElement) => [
                                                     this.text('×')

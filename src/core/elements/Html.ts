@@ -1,9 +1,11 @@
 import { ESK, InitMode, InitModes } from "../contracts/common";
-import type { HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElementChildren, SaoElementConfig } from "../contracts/ElementInterface";
+import type { DOMElement, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElement, SaoElementChildren, SaoElementConfig } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
 import { hasData } from "../helpers/utils";
+import { mountElementList } from "../helpers/view";
 import type { SaoObjectType } from "../types/utils";
+import { TextElement } from "./TextElement";
 
 export class Html implements HtmlInterface {
     saoType: SaoObjectType = 'Html';
@@ -79,7 +81,7 @@ export class Html implements HtmlInterface {
     }
 
     updateConfig(newConfig: Partial<SaoElementConfig>): void {
-        if(hasData(newConfig)){
+        if (hasData(newConfig)) {
             this.config = { ...this.config, ...newConfig };
         }
     }
@@ -265,45 +267,42 @@ export class Html implements HtmlInterface {
         return ['input', 'img', 'br', 'hr', 'meta', 'link'].includes(this.tagName.toLowerCase());
     }
 
+    getElement(): HTMLElement {
+        return this.element;
+    }
+
+    renderChildren(): SaoElementChildren {
+        const children = this.childrenFactory ? this.childrenFactory(this) : [];
+        this.children = [];
+        this.children = children.map((child: SaoElement | DOMElement | string | number) => {
+            if (typeof child === 'string' || typeof child === 'number') {
+                return new TextElement({ ctx: this.ctx as ViewControllerInterface, parent: this.parent, stateKeys: [], generateText: () => String(child) });
+            }
+            return child;
+        });
+        return this.children;
+    }
+
     render(): HTMLElement {
         if (this.isSingleElement()) {
             return this.element;
         }
-        let children: SaoChildrenFactoryOutput = [];
+        let children: SaoElementChildren = [];
         if (this.childrenFactory) {
             // Compiled output uses (parentElement) => [...] — pass `this` as parentElement
-            children = this.childrenFactory(this);
+            children = this.renderChildren();
         }
         // CLEAR EXISTING CONTENT BEFORE RENDERING NEW CHILDREN
         this.element.innerHTML = ''; // Clear existing content before rendering children
 
         if (children && children.length > 0) {
-            children.forEach(child => {
-                if (typeof child === 'string' || typeof child === 'number') {
-                    const textNode = document.createTextNode(String(child));
-                    this.element.appendChild(textNode);
-                    this.children.push(textNode);
-                } else if (child && typeof child === 'object') {
-                    if ('element' in child) {
-                        // HtmlInterface, TextInterface
-                        this.element.appendChild(child.element);
-                        this.children.push(child);
-                        child.render();
-                    } else if ('openTag' in child && 'closeTag' in child) {
-                        // Output, Reactive, Fragment, BlockOutlet — they self-append markers
-                        if ('parent' in child) {
-                            (child as any).parent = this;
-                        }
-                        if ('parentElement' in child) {
-                            (child as any).parentElement = this;
-                        }
-                        this.children.push(child);
-                        child.render();
-                    }
-                }
-            });
+            mountElementList(this, children);
         }
         return this.element;
+    }
+
+    appendElement(element: HTMLElement | Comment | Text) {
+        this.element.appendChild(element);
     }
 
     /** Start reactive bindings + children (Phase 2 lifecycle) */
@@ -324,7 +323,7 @@ export class Html implements HtmlInterface {
         }
     }
 
-    
+
 
     clearHTML(): void {
         this.element.innerHTML = '';

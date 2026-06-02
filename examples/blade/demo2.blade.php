@@ -11,36 +11,36 @@
 ]))
 @let($i = 0)
 @wrapper
-<div @class([$__VIEW_ID__ . '-div-1', 'demo', 'active'=> $status]) @attr(['dataCount'=> count($demoList), 'dataUserName'=> $user->name])>
-    <h1 @class([$__VIEW_ID__ . '-div-1-h1-1'])>Hello, @startMarker('output', 'div-1-h1-1-output-1'){{ $user->name }}@endMarker('output', 'div-1-h1-1-output-1')!</h1>
-    <p @class([$__VIEW_ID__ . '-div-1-p-2'])>Your email is <span @class([$__VIEW_ID__ . '-div-1-p-2-span-1'])>@startMarker('output', 'div-1-p-2-span-1-output-1'){{ $user->email }}@endMarker('output', 'div-1-p-2-span-1-output-1')</span>.</p>
+<div @class([$__VIEW_ID__ . '-d69e6b1d', 'demo', 'active'=> $status]) @attr(['dataCount'=> count($demoList), 'dataUserName'=> $user->name])>
+    <h1 @class([$__VIEW_ID__ . '-0c3ea1b5'])>Hello, @startMarker('output', 'e3c5d086'){{ $user->name }}@endMarker('output', 'e3c5d086')!</h1>
+    <p @class([$__VIEW_ID__ . '-96323a6c'])>Your email is <span @class([$__VIEW_ID__ . '-a649093e'])>@startMarker('output', '5ce3429f'){{ $user->email }}@endMarker('output', '5ce3429f')</span>.</p>
 
-    <button @class([$__VIEW_ID__ . '-div-1-button-3'])>Toggle Status: @startMarker('output', 'div-1-button-3-output-1'){{ $status ? 'On' : 'Off' }}@endMarker('output', 'div-1-button-3-output-1')</button>
+    <button @class([$__VIEW_ID__ . '-3962518c'])>Toggle Status: @startMarker('output', '20cded4c'){{ $status ? 'On' : 'Off' }}@endMarker('output', '20cded4c')</button>
 
-    <h2 @class([$__VIEW_ID__ . '-div-1-h2-4'])>Posts:</h2>
-    <ul @class([$__VIEW_ID__ . '-div-1-ul-5'])>
-        @startMarker('reactive', 'div-1-ul-5-rc-if-1', ['stateKey' => ['posts'], 'type' => 'if'])
+    <h2 @class([$__VIEW_ID__ . '-5b8ca3d9'])>Posts:</h2>
+    <ul @class([$__VIEW_ID__ . '-c426c520'])>
+        @startMarker('reactive', '08e53cbf', ['stateKey' => ['posts'], 'type' => 'if'])
         @if(count($posts) === 0)
-            <li @class([$__VIEW_ID__ . '-div-1-ul-5-rc-if-1-case_1-li-1'])>No posts available.</li>
+            <li @class([$__VIEW_ID__ . '-4179f69c'])>No posts available.</li>
         @else
-            @startMarker('reactive', 'div-1-ul-5-rc-if-1-case_2-foreach-1', ['stateKey' => ['posts'], 'type' => 'foreach'])
+            @startMarker('reactive', '33b4ec90', ['stateKey' => ['posts'], 'type' => 'foreach'])
             @foreach($posts as $post)
-                <li @class([$__VIEW_ID__ . "-div-1-ul-5-rc-if-1-case_2-foreach-1-{$loop->index}-li-1"])>
-                    <h3 @class([$__VIEW_ID__ . "-div-1-ul-5-rc-if-1-case_2-foreach-1-{$loop->index}-li-1-h3-1"])>{{ $post->title }}</h3>
-                    <p @class([$__VIEW_ID__ . "-div-1-ul-5-rc-if-1-case_2-foreach-1-{$loop->index}-li-1-p-2"])>{{ $post->content }}</p>
+                <li @class([$__VIEW_ID__ . "-916b3f4f-{$loop->index}"])>
+                    <h3 @class([$__VIEW_ID__ . "-03b7fc5c-{$loop->index}"])>{{ $post->title }}</h3>
+                    <p @class([$__VIEW_ID__ . "-b42d3610-{$loop->index}"])>{{ $post->content }}</p>
                 </li>
             @endforeach
-            @endMarker('reactive', 'div-1-ul-5-rc-if-1-case_2-foreach-1')
+            @endMarker('reactive', '33b4ec90')
         @endif
-        @endMarker('reactive', 'div-1-ul-5-rc-if-1')
+        @endMarker('reactive', '08e53cbf')
     </ul>
-    <div @class([$__VIEW_ID__ . '-div-1-div-6', 'while-loop-demo'])>
-        @startMarker('while', 'div-1-div-6-while-1', ['start' => $i, 'end' => 5])
+    <div @class([$__VIEW_ID__ . '-b3c7e734', 'while-loop-demo'])>
+        @startMarker('while', 'e231788c', ['start' => $i, 'end' => 5])
         @while($i < 5)
-            <p @class([$__VIEW_ID__ . "-div-1-div-6-while-1-{$i}-p-1"])>Counter: {{ $i }}</p>
+            <p @class([$__VIEW_ID__ . "-d0fe77a9-{$i}"])>Counter: {{ $i }}</p>
             @exec($i++)
         @endwhile
-        @endMarker('while', 'div-1-div-6-while-1')
+        @endMarker('while', 'e231788c')
     </div>
 
 </div>

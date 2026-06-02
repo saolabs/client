@@ -9,12 +9,12 @@
 @const([$message, $setMessage] = useState('Hello, Saola!'))
 @let($textContent = $message . ' Count is ' . $count)
 @wrapper
-<div @class([$__VIEW_ID__ . '-div-1', 'counter-component'])>
-    <h4 @class([$__VIEW_ID__ . '-div-1-h4-1'])>Count: <span @class([$__VIEW_ID__ . '-div-1-h4-1-span-1']) @attr(['id' => 'counter-value', 'data-count' => $count])>@startMarker('output', 'div-1-h4-1-span-1-output-1'){{ $count }}@endMarker('output', 'div-1-h4-1-span-1-output-1')</span></h4>
-    <div @class([$__VIEW_ID__ . '-div-1-div-2', 'btn-group'])>
-        <button @class([$__VIEW_ID__ . '-div-1-div-2-button-1', 'btn', 'btn-primary'])>-</button>
-        <button @class([$__VIEW_ID__ . '-div-1-div-2-button-2', 'btn', 'btn-primary'])>+</button>
-        <button @class([$__VIEW_ID__ . '-div-1-div-2-button-3', 'btn', 'btn-primary'])>Reset</button>
+<div @class([$__VIEW_ID__ . '-d69e6b1d', 'counter-component'])>
+    <h4 @class([$__VIEW_ID__ . '-beab9ba1'])>Count: <span @class([$__VIEW_ID__ . '-1eafe912']) @attr(['id' => 'counter-value', 'data-count' => $count])>@startMarker('output', '5ff3bd35'){{ $count }}@endMarker('output', '5ff3bd35')</span></h4>
+    <div @class([$__VIEW_ID__ . '-fccc82c8', 'btn-group'])>
+        <button @class([$__VIEW_ID__ . '-aa23a7be', 'btn', 'btn-primary'])>-</button>
+        <button @class([$__VIEW_ID__ . '-9ac7c16c', 'btn', 'btn-primary'])>+</button>
+        <button @class([$__VIEW_ID__ . '-f4cc6573', 'btn', 'btn-primary'])>Reset</button>
     </div>
 </div>
 @endWrapper

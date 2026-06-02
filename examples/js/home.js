@@ -108,48 +108,48 @@ class HomeView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.include("component-1", __template__+'sessions.tasks', parentElement, [], (parentElement) => ({
+            this.include(`68594f9a`, __template__+'sessions.tasks', parentElement, [], (parentElement) => ({
                     __ONE_CHILDREN_CONTENT__: (parentElement) => [
-                    this.include("component-1-component-1", __template__+'demo.fetch', parentElement, [], (parentElement) => ({"users": users}))
+                    this.include(`fa6abab0`, __template__+'demo.fetch', parentElement, [], (parentElement) => ({"users": users}))
                 ]
                 })),
-            this.include("component-2", __template__+'sessions.tasks', parentElement, [], (parentElement) => ({"title": "Custom Task List"})),
-            this.include("component-3", __template__+'sessions.projects', parentElement, [], (parentElement) => ({
+            this.include(`cdc4fc98`, __template__+'sessions.tasks', parentElement, [], (parentElement) => ({"title": "Custom Task List"})),
+            this.include(`e0f18838`, __template__+'sessions.projects', parentElement, [], (parentElement) => ({
                     "projects": projects,
                     __ONE_CHILDREN_CONTENT__: (parentElement) => [
-                    this.html(`component-3-div-1`, "div", parentElement,
+                    this.html(`b18fe9d7`, "div", parentElement,
                         { classes: [{ type: 'static', value: "header" }] },
                         (parentElement) => [
-                        this.html(`component-3-div-1-h2-1`, "h2", parentElement, {}, (parentElement) => [
+                        this.html(`1c77c20b`, "h2", parentElement, {}, (parentElement) => [
                             this.text('My Projects')
                         ])
                         ]),
-                    this.html(`component-3-div-2`, "div", parentElement,
+                    this.html(`fe28a62f`, "div", parentElement,
                         { classes: [{ type: 'static', value: "footer" }] },
                         (parentElement) => [
-                        this.html(`component-3-div-2-p-1`, "p", parentElement, {}, (parentElement) => [
+                        this.html(`c9f0c18f`, "p", parentElement, {}, (parentElement) => [
                             this.text('Total Projects: '),
-                            this.output(`component-3-div-2-p-1-output-1`, parentElement, true, [], (parentElement) => App.Helper.count(projects))
+                            this.output(`0f81d2b8`, parentElement, true, [], (parentElement) => App.Helper.count(projects))
                         ])
                         ]),
-                    this.include("component-3-component-1", __template__+'sessions.tasks', parentElement, [], (parentElement) => ({
+                    this.include(`4aac35d9`, __template__+'sessions.tasks', parentElement, [], (parentElement) => ({
                             "owners": ["Alice", "Bob"],
                             __ONE_CHILDREN_CONTENT__: (parentElement) => [
-                            this.html(`component-3-component-1-div-1`, "div", parentElement,
+                            this.html(`727ca7d7`, "div", parentElement,
                                 { classes: [{ type: 'static', value: "header" }] },
                                 (parentElement) => [
-                                this.html(`component-3-component-1-div-1-h3-1`, "h3", parentElement, {}, (parentElement) => [
+                                this.html(`8a745b38`, "h3", parentElement, {}, (parentElement) => [
                                     this.text('Task Owners')
                                 ])
                                 ]),
-                            this.include("component-3-component-1-component-1", __template__+'demo.fetch', parentElement, [], (parentElement) => ({"users": users}))
+                            this.include(`f02a36c3`, __template__+'demo.fetch', parentElement, [], (parentElement) => ({"users": users}))
                         ]
                         }))
                 ]
                 })),
-            this.include("component-4", 'sessions.tasks.count', parentElement, [], (parentElement) => ({})),
-            this.include("component-5", __template__+'demo.fetch', parentElement, [], (parentElement) => ({})),
-            this.include("component-6", __blade_custom_path__, parentElement, [], (parentElement) => ({"type": "success", "message": "This is a custom alert component!"}))
+            this.include(`712094c8`, 'sessions.tasks.count', parentElement, [], (parentElement) => ({})),
+            this.include(`0aed4ae2`, __template__+'demo.fetch', parentElement, [], (parentElement) => ({})),
+            this.include(`f06e1819`, __blade_custom_path__, parentElement, [], (parentElement) => ({"type": "success", "message": "This is a custom alert component!"}))
             ]);
             }
         });

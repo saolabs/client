@@ -127,33 +127,33 @@ class TestDirectivesView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.html(`div-1`, "div", parentElement,
+            this.html(`d69e6b1d`, "div", parentElement,
                 { classes: [{ type: 'static', value: "test-component" }] },
                 (parentElement) => [
-                this.html(`div-1-h3-1`, "h3", parentElement, {}, (parentElement) => [
+                this.html(`6ff016ee`, "h3", parentElement, {}, (parentElement) => [
                     this.text('State: '),
-                    this.output(`div-1-h3-1-output-1`, parentElement, true, ["count"], (parentElement) => count)
+                    this.output(`4c3e6fc4`, parentElement, true, ["count"], (parentElement) => count)
                 ]),
-                this.html(`div-1-p-2`, "p", parentElement, {}, (parentElement) => [
+                this.html(`96323a6c`, "p", parentElement, {}, (parentElement) => [
                     this.text('Message: '),
-                    this.output(`div-1-p-2-output-1`, parentElement, true, [], (parentElement) => message)
+                    this.output(`4ed23a9a`, parentElement, true, [], (parentElement) => message)
                 ]),
-                this.html(`div-1-p-3`, "p", parentElement, {}, (parentElement) => [
+                this.html(`7d4b4366`, "p", parentElement, {}, (parentElement) => [
                     this.text('Max: '),
-                    this.output(`div-1-p-3-output-1`, parentElement, true, [], (parentElement) => MAX)
+                    this.output(`7ca907d2`, parentElement, true, [], (parentElement) => MAX)
                 ]),
-                this.reactive(`div-1-rc-if-1`, "if", parentReactive, parentElement, ["count"], (parentReactive, parentElement) => {
+                this.reactive(`8304c314`, "if", parentReactive, parentElement, ["count"], (parentReactive, parentElement) => {
                     const reactiveContents = [];
                     if (count > 5) {
                         reactiveContents.push(
-                        this.html(`div-1-rc-if-1-case_1-div-1`, "div", parentElement, {}, (parentElement) => [
+                        this.html(`c0d851d9`, "div", parentElement, {}, (parentElement) => [
                             this.text('Count is greater than 5')
                         ])
                         );
                     }
                     else {
                         reactiveContents.push(
-                        this.html(`div-1-rc-if-1-case_2-div-1`, "div", parentElement, {}, (parentElement) => [
+                        this.html(`425fc843`, "div", parentElement, {}, (parentElement) => [
                             this.text('Count is 5 or less')
                         ])
                         );
@@ -161,12 +161,12 @@ class TestDirectivesView extends View {
                     return reactiveContents;
                 }),
                 this.__foreach([1, 2, 3], (item, __loopKey, __loopIndex, __loop) => [
-                        this.html(`div-1-foreach-2-${__loopIndex + 1}-div-1`, "div", parentElement, {}, (parentElement) => [
+                        this.html(`9f765099-${__loopIndex + 1}`, "div", parentElement, {}, (parentElement) => [
                             this.text('Item: '),
-                            this.output(`div-1-foreach-2-${__loopIndex + 1}-div-1-output-1`, parentElement, true, [], (parentElement) => item)
+                            this.output(`c2080d34-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => item)
                         ])
                 ]),
-                this.html(`div-1-button-4`, "button", parentElement,
+                this.html(`55484cc3`, "button", parentElement,
                     { events: { click: [(event) => setCount(count + 1)] } },
                     (parentElement) => [
                     this.text('Increment')

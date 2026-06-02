@@ -66,7 +66,7 @@ export class ViewManager implements ViewManagerInterface {
 
     /** ROOT DOM container where views mount */
     private container: HTMLElement | null = null;
-    private rootElement: Html | null = null; // Html wrapper for the root container
+    private rootElement: HtmlInterface | null = null; // Html wrapper for the root container
     /** View module registry: name → factory or async loader */
     private viewRegistry: Record<string, ((...args: any[]) => any) | (() => Promise<any>)> = {};
 
@@ -181,7 +181,7 @@ export class ViewManager implements ViewManagerInterface {
             ctx: this,
             tagName: this.container.tagName.toLowerCase(),
             element: this.container,
-            initMode: 'hydrate',
+            initMode: InitModes.HYDRATE,
             childrenFactory: () => [],
         });
         if (config?.registry) {
@@ -325,11 +325,11 @@ export class ViewManager implements ViewManagerInterface {
     }
 
     async renderPageView(
-        view: ViewInterface, 
-        data: Record<string, any>, 
-        mountRoot: HtmlInterface | null = null, 
-        initMode: InitMode = InitModes.CREATE, 
-        cache: boolean = false, 
+        view: ViewInterface,
+        data: Record<string, any>,
+        mountRoot: HtmlInterface | null = null,
+        initMode: InitMode = InitModes.CREATE,
+        cache: boolean = false,
         renderLevel: number = 0
     ): Promise<RenderPageViewResult> {
         try {
@@ -349,7 +349,7 @@ export class ViewManager implements ViewManagerInterface {
             const App = app() as ApplicationInterface;
             const Http = App.Http;
             const fetchConfig = config.fetch;
-            const fetchUrl = (config.hasAwaitData && fetchConfig?.url)? fetchConfig?.url : App.Router.getFullUrl();
+            const fetchUrl = (config.hasAwaitData && fetchConfig?.url) ? fetchConfig?.url : App.Router.getFullUrl();
 
             // ── Case 2: Có async + có prerender → prerender skeleton trước, fetch sau ──
             if (config.hasPrerender) {
@@ -431,7 +431,7 @@ export class ViewManager implements ViewManagerInterface {
 
         view.__ctrl__.urlPath = route?.$urlPath ?? null;
 
-        if(oldLayoutView){
+        if (oldLayoutView) {
             oldLayoutView.__ctrl__.stop();
             oldLayoutView.__ctrl__.deactive();
         }
@@ -465,20 +465,23 @@ export class ViewManager implements ViewManagerInterface {
 
         // ============══════════════════════════════════════════════════════════
         // case 1: khong có superView
-        if(!hasSuperView){
-            if(oldLayoutView){
+        if (!hasSuperView) {
+            if (oldLayoutView) {
                 this.currentLayoutView = null;
                 this.currentLayoutPath = null;
             }
 
             pageView.__ctrl__.setParentElement(this.rootElement!);
-            if(pageView.__ctrl__.mainElement){
+            if (pageView.__ctrl__.mainElement) {
                 pageView.__ctrl__.mainElement.setParentElement(this.rootElement!);
-                
+                pageView.__ctrl__.mainElement.mountTo(this.rootElement!);
+
             }
-            else if(pageView.__ctrl__.preloadElement){
+            else if (pageView.__ctrl__.preloadElement) {
                 pageView.__ctrl__.preloadElement.setParentElement(this.rootElement!);
+                pageView.__ctrl__.preloadElement.mountTo(this.rootElement!);
             }
+
 
         }
 

@@ -126,11 +126,11 @@ class Demo3View extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.html(`div-1`, "div", parentElement,
+            this.html(`d69e6b1d`, "div", parentElement,
                 { classes: [{ type: 'static', value: "demo3-component" }], events: { click: [{"handler":"toggle","params":[]}] } },
                 (parentElement) => [
                 this.text('Status: '),
-                this.output(`div-1-output-1`, parentElement, true, ["isOpen"], (parentElement) => isOpen ? 'Open' : 'Closed')
+                this.output(`fd128df1`, parentElement, true, ["isOpen"], (parentElement) => isOpen ? 'Open' : 'Closed')
                 ])
             ]);
             }

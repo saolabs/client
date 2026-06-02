@@ -181,19 +181,19 @@ class FetchBeatifulView extends View {
             let parentReactive = null;
             this.section('meta:title', { type: 'static', contentType: 'text', stateKeys: [] }, () => 'Demo Fetch Users');
             this.block('block-content', 'content', (parentElement) => [
-            this.html(`block-content-div-1`, "div", parentElement,
+            this.html(`e085b222`, "div", parentElement,
                 { classes: [{ type: 'static', value: "container" }, { type: 'static', value: "py-5" }] },
                 (parentElement) => [
-                this.html(`block-content-div-1-h1-1`, "h1", parentElement,
+                this.html(`06fe9377`, "h1", parentElement,
                     { classes: [{ type: 'static', value: "mb-4" }] },
                     (parentElement) => [
                     this.text('Fetch Users Demo')
                     ]),
-                this.reactive(`block-content-div-1-rc-if-1`, "if", parentReactive, parentElement, ["error", "isLoading", "users"], (parentReactive, parentElement) => {
+                this.reactive(`97d74020`, "if", parentReactive, parentElement, ["error", "isLoading", "users"], (parentReactive, parentElement) => {
                     const reactiveContents = [];
                     if (isLoading) {
                         reactiveContents.push(
-                        this.html(`block-content-div-1-rc-if-1-case_1-div-1`, "div", parentElement,
+                        this.html(`44e075bd`, "div", parentElement,
                             { classes: [{ type: 'static', value: "alert" }, { type: 'static', value: "alert-info" }] },
                             (parentElement) => [
                             this.text('Đang tải users...')
@@ -202,17 +202,17 @@ class FetchBeatifulView extends View {
                     }
                     else if (error) {
                         reactiveContents.push(
-                        this.html(`block-content-div-1-rc-if-1-case_2-div-1`, "div", parentElement,
+                        this.html(`b8e33ef9`, "div", parentElement,
                             { classes: [{ type: 'static', value: "alert" }, { type: 'static', value: "alert-danger" }] },
                             (parentElement) => [
                             this.text('Error: '),
-                            this.output(`block-content-div-1-rc-if-1-case_2-div-1-output-1`, parentElement, true, ["error"], (parentElement) => error)
+                            this.output(`f4f15243`, parentElement, true, ["error"], (parentElement) => error)
                             ])
                         );
                     }
                     else if (!users || App.Helper.count(users) === 0) {
                         reactiveContents.push(
-                        this.html(`block-content-div-1-rc-if-1-case_3-div-1`, "div", parentElement,
+                        this.html(`55ff6a50`, "div", parentElement,
                             { classes: [{ type: 'static', value: "alert" }, { type: 'static', value: "alert-danger" }] },
                             (parentElement) => [
                             this.text('Error không có users')
@@ -221,23 +221,23 @@ class FetchBeatifulView extends View {
                     }
                     else {
                         reactiveContents.push(
-                        this.reactive(`block-content-div-1-rc-if-1-case_4-foreach-1`, "foreach", parentReactive, parentElement, ["users"], (parentReactive, parentElement) => {
+                        this.reactive(`93adb396`, "foreach", parentReactive, parentElement, ["users"], (parentReactive, parentElement) => {
                             return this.__foreach(users, (user, __loopKey, __loopIndex, __loop) => [
-                                this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1`, "div", parentElement,
+                                this.html(`0ca9f865-${__loopIndex + 1}`, "div", parentElement,
                                     { classes: [{ type: 'static', value: "user-card" }, { type: 'static', value: "mb-3" }, { type: 'static', value: "p-3" }, { type: 'static', value: "border" }, { type: 'static', value: "rounded" }] },
                                     (parentElement) => [
-                                    this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-h6-1`, "h6", parentElement, {}, (parentElement) => [
-                                        this.output(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-h6-1-output-1`, parentElement, true, [], (parentElement) => user.name)
+                                    this.html(`6f51958c-${__loopIndex + 1}`, "h6", parentElement, {}, (parentElement) => [
+                                        this.output(`a25a5270-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => user.name)
                                     ]),
-                                    this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-p-2`, "p", parentElement,
+                                    this.html(`fc55c64f-${__loopIndex + 1}`, "p", parentElement,
                                         { classes: [{ type: 'static', value: "mb-1" }] },
                                         (parentElement) => [
-                                        this.output(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-p-2-output-1`, parentElement, true, [], (parentElement) => user.email)
+                                        this.output(`b266bc52-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => user.email)
                                         ]),
-                                    this.html(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-small-3`, "small", parentElement,
+                                    this.html(`ca9dc9a1-${__loopIndex + 1}`, "small", parentElement,
                                         { classes: [{ type: 'static', value: "text-muted" }] },
                                         (parentElement) => [
-                                        this.output(`block-content-div-1-rc-if-1-case_4-foreach-1-${__loopIndex + 1}-div-1-small-3-output-1`, parentElement, true, [], (parentElement) => user.company.name)
+                                        this.output(`4ab011e3-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => user.company.name)
                                         ])
                                     ])
                             ])

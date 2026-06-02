@@ -5,23 +5,23 @@
 @const($MAX = 100)
 @vars($temp)
 @wrapper
-<div @class([$__VIEW_ID__ . '-div-1', 'test-component'])>
-    <h3 @class([$__VIEW_ID__ . '-div-1-h3-1'])>State: @startMarker('output', 'div-1-h3-1-output-1'){{ $count }}@endMarker('output', 'div-1-h3-1-output-1')</h3>
-    <p @class([$__VIEW_ID__ . '-div-1-p-2'])>Message: {{ $message }}</p>
-    <p @class([$__VIEW_ID__ . '-div-1-p-3'])>Max: {{ $MAX }}</p>
+<div @class([$__VIEW_ID__ . '-d69e6b1d', 'test-component'])>
+    <h3 @class([$__VIEW_ID__ . '-6ff016ee'])>State: @startMarker('output', '4c3e6fc4'){{ $count }}@endMarker('output', '4c3e6fc4')</h3>
+    <p @class([$__VIEW_ID__ . '-96323a6c'])>Message: {{ $message }}</p>
+    <p @class([$__VIEW_ID__ . '-7d4b4366'])>Max: {{ $MAX }}</p>
     
-    @startMarker('reactive', 'div-1-rc-if-1', ['stateKey' => ['count'], 'type' => 'if'])
+    @startMarker('reactive', '8304c314', ['stateKey' => ['count'], 'type' => 'if'])
     @if($count > 5)
-        <div @class([$__VIEW_ID__ . '-div-1-rc-if-1-case_1-div-1'])>Count is greater than 5</div>
+        <div @class([$__VIEW_ID__ . '-c0d851d9'])>Count is greater than 5</div>
     @else
-        <div @class([$__VIEW_ID__ . '-div-1-rc-if-1-case_2-div-1'])>Count is 5 or less</div>
+        <div @class([$__VIEW_ID__ . '-425fc843'])>Count is 5 or less</div>
     @endif
-    @endMarker('reactive', 'div-1-rc-if-1')
+    @endMarker('reactive', '8304c314')
     
     @foreach([1, 2, 3] as $item)
-        <div @class([$__VIEW_ID__ . "-div-1-foreach-2-{$loop->index}-div-1"])>Item: {{ $item }}</div>
+        <div @class([$__VIEW_ID__ . "-9f765099-{$loop->index}"])>Item: {{ $item }}</div>
     @endforeach
     
-    <button @class([$__VIEW_ID__ . '-div-1-button-4'])>Increment</button>
+    <button @class([$__VIEW_ID__ . '-55484cc3'])>Increment</button>
 </div>
 @endWrapper

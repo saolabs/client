@@ -4,19 +4,19 @@
 @useState($name, 'World')
 @extends($__layout__ . 'test-yield-layout')
 @block('title')
-    Page Title - @startMarker('output', 'block-title-output-1'){{ $name }}@endMarker('output', 'block-title-output-1')
+    Page Title - @startMarker('output', 'ee7f8e00'){{ $name }}@endMarker('output', 'ee7f8e00')
 @endblock
 @block('nav')
-    <a @class([$__VIEW_ID__ . '-block-nav-a-1']) @attr(['href' => '/'])>Home</a>
-    <a @class([$__VIEW_ID__ . '-block-nav-a-2']) @attr(['href' => '/about'])>About</a>
+    <a @class([$__VIEW_ID__ . '-2627e073']) @attr(['href' => '/'])>Home</a>
+    <a @class([$__VIEW_ID__ . '-098bef20']) @attr(['href' => '/about'])>About</a>
 @endblock
 @block('content')
-    <div @class([$__VIEW_ID__ . '-block-content-div-1', 'content-area'])>
-        <h2 @class([$__VIEW_ID__ . '-block-content-div-1-h2-1'])>Hello, @startMarker('output', 'block-content-div-1-h2-1-output-1'){{ $name }}@endMarker('output', 'block-content-div-1-h2-1-output-1')!</h2>
-        <p @class([$__VIEW_ID__ . '-block-content-div-1-p-2'])>Count: @startMarker('output', 'block-content-div-1-p-2-output-1'){{ $count }}@endMarker('output', 'block-content-div-1-p-2-output-1')</p>
-        <button @class([$__VIEW_ID__ . '-block-content-div-1-button-3'])>Increment</button>
+    <div @class([$__VIEW_ID__ . '-e085b222', 'content-area'])>
+        <h2 @class([$__VIEW_ID__ . '-dea81b3e'])>Hello, @startMarker('output', '2ecb12cd'){{ $name }}@endMarker('output', '2ecb12cd')!</h2>
+        <p @class([$__VIEW_ID__ . '-f0393273'])>Count: @startMarker('output', '4a27f886'){{ $count }}@endMarker('output', '4a27f886')</p>
+        <button @class([$__VIEW_ID__ . '-21f51b84'])>Increment</button>
     </div>
 @endblock
 @block('footer')
-    <p @class([$__VIEW_ID__ . '-block-footer-p-1'])>Custom Footer for @startMarker('output', 'block-footer-p-1-output-1'){{ $name }}@endMarker('output', 'block-footer-p-1-output-1')</p>
+    <p @class([$__VIEW_ID__ . '-cd16ec4a'])>Custom Footer for @startMarker('output', '8cfe315a'){{ $name }}@endMarker('output', '8cfe315a')</p>
 @endblock

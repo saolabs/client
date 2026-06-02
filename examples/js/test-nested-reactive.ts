@@ -188,44 +188,44 @@ class TestNestedReactiveView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement: any) => [
-            this.html(`div-1`, "div", parentElement,
+            this.html(`d69e6b1d`, "div", parentElement,
                 { classes: [{ type: 'static', value: "nested-reactive-demo" }] },
                 (parentElement: any) => [
-                this.html(`div-1-h2-1`, "h2", parentElement, {}, (parentElement: any) => [
+                this.html(`9d70118d`, "h2", parentElement, {}, (parentElement: any) => [
                     this.text('Total items: '),
-                    this.output(`div-1-h2-1-output-1`, parentElement, true, ["items"], (parentElement: any) => App.Helper.count(items))
+                    this.output(`57d9b60b`, parentElement, true, ["items"], (parentElement: any) => App.Helper.count(items))
                 ]),
-                this.html(`div-1-p-2`, "p", parentElement, {}, (parentElement: any) => [
+                this.html(`96323a6c`, "p", parentElement, {}, (parentElement: any) => [
                     this.text('Status: '),
-                    this.output(`div-1-p-2-output-1`, parentElement, true, ["status"], (parentElement: any) => status)
+                    this.output(`4ed23a9a`, parentElement, true, ["status"], (parentElement: any) => status)
                 ]),
-                this.reactive(`div-1-rc-if-1`, "if", parentReactive, parentElement, ["showDetails"], (parentReactive: any, parentElement: any) => {
+                this.reactive(`8304c314`, "if", parentReactive, parentElement, ["showDetails"], (parentReactive: any, parentElement: any) => {
                     const reactiveContents = [];
                     if (showDetails) {
                         reactiveContents.push(
-                        this.html(`div-1-rc-if-1-case_1-div-1`, "div", parentElement,
+                        this.html(`c0d851d9`, "div", parentElement,
                             { classes: [{ type: 'static', value: "details-panel" }] },
                             (parentElement: any) => [
-                            this.html(`div-1-rc-if-1-case_1-div-1-h3-1`, "h3", parentElement, {}, (parentElement: any) => [
+                            this.html(`e240b46f`, "h3", parentElement, {}, (parentElement: any) => [
                                 this.text('Item Details (count: '),
-                                this.output(`div-1-rc-if-1-case_1-div-1-h3-1-output-1`, parentElement, true, ["count"], (parentElement: any) => count),
+                                this.output(`a4ea9243`, parentElement, true, ["count"], (parentElement: any) => count),
                                 this.text(')')
                             ]),
-                            this.reactive(`div-1-rc-if-1-case_1-div-1-foreach-1`, "foreach", parentReactive, parentElement, ["items"], (parentReactive: any, parentElement: any) => {
+                            this.reactive(`902f863d`, "foreach", parentReactive, parentElement, ["items"], (parentReactive: any, parentElement: any) => {
                                 return this.__foreach(items, (item: any, __loopKey: any, __loopIndex: any, __loop: any) => [
-                                    this.html(`div-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-div-1`, "div", parentElement,
+                                    this.html(`b694ec4d-${__loopIndex + 1}`, "div", parentElement,
                                         { classes: [{ type: 'static', value: "item-card" }], attrs: { "data-id": { type: 'binding', value: `${item.id}`, factory: () => `${item.id}`, stateKeys: [] } } },
                                         (parentElement: any) => [
-                                        this.html(`div-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-div-1-strong-1`, "strong", parentElement, {}, (parentElement: any) => [
-                                            this.output(`div-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-div-1-strong-1-output-1`, parentElement, true, [], (parentElement: any) => item.name)
+                                        this.html(`09a1f0cb-${__loopIndex + 1}`, "strong", parentElement, {}, (parentElement: any) => [
+                                            this.output(`1bbdf8ed-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => item.name)
                                         ]),
                                         this.text(' - $'),
-                                        this.output(`div-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-div-1-output-1`, parentElement, true, [], (parentElement: any) => item.price),
-                                        this.reactive(`div-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-div-1-rc-if-1`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
+                                        this.output(`02ce1872-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => item.price),
+                                        this.reactive(`cd817d05-${__loopIndex + 1}`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
                                             const reactiveContents = [];
                                             if (item.price > 2) {
                                                 reactiveContents.push(
-                                                this.html(`div-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-div-1-rc-if-1-case_1-span-1`, "span", parentElement,
+                                                this.html(`3c490cef-${__loopIndex + 1}`, "span", parentElement,
                                                     { classes: [{ type: 'static', value: "badge" }, { type: 'static', value: "expensive" }] },
                                                     (parentElement: any) => [
                                                     this.text('Expensive')
@@ -234,7 +234,7 @@ class TestNestedReactiveView extends View {
                                             }
                                             else {
                                                 reactiveContents.push(
-                                                this.html(`div-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-div-1-rc-if-1-case_2-span-1`, "span", parentElement,
+                                                this.html(`5ba7666b-${__loopIndex + 1}`, "span", parentElement,
                                                     { classes: [{ type: 'static', value: "badge" }, { type: 'static', value: "cheap" }] },
                                                     (parentElement: any) => [
                                                     this.text('Affordable')
@@ -243,14 +243,14 @@ class TestNestedReactiveView extends View {
                                             }
                                             return reactiveContents;
                                         }),
-                                        this.html(`div-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2`, "div", parentElement,
+                                        this.html(`096ac143-${__loopIndex + 1}`, "div", parentElement,
                                             { classes: [{ type: 'static', value: "tags" }] },
                                             (parentElement: any) => [
                                             this.__foreach(item.tags, (tag: any, __loopKey: any, __loopIndex: any, __loop: any) => [
-                                                    this.html(`div-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-span-1`, "span", parentElement,
+                                                    this.html(`69ab6ad3-${__loopIndex + 1}-${__loopIndex + 1}`, "span", parentElement,
                                                         { classes: [{ type: 'static', value: "tag" }] },
                                                         (parentElement: any) => [
-                                                        this.output(`div-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-span-1-output-1`, parentElement, true, [], (parentElement: any) => tag)
+                                                        this.output(`95cfba3f-${__loopIndex + 1}-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => tag)
                                                         ])
                                             ])
                                             ])
@@ -262,47 +262,47 @@ class TestNestedReactiveView extends View {
                     }
                     else {
                         reactiveContents.push(
-                        this.html(`div-1-rc-if-1-case_2-p-1`, "p", parentElement, {}, (parentElement: any) => [
+                        this.html(`f08cfbae`, "p", parentElement, {}, (parentElement: any) => [
                             this.text('Details hidden. Click to show.')
                         ])
                         );
                     }
                     return reactiveContents;
                 }),
-                this.reactive(`div-1-rc-switch-2`, "switch", parentReactive, parentElement, ["status"], (parentReactive: any, parentElement: any) => {
+                this.reactive(`87da1671`, "switch", parentReactive, parentElement, ["status"], (parentReactive: any, parentElement: any) => {
                     const reactiveContents = [];
                     switch (status) {
                         case 'active':
                             reactiveContents.push(
-                            this.html(`div-1-rc-switch-2-case_1-div-1`, "div", parentElement,
+                            this.html(`17b81f01`, "div", parentElement,
                                 { classes: [{ type: 'static', value: "status-active" }] },
                                 (parentElement: any) => [
-                                this.html(`div-1-rc-switch-2-case_1-div-1-p-1`, "p", parentElement, {}, (parentElement: any) => [
+                                this.html(`d566c824`, "p", parentElement, {}, (parentElement: any) => [
                                     this.text('System is active')
                                 ]),
-                                this.reactive(`div-1-rc-switch-2-case_1-div-1-for-1`, "for", parentReactive, parentElement, ["count"], (parentReactive: any, parentElement: any) => {
+                                this.reactive(`fecf94b7`, "for", parentReactive, parentElement, ["count"], (parentReactive: any, parentElement: any) => {
                                     return this.__for("increment", 0, count, (__loop: any) => {
                                         let __forOutput = [];
                                         for (let i = 0; i < count; i++) {
                                             __loop.setCurrentTimes(i);
                                             __forOutput.push(
-                                            this.html(`div-1-rc-switch-2-case_1-div-1-for-1-${i}-div-1`, "div", parentElement,
+                                            this.html(`c89d0a72-${i}`, "div", parentElement,
                                                 { classes: [{ type: 'static', value: "counter-item" }] },
                                                 (parentElement: any) => [
                                                 this.text('Item #'),
-                                                this.output(`div-1-rc-switch-2-case_1-div-1-for-1-${i}-div-1-output-1`, parentElement, true, ["i"], (parentElement: any) => i + 1),
-                                                this.reactive(`div-1-rc-switch-2-case_1-div-1-for-1-${i}-div-1-rc-if-1`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
+                                                this.output(`2cbe2f68-${i}`, parentElement, true, ["i"], (parentElement: any) => i + 1),
+                                                this.reactive(`308be5af-${i}`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
                                                     const reactiveContents = [];
                                                     if (i % 2 === 0) {
                                                         reactiveContents.push(
-                                                        this.html(`div-1-rc-switch-2-case_1-div-1-for-1-${i}-div-1-rc-if-1-case_1-span-1`, "span", parentElement, {}, (parentElement: any) => [
+                                                        this.html(`2dbe1b86-${i}`, "span", parentElement, {}, (parentElement: any) => [
                                                             this.text('(even)')
                                                         ])
                                                         );
                                                     }
                                                     else {
                                                         reactiveContents.push(
-                                                        this.html(`div-1-rc-switch-2-case_1-div-1-for-1-${i}-div-1-rc-if-1-case_2-span-1`, "span", parentElement, {}, (parentElement: any) => [
+                                                        this.html(`85813a75-${i}`, "span", parentElement, {}, (parentElement: any) => [
                                                             this.text('(odd)')
                                                         ])
                                                         );
@@ -320,10 +320,10 @@ class TestNestedReactiveView extends View {
                             break;
                         case 'inactive':
                             reactiveContents.push(
-                            this.html(`div-1-rc-switch-2-case_2-div-1`, "div", parentElement,
+                            this.html(`5e0e01f9`, "div", parentElement,
                                 { classes: [{ type: 'static', value: "status-inactive" }] },
                                 (parentElement: any) => [
-                                this.html(`div-1-rc-switch-2-case_2-div-1-p-1`, "p", parentElement, {}, (parentElement: any) => [
+                                this.html(`ff6f5732`, "p", parentElement, {}, (parentElement: any) => [
                                     this.text('System is inactive')
                                 ])
                                 ])
@@ -331,12 +331,12 @@ class TestNestedReactiveView extends View {
                             break;
                         default:
                             reactiveContents.push(
-                            this.html(`div-1-rc-switch-2-case_3-div-1`, "div", parentElement,
+                            this.html(`e624844c`, "div", parentElement,
                                 { classes: [{ type: 'static', value: "status-unknown" }] },
                                 (parentElement: any) => [
-                                this.html(`div-1-rc-switch-2-case_3-div-1-p-1`, "p", parentElement, {}, (parentElement: any) => [
+                                this.html(`a9edb396`, "p", parentElement, {}, (parentElement: any) => [
                                     this.text('Unknown status: '),
-                                    this.output(`div-1-rc-switch-2-case_3-div-1-p-1-output-1`, parentElement, true, ["status"], (parentElement: any) => status)
+                                    this.output(`12037c02`, parentElement, true, ["status"], (parentElement: any) => status)
                                 ])
                                 ])
                             );
@@ -344,29 +344,29 @@ class TestNestedReactiveView extends View {
                     }
                     return reactiveContents;
                 }),
-                this.html(`div-1-div-3`, "div", parentElement,
+                this.html(`6b7c3ec4`, "div", parentElement,
                     { classes: [{ type: 'static', value: "category-groups" }] },
                     (parentElement: any) => [
-                    this.reactive(`div-1-div-3-foreach-1`, "foreach", parentReactive, parentElement, ["items"], (parentReactive: any, parentElement: any) => {
+                    this.reactive(`9e7541ab`, "foreach", parentReactive, parentElement, ["items"], (parentReactive: any, parentElement: any) => {
                         return this.__foreach(items, (item: any, key: any, __loopIndex: any, __loop: any) => [
-                            this.html(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1`, "div", parentElement,
+                            this.html(`a5dc4800-${__loopIndex + 1}`, "div", parentElement,
                                 { classes: [{ type: 'static', value: "group" }] },
                                 (parentElement: any) => [
-                                this.html(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-h4-1`, "h4", parentElement, {}, (parentElement: any) => [
+                                this.html(`257a304c-${__loopIndex + 1}`, "h4", parentElement, {}, (parentElement: any) => [
                                     this.text('['),
-                                    this.output(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-h4-1-output-1`, parentElement, true, [], (parentElement: any) => key),
+                                    this.output(`9358af9a-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => key),
                                     this.text('] '),
-                                    this.output(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-h4-1-output-2`, parentElement, true, [], (parentElement: any) => item.name),
+                                    this.output(`20fe2a71-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => item.name),
                                     this.text(' ('),
-                                    this.output(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-h4-1-output-3`, parentElement, true, [], (parentElement: any) => item.category),
+                                    this.output(`5b06d485-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => item.category),
                                     this.text(')')
                                 ]),
-                                this.reactive(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-switch-1`, "switch", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
+                                this.reactive(`be70c31c-${__loopIndex + 1}`, "switch", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
                                     const reactiveContents = [];
                                     switch (item.category) {
                                         case 'fruit':
                                             reactiveContents.push(
-                                            this.html(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-switch-1-case_1-span-1`, "span", parentElement,
+                                            this.html(`6c67bd33-${__loopIndex + 1}`, "span", parentElement,
                                                 { classes: [{ type: 'static', value: "icon" }] },
                                                 (parentElement: any) => [
                                                 this.text('🍎')
@@ -375,7 +375,7 @@ class TestNestedReactiveView extends View {
                                             break;
                                         case 'vegetable':
                                             reactiveContents.push(
-                                            this.html(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-switch-1-case_2-span-1`, "span", parentElement,
+                                            this.html(`75a19431-${__loopIndex + 1}`, "span", parentElement,
                                                 { classes: [{ type: 'static', value: "icon" }] },
                                                 (parentElement: any) => [
                                                 this.text('🥦')
@@ -385,22 +385,22 @@ class TestNestedReactiveView extends View {
                                     }
                                     return reactiveContents;
                                 }),
-                                this.reactive(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-if-2`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
+                                this.reactive(`6600da4e-${__loopIndex + 1}`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
                                     const reactiveContents = [];
                                     if (App.Helper.count(item.tags) > 1) {
                                         reactiveContents.push(
-                                        this.html(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-if-2-case_1-ul-1`, "ul", parentElement, {}, (parentElement: any) => [
+                                        this.html(`887408bb-${__loopIndex + 1}`, "ul", parentElement, {}, (parentElement: any) => [
                                             this.__foreach(item.tags, (tag: any, idx: any, __loopIndex: any, __loop: any) => [
-                                                    this.html(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-if-2-case_1-ul-1-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement, {}, (parentElement: any) => [
+                                                    this.html(`51b02d05-${__loopIndex + 1}-${__loopIndex + 1}`, "li", parentElement, {}, (parentElement: any) => [
                                                         this.text('Tag '),
-                                                        this.output(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-if-2-case_1-ul-1-foreach-1-${__loopIndex + 1}-li-1-output-1`, parentElement, true, [], (parentElement: any) => idx),
+                                                        this.output(`0d1cbbf5-${__loopIndex + 1}-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => idx),
                                                         this.text(': '),
-                                                        this.output(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-if-2-case_1-ul-1-foreach-1-${__loopIndex + 1}-li-1-output-2`, parentElement, true, [], (parentElement: any) => tag),
-                                                        this.reactive(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-if-2-case_1-ul-1-foreach-1-${__loopIndex + 1}-li-1-rc-if-1`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
+                                                        this.output(`455eb528-${__loopIndex + 1}-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => tag),
+                                                        this.reactive(`809bb5e9-${__loopIndex + 1}-${__loopIndex + 1}`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
                                                             const reactiveContents = [];
                                                             if (tag === 'sweet') {
                                                                 reactiveContents.push(
-                                                                this.html(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-if-2-case_1-ul-1-foreach-1-${__loopIndex + 1}-li-1-rc-if-1-case_1-em-1`, "em", parentElement, {}, (parentElement: any) => [
+                                                                this.html(`27607e6e-${__loopIndex + 1}-${__loopIndex + 1}`, "em", parentElement, {}, (parentElement: any) => [
                                                                     this.text(' ← popular!')
                                                                 ])
                                                                 );
@@ -414,9 +414,9 @@ class TestNestedReactiveView extends View {
                                     }
                                     else {
                                         reactiveContents.push(
-                                        this.html(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-if-2-case_2-p-1`, "p", parentElement, {}, (parentElement: any) => [
+                                        this.html(`89200765-${__loopIndex + 1}`, "p", parentElement, {}, (parentElement: any) => [
                                             this.text('Only one tag: '),
-                                            this.output(`div-1-div-3-foreach-1-${__loopIndex + 1}-div-1-rc-if-2-case_2-p-1-output-1`, parentElement, true, [], (parentElement: any) => item.tags[0])
+                                            this.output(`07a1cb6f-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => item.tags[0])
                                         ])
                                         );
                                     }
@@ -426,7 +426,7 @@ class TestNestedReactiveView extends View {
                         ])
                     })
                     ]),
-                this.include("div-1-component-1", components.item-card, parentElement, [], (parentElement: any) => ({"items": items, "count": count}))
+                this.include(`64cf91d6`, components.item-card, parentElement, [], (parentElement: any) => ({"items": items, "count": count}))
                 ])
             ]);
             }

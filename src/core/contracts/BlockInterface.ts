@@ -2,6 +2,7 @@ import type { SaoObjectType } from "../types/utils";
 import type { ViewControllerInterface } from "./ViewControllerInterface";
 import type { HtmlInterface, FragmentInterface, SaoChildrenFactoryOutput, SaoNodeInterface } from "./ElementInterface";
 import { InitMode } from "./common";
+import { MarkerModelInterface } from "./MarkerInterface";
 
 // ─── Block / Layout Interfaces ───────────────────────────────────
 export type BlockConstructorParams = {
@@ -27,19 +28,20 @@ export interface BlockInterface {
     isSaoElement: boolean;
     isOneBlock: boolean;
     initMode?: InitMode;
-     /** Initialize the block (e.g. during hydration) */
+    marker?: MarkerModelInterface | null;
+    /** Initialize the block (e.g. during hydration) */
     init(): void;
-     /** Render the block's content into the parent element */
+    /** Render the block's content into the parent element */
     render(): void;
-     /** Mount the block's content into the DOM, finding matching outlets */
+    /** Mount the block's content into the DOM, finding matching outlets */
     mount(mountCtx: ViewControllerInterface, parentElement: HtmlInterface): any;
-     /** Unmount the block's content from the DOM */
+    /** Unmount the block's content from the DOM */
     unmount(): void;
-     /** Destroy the block and clean up resources */
+    /** Destroy the block and clean up resources */
     destroy(): void;
-     /** Update the block's content (e.g. on state change) */
+    /** Update the block's content (e.g. on state change) */
     update(): void;
-     /** Set the block's parent element (used for mounting) */
+    /** Set the block's parent element (used for mounting) */
     setParentElement(parentElement: HtmlInterface | null): void;
 
     contentRenderFactory: BlockRenderFactory | null;
@@ -58,7 +60,8 @@ export interface BlockOutletInterface extends SaoNodeInterface {
     initMode: InitMode;
     isSaoElement: boolean;
     isOneBlockOutlet: boolean;
-     /** Render the outlet's markers into the parent element */
+    marker?: MarkerModelInterface | null;
+    /** Render the outlet's markers into the parent element */
     render(): any;
     hydrate(): any;
     destroy(): any;

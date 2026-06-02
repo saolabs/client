@@ -57,7 +57,7 @@ export class TextElement implements TextInterface {
         }
     }
     setParentElement(parent: HtmlInterface | null): void {
-        
+        this.parent = parent;
     }
 
     /** Update text content in-place */
@@ -68,10 +68,14 @@ export class TextElement implements TextInterface {
         }
     }
 
-    render(): void {
-        if (this.parent && this.parent.element) {
-            this.parent.element.appendChild(this.element);
+    render(): HTMLElement | Text | Comment {
+        let text = this.generateText();
+        if (this.shouldEscapeHTML) {
+            text = escapeHTML(text);
         }
+        this._text = text;
+        this.element.textContent = text;
+        return this.element;
     }
 
     remove(): void {

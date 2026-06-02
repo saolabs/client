@@ -539,8 +539,9 @@ export class ViewController implements ViewControllerInterface {
 
     block(id: string | null, name: string, contentRenderFactory: BlockRenderFactory): BlockInterface {
         if (!id) {
-            id = `b-${name}`;
+            id = `block-${name}`;
         }
+        id = `${this.viewId}-${id}`;
         const existing = this.blocks.get(id);
         const initMode = this.initMode;
         if (existing) {
@@ -561,6 +562,7 @@ export class ViewController implements ViewControllerInterface {
         if (!id) {
             id = `ob-${name}`;
         }
+        id = `${this.viewId}-${id}`;
         const existing = this.elements.get(id);
         if (existing instanceof BlockOutlet) {
             existing.setParentElement(parentElement);
@@ -584,7 +586,7 @@ export class ViewController implements ViewControllerInterface {
      * Creates a Reactive region between markers that will hold the block content.
      * BlockManager.mountAll() later inserts the page view's block content here.
      */
-    useBlock(id: string | null = null, name: string, parent: HtmlInterface): BlockOutlet {
+    useBlock(id: string | null = null, name: string, parent: HtmlInterface): BlockOutletInterface {
         return this.blockOutlet(id, name, parent);
     }
 

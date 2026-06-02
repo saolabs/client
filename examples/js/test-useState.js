@@ -154,12 +154,12 @@ class TestUseStateView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.html(`div-1`, "div", parentElement,
+            this.html(`d69e6b1d`, "div", parentElement,
                 { classes: [{ type: 'static', value: "test" }] },
                 (parentElement) => [
-                this.html(`div-1-h2-1`, "h2", parentElement, {}, (parentElement) => [
+                this.html(`9d70118d`, "h2", parentElement, {}, (parentElement) => [
                     this.text('Test '),
-                    this.output(`div-1-h2-1-output-1`, parentElement, true, ["users"], (parentElement) => users)
+                    this.output(`57d9b60b`, parentElement, true, ["users"], (parentElement) => users)
                 ])
                 ])
             ]);

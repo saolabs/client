@@ -22,6 +22,10 @@ export interface HtmlInterface extends SaoNodeInterface {
     domChildren: Node[];
     [key: string]: any;
     clearHTML(): void;
+    appendElement(element: HTMLElement | Comment | Text): void;
+    getElement(): HTMLElement;
+    renderChildren(): SaoElementChildren;
+    render(): HTMLElement;
 }
 
 /** Text node wrapper */
@@ -32,6 +36,7 @@ export interface TextInterface extends SaoNodeInterface {
 
     domChildren: Node[];
     update(newText: string): void;
+    render(): HTMLElement | Text | Comment;
 }
 
 export interface OutputInterface extends SaoNodeInterface {
@@ -68,6 +73,14 @@ export interface WrapperInterface extends SaoNodeInterface {
     nodes: Node[];
     domChildren: Node[];
     [key: string]: any;
+    appendTo(parent: HtmlInterface): void;
+    mountTo(parent: HtmlInterface): void;
+    clear(): void;
+    setChildrenFactory(factory: SaoChildrenFactory): void;
+    children: SaoElementChildren;
+    openTag: Comment;
+    closeTag: Comment;
+
 }
 
 // ─── Element Config Types ────────────────────────────────────────
@@ -129,13 +142,15 @@ export type SaoElementEventHandler = Array<{
     params?: (any | ((event: Event) => any[]))[];
 } | ((event: Event) => any)>;
 
+export type SaoElement = WrapperInterface | HtmlInterface | ReactiveInterface | TextInterface | FragmentInterface;
+export type DOMElement = HTMLElement | SVGElement | DocumentFragment | Text | Comment;
 // ─── Children Types ─────────────────────────────────────────────
 
 /** All possible rendered child node types */
-export type SaoElementChildren = Array<WrapperInterface | HtmlInterface | ReactiveInterface | TextInterface | FragmentInterface | HTMLElement | SVGElement | DocumentFragment | Text | Comment>;
+export type SaoElementChildren = Array<SaoElement | DOMElement>;
 
 /** What a children factory can return (before mounting) */
-export type SaoChildrenFactoryOutput = Array<WrapperInterface | HtmlInterface | ReactiveInterface | TextInterface | FragmentInterface | string | number | HTMLElement | SVGElement | DocumentFragment | Text | Comment>;
+export type SaoChildrenFactoryOutput = Array<SaoElement | DOMElement | string | number>;
 
 /** Factory function that produces children given parent element */
 export type SaoChildrenFactory = (parentElement: HtmlInterface | null) => SaoChildrenFactoryOutput;

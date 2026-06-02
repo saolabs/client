@@ -6,26 +6,26 @@
 @extends($__layout__ . 'base')
 @section('meta:title', 'Demo Fetch Users')
 @block('content')
-    <div @class([$__VIEW_ID__ . '-block-content-div-1', 'container', 'py-5'])>
-        <h1 @class([$__VIEW_ID__ . '-block-content-div-1-h1-1', 'mb-4'])>Fetch Users Demo</h1>
-        @startMarker('reactive', 'block-content-div-1-rc-if-1', ['stateKey' => ['isLoading'], 'type' => 'if'])
+    <div @class([$__VIEW_ID__ . '-e085b222', 'container', 'py-5'])>
+        <h1 @class([$__VIEW_ID__ . '-06fe9377', 'mb-4'])>Fetch Users Demo</h1>
+        @startMarker('reactive', '97d74020', ['stateKey' => ['isLoading'], 'type' => 'if'])
         @if($isLoading)
-            <div @class([$__VIEW_ID__ . '-block-content-div-1-rc-if-1-case_1-div-1', 'alert', 'alert-info'])>Đang tải users...</div>
+            <div @class([$__VIEW_ID__ . '-44e075bd', 'alert', 'alert-info'])>Đang tải users...</div>
         @elseif($error)
-            <div @class([$__VIEW_ID__ . '-block-content-div-1-rc-if-1-case_2-div-1', 'alert', 'alert-danger'])>Error: @startMarker('output', 'block-content-div-1-rc-if-1-case_2-div-1-output-1'){{ $error }}@endMarker('output', 'block-content-div-1-rc-if-1-case_2-div-1-output-1')</div>
+            <div @class([$__VIEW_ID__ . '-b8e33ef9', 'alert', 'alert-danger'])>Error: @startMarker('output', 'f4f15243'){{ $error }}@endMarker('output', 'f4f15243')</div>
         @elseif(!$users || count($users) === 0)
-            <div @class([$__VIEW_ID__ . '-block-content-div-1-rc-if-1-case_3-div-1', 'alert', 'alert-danger'])>Error không có users</div>
+            <div @class([$__VIEW_ID__ . '-55ff6a50', 'alert', 'alert-danger'])>Error không có users</div>
         @else
-            @startMarker('reactive', 'block-content-div-1-rc-if-1-case_4-foreach-1', ['stateKey' => ['users'], 'type' => 'foreach'])
+            @startMarker('reactive', '93adb396', ['stateKey' => ['users'], 'type' => 'foreach'])
             @foreach($users as $user)
-                <div @class([$__VIEW_ID__ . "-block-content-div-1-rc-if-1-case_4-foreach-1-{$loop->index}-div-1", 'user-card', 'mb-3', 'p-3', 'border', 'rounded'])>
-                    <h6 @class([$__VIEW_ID__ . "-block-content-div-1-rc-if-1-case_4-foreach-1-{$loop->index}-div-1-h6-1"])>{{ $user->name }}</h6>
-                    <p @class([$__VIEW_ID__ . "-block-content-div-1-rc-if-1-case_4-foreach-1-{$loop->index}-div-1-p-2", 'mb-1'])>{{ $user->email }}</p>
-                    <small @class([$__VIEW_ID__ . "-block-content-div-1-rc-if-1-case_4-foreach-1-{$loop->index}-div-1-small-3", 'text-muted'])>{{ $user->company->name }}</small>
+                <div @class([$__VIEW_ID__ . "-0ca9f865-{$loop->index}", 'user-card', 'mb-3', 'p-3', 'border', 'rounded'])>
+                    <h6 @class([$__VIEW_ID__ . "-6f51958c-{$loop->index}"])>{{ $user->name }}</h6>
+                    <p @class([$__VIEW_ID__ . "-fc55c64f-{$loop->index}", 'mb-1'])>{{ $user->email }}</p>
+                    <small @class([$__VIEW_ID__ . "-ca9dc9a1-{$loop->index}", 'text-muted'])>{{ $user->company->name }}</small>
                 </div>
             @endforeach
-            @endMarker('reactive', 'block-content-div-1-rc-if-1-case_4-foreach-1')
+            @endMarker('reactive', '93adb396')
         @endif
-        @endMarker('reactive', 'block-content-div-1-rc-if-1')
+        @endMarker('reactive', '97d74020')
     </div>
 @endblock

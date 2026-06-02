@@ -244,114 +244,114 @@ class InputView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement: any) => [
-            this.html(`div-1`, "div", parentElement,
+            this.html(`d69e6b1d`, "div", parentElement,
                 { classes: [{ type: 'static', value: "input-demo" }] },
                 (parentElement: any) => [
-                this.html(`div-1-h2-1`, "h2", parentElement, {}, (parentElement: any) => [
+                this.html(`9d70118d`, "h2", parentElement, {}, (parentElement: any) => [
                     this.text('Input State Demo')
                 ]),
-                this.html(`div-1-div-2`, "div", parentElement,
+                this.html(`fccc82c8`, "div", parentElement,
                     { classes: [{ type: 'static', value: "users" }] },
                     (parentElement: any) => [
-                    this.html(`div-1-div-2-h3-1`, "h3", parentElement, {}, (parentElement: any) => [
+                    this.html(`bb95914d`, "h3", parentElement, {}, (parentElement: any) => [
                         this.text('Users')
                     ]),
-                    this.html(`div-1-div-2-ul-2`, "ul", parentElement, {}, (parentElement: any) => [
+                    this.html(`fabeb0e6`, "ul", parentElement, {}, (parentElement: any) => [
                         this.__foreach(users, (user: any, __loopKey: any, __loopIndex: any, __loop: any) => [
-                                this.html(`div-1-div-2-ul-2-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement, {}, (parentElement: any) => [
-                                    this.output(`div-1-div-2-ul-2-foreach-1-${__loopIndex + 1}-li-1-output-1`, parentElement, true, [], (parentElement: any) => user.name),
+                                this.html(`51785291-${__loopIndex + 1}`, "li", parentElement, {}, (parentElement: any) => [
+                                    this.output(`2eba362a-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => user.name),
                                     this.text(' ('),
-                                    this.output(`div-1-div-2-ul-2-foreach-1-${__loopIndex + 1}-li-1-output-2`, parentElement, true, [], (parentElement: any) => user.email),
+                                    this.output(`158fdf32-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => user.email),
                                     this.text(')')
                                 ])
                         ])
                     ])
                     ]),
-                this.html(`div-1-div-3`, "div", parentElement,
+                this.html(`6b7c3ec4`, "div", parentElement,
                     { classes: [{ type: 'static', value: "posts" }] },
                     (parentElement: any) => [
-                    this.html(`div-1-div-3-h3-1`, "h3", parentElement, {}, (parentElement: any) => [
+                    this.html(`3c11cc9f`, "h3", parentElement, {}, (parentElement: any) => [
                         this.text('Posts')
                     ]),
-                    this.html(`div-1-div-3-ul-2`, "ul", parentElement, {}, (parentElement: any) => [
+                    this.html(`03a5e96a`, "ul", parentElement, {}, (parentElement: any) => [
                         this.__foreach(posts, (post: any, __loopKey: any, __loopIndex: any, __loop: any) => [
-                                this.html(`div-1-div-3-ul-2-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement, {}, (parentElement: any) => [
-                                    this.html(`div-1-div-3-ul-2-foreach-1-${__loopIndex + 1}-li-1-strong-1`, "strong", parentElement, {}, (parentElement: any) => [
-                                        this.output(`div-1-div-3-ul-2-foreach-1-${__loopIndex + 1}-li-1-strong-1-output-1`, parentElement, true, [], (parentElement: any) => post.title)
+                                this.html(`4f286c4f-${__loopIndex + 1}`, "li", parentElement, {}, (parentElement: any) => [
+                                    this.html(`b2511220-${__loopIndex + 1}`, "strong", parentElement, {}, (parentElement: any) => [
+                                        this.output(`134a7ae9-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => post.title)
                                     ]),
                                     this.text(': '),
-                                    this.output(`div-1-div-3-ul-2-foreach-1-${__loopIndex + 1}-li-1-output-1`, parentElement, true, [], (parentElement: any) => post.content)
+                                    this.output(`90ab339b-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => post.content)
                                 ])
                         ])
                     ])
                     ])
                 ]),
-            this.html(`div-2`, "div", parentElement,
+            this.html(`eced4db6`, "div", parentElement,
                 { classes: [{ type: 'static', value: "todos-demo" }] },
                 (parentElement: any) => [
-                this.html(`div-2-h2-1`, "h2", parentElement, {}, (parentElement: any) => [
+                this.html(`e2fbe38d`, "h2", parentElement, {}, (parentElement: any) => [
                     this.text('Todos')
                 ]),
-                this.html(`div-2-ul-2`, "ul", parentElement, {}, (parentElement: any) => [
-                    this.reactive(`div-2-ul-2-foreach-1`, "foreach", parentReactive, parentElement, ["todos"], (parentReactive: any, parentElement: any) => {
+                this.html(`bcf6c3a3`, "ul", parentElement, {}, (parentElement: any) => [
+                    this.reactive(`9605f90b`, "foreach", parentReactive, parentElement, ["todos"], (parentReactive: any, parentElement: any) => {
                         return this.__foreach(todos, (todo: any, __loopKey: any, __loopIndex: any, __loop: any) => [
-                            this.html(`div-2-ul-2-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement, {}, (parentElement: any) => [
-                                this.html(`div-2-ul-2-foreach-1-${__loopIndex + 1}-li-1-label-1`, "label", parentElement, {}, (parentElement: any) => [
-                                    this.html(`div-2-ul-2-foreach-1-${__loopIndex + 1}-li-1-label-1-input-1`, "input", parentElement, { attrs: { "type": { type: 'static', value: "checkbox" }, "bind": { type: 'static', value: true }, "todo": { type: 'static', value: true }, "completed": { type: 'static', value: true }, "checked": { type: 'static', value: true } } }),
-                                    this.output(`div-2-ul-2-foreach-1-${__loopIndex + 1}-li-1-label-1-output-1`, parentElement, true, [], (parentElement: any) => todo.task)
+                            this.html(`d8484f9d-${__loopIndex + 1}`, "li", parentElement, {}, (parentElement: any) => [
+                                this.html(`9d96460a-${__loopIndex + 1}`, "label", parentElement, {}, (parentElement: any) => [
+                                    this.html(`f73b73c3-${__loopIndex + 1}`, "input", parentElement, { attrs: { "type": { type: 'static', value: "checkbox" }, "bind": { type: 'static', value: true }, "todo": { type: 'static', value: true }, "completed": { type: 'static', value: true }, "checked": { type: 'static', value: true } } }),
+                                    this.output(`22697e74-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => todo.task)
                                 ])
                             ])
                         ])
                     })
                 ]),
-                this.html(`div-2-div-3`, "div", parentElement,
+                this.html(`a582380a`, "div", parentElement,
                     { classes: [{ type: 'static', value: "is-edit-mode" }] },
                     (parentElement: any) => [
-                    this.html(`div-2-div-3-input-1`, "input", parentElement, { attrs: { "type": { type: 'static', value: "text" }, "bind": { type: 'static', value: true }, "newTodo": { type: 'static', value: true }, "placeholder": { type: 'static', value: "Nhập công việc mới" } }, events: { keydown: [{"handler":"handleNewTodoKeyDown","params":[() => event]}] } }),
-                    this.html(`div-2-div-3-button-2`, "button", parentElement,
+                    this.html(`f4cf2d24`, "input", parentElement, { attrs: { "type": { type: 'static', value: "text" }, "bind": { type: 'static', value: true }, "newTodo": { type: 'static', value: true }, "placeholder": { type: 'static', value: "Nhập công việc mới" } }, events: { keydown: [{"handler":"handleNewTodoKeyDown","params":[() => event]}] } }),
+                    this.html(`fecec939`, "button", parentElement,
                         { events: { click: [{"handler":"addTodo","params":[]}] } },
                         (parentElement: any) => [
                         this.text('+')
                         ])
                     ])
                 ]),
-            this.html(`div-3`, "div", parentElement,
+            this.html(`559b51aa`, "div", parentElement,
                 { classes: [{ type: 'static', value: "products-demo" }] },
                 (parentElement: any) => [
-                this.html(`div-3-h2-1`, "h2", parentElement, {}, (parentElement: any) => [
+                this.html(`b2282b82`, "h2", parentElement, {}, (parentElement: any) => [
                     this.text('Products '),
-                    this.output(`div-3-h2-1-output-1`, parentElement, true, ["products"], (parentElement: any) => App.Helper.count(products))
+                    this.output(`4ec44176`, parentElement, true, ["products"], (parentElement: any) => App.Helper.count(products))
                 ]),
-                this.reactive(`div-3-rc-if-1`, "if", parentReactive, parentElement, ["products"], (parentReactive: any, parentElement: any) => {
+                this.reactive(`6c1b628b`, "if", parentReactive, parentElement, ["products"], (parentReactive: any, parentElement: any) => {
                     const reactiveContents = [];
                     if (App.Helper.count(products) === 0) {
                         reactiveContents.push(
-                        this.html(`div-3-rc-if-1-case_1-p-1`, "p", parentElement, {}, (parentElement: any) => [
+                        this.html(`6fb21822`, "p", parentElement, {}, (parentElement: any) => [
                             this.text('No products available.')
                         ])
                         );
                     }
                     else {
                         reactiveContents.push(
-                        this.html(`div-3-rc-if-1-case_2-ul-1`, "ul", parentElement, {}, (parentElement: any) => [
-                            this.reactive(`div-3-rc-if-1-case_2-ul-1-foreach-1`, "foreach", parentReactive, parentElement, ["products"], (parentReactive: any, parentElement: any) => {
+                        this.html(`e5c6fe78`, "ul", parentElement, {}, (parentElement: any) => [
+                            this.reactive(`cbf33dd6`, "foreach", parentReactive, parentElement, ["products"], (parentReactive: any, parentElement: any) => {
                                 return this.__foreach(products, (product: any, __loopKey: any, __loopIndex: any, __loop: any) => [
-                                    this.html(`div-3-rc-if-1-case_2-ul-1-foreach-1-${__loopIndex + 1}-li-1`, "li", parentElement, {}, (parentElement: any) => [
-                                        this.output(`div-3-rc-if-1-case_2-ul-1-foreach-1-${__loopIndex + 1}-li-1-output-1`, parentElement, true, [], (parentElement: any) => product.name),
+                                    this.html(`f5bde316-${__loopIndex + 1}`, "li", parentElement, {}, (parentElement: any) => [
+                                        this.output(`459e9ee4-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => product.name),
                                         this.text(' - $'),
-                                        this.output(`div-3-rc-if-1-case_2-ul-1-foreach-1-${__loopIndex + 1}-li-1-output-2`, parentElement, true, [], (parentElement: any) => product.price),
-                                        this.reactive(`div-3-rc-if-1-case_2-ul-1-foreach-1-${__loopIndex + 1}-li-1-rc-if-1`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
+                                        this.output(`783a24e9-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => product.price),
+                                        this.reactive(`5c1d8559-${__loopIndex + 1}`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
                                             const reactiveContents = [];
                                             if (product.tags && App.Helper.count(product.tags) > 0) {
                                                 reactiveContents.push(
-                                                this.html(`div-3-rc-if-1-case_2-ul-1-foreach-1-${__loopIndex + 1}-li-1-rc-if-1-case_1-div-1`, "div", parentElement,
+                                                this.html(`8b2a29e5-${__loopIndex + 1}`, "div", parentElement,
                                                     { classes: [{ type: 'static', value: "tags" }] },
                                                     (parentElement: any) => [
                                                     this.__foreach(product.tags, (tag: any, __loopKey: any, __loopIndex: any, __loop: any) => [
-                                                            this.html(`div-3-rc-if-1-case_2-ul-1-foreach-1-${__loopIndex + 1}-li-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-span-1`, "span", parentElement,
+                                                            this.html(`b82d8442-${__loopIndex + 1}-${__loopIndex + 1}`, "span", parentElement,
                                                                 { classes: [{ type: 'static', value: "tag" }] },
                                                                 (parentElement: any) => [
-                                                                this.output(`div-3-rc-if-1-case_2-ul-1-foreach-1-${__loopIndex + 1}-li-1-rc-if-1-case_1-div-1-foreach-1-${__loopIndex + 1}-span-1-output-1`, parentElement, true, [], (parentElement: any) => tag)
+                                                                this.output(`3ffbaf01-${__loopIndex + 1}-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => tag)
                                                                 ])
                                                     ])
                                                     ])
@@ -368,40 +368,40 @@ class InputView extends View {
                     return reactiveContents;
                 })
                 ]),
-            this.html(`div-4`, "div", parentElement,
+            this.html(`3c2aeb7e`, "div", parentElement,
                 { classes: [{ type: 'static', value: "for-loop" }] },
                 (parentElement: any) => [
-                this.html(`div-4-h2-1`, "h2", parentElement, {}, (parentElement: any) => [
+                this.html(`93e3f970`, "h2", parentElement, {}, (parentElement: any) => [
                     this.text('Inventory (For Loop Demo)')
                 ]),
-                this.html(`div-4-ul-2`, "ul", parentElement, {}, (parentElement: any) => [
-                    this.reactive(`div-4-ul-2-for-1`, "for", parentReactive, parentElement, ["inventory"], (parentReactive: any, parentElement: any) => {
+                this.html(`073fbc1b`, "ul", parentElement, {}, (parentElement: any) => [
+                    this.reactive(`3ea87d0d`, "for", parentReactive, parentElement, ["inventory"], (parentReactive: any, parentElement: any) => {
                         return this.__for("increment", 0, App.Helper.count(inventory), (__loop: any) => {
                             let __forOutput = [];
                             for (let i = 0; i < App.Helper.count(inventory); i++) {
                                 __loop.setCurrentTimes(i);
                                 __forOutput.push(
-                                this.html(`div-4-ul-2-for-1-${i}-li-1`, "li", parentElement, {}, (parentElement: any) => [
-                                    this.output(`div-4-ul-2-for-1-${i}-li-1-output-1`, parentElement, true, ["inventory"], (parentElement: any) => inventory[i].name),
+                                this.html(`44293bc7-${i}`, "li", parentElement, {}, (parentElement: any) => [
+                                    this.output(`88a7713e-${i}`, parentElement, true, ["inventory"], (parentElement: any) => inventory[i].name),
                                     this.text(' - $'),
-                                    this.output(`div-4-ul-2-for-1-${i}-li-1-output-2`, parentElement, true, ["inventory"], (parentElement: any) => inventory[i].price),
-                                    this.reactive(`div-4-ul-2-for-1-${i}-li-1-rc-if-1`, "if", parentReactive, parentElement, ["inventory"], (parentReactive: any, parentElement: any) => {
+                                    this.output(`da4f77c1-${i}`, parentElement, true, ["inventory"], (parentElement: any) => inventory[i].price),
+                                    this.reactive(`e04813ce-${i}`, "if", parentReactive, parentElement, ["inventory"], (parentReactive: any, parentElement: any) => {
                                         const reactiveContents = [];
                                         if (inventory[i].tags && App.Helper.count(inventory[i].tags) > 0) {
                                             reactiveContents.push(
-                                            this.html(`div-4-ul-2-for-1-${i}-li-1-rc-if-1-case_1-div-1`, "div", parentElement,
+                                            this.html(`171b943a-${i}`, "div", parentElement,
                                                 { classes: [{ type: 'static', value: "tags" }] },
                                                 (parentElement: any) => [
-                                                this.reactive(`div-4-ul-2-for-1-${i}-li-1-rc-if-1-case_1-div-1-for-1`, "for", parentReactive, parentElement, ["inventory"], (parentReactive: any, parentElement: any) => {
+                                                this.reactive(`87621184-${i}`, "for", parentReactive, parentElement, ["inventory"], (parentReactive: any, parentElement: any) => {
                                                     return this.__for("increment", 0, App.Helper.count(inventory[i].tags), (__loop: any) => {
                                                         let __forOutput = [];
                                                         for (let j = 0; j < App.Helper.count(inventory[i].tags); j++) {
                                                             __loop.setCurrentTimes(j);
                                                             __forOutput.push(
-                                                            this.html(`div-4-ul-2-for-1-${i}-li-1-rc-if-1-case_1-div-1-for-1-${j}-span-1`, "span", parentElement,
+                                                            this.html(`8184c7f7-${i}-${j}`, "span", parentElement,
                                                                 { classes: [{ type: 'static', value: "tag" }] },
                                                                 (parentElement: any) => [
-                                                                this.output(`div-4-ul-2-for-1-${i}-li-1-rc-if-1-case_1-div-1-for-1-${j}-span-1-output-1`, parentElement, true, ["inventory"], (parentElement: any) => inventory[i].tags[j])
+                                                                this.output(`acfd5bfd-${i}-${j}`, parentElement, true, ["inventory"], (parentElement: any) => inventory[i].tags[j])
                                                                 ])
                                                             );
                                                         }
@@ -421,49 +421,49 @@ class InputView extends View {
                     })
                 ])
                 ]),
-            this.html(`div-5`, "div", parentElement,
+            this.html(`f6964623`, "div", parentElement,
                 { classes: [{ type: 'static', value: "while-loop" }] },
                 (parentElement: any) => {
                     const __execArr = [];
                     __execArr.push(
-                        this.html(`div-5-h2-1`, "h2", parentElement, {}, (parentElement: any) => [
+                        this.html(`16850172`, "h2", parentElement, {}, (parentElement: any) => [
                             this.text('Catalog (While Loop Demo)')
                         ])
                     );
                     __execArr.push(
-                        this.html(`div-5-ul-2`, "ul", parentElement, {}, (parentElement: any) => [
+                        this.html(`dd6923de`, "ul", parentElement, {}, (parentElement: any) => [
                             this.__for("increment", 0, MAX_COUNT, (__loop: any) => {
                                     let __forOutput = [];
                                     for (let i = 0; i < MAX_COUNT; i++) {
                                         __loop.setCurrentTimes(i);
                                         __forOutput.push(
-                                        this.reactive(`div-5-ul-2-for-1-${i}-rc-if-1`, "if", parentReactive, parentElement, ["catalog"], (parentReactive: any, parentElement: any) => {
+                                        this.reactive(`224ef3d8-${i}`, "if", parentReactive, parentElement, ["catalog"], (parentReactive: any, parentElement: any) => {
                                             const reactiveContents = [];
                                             if (i >= App.Helper.count(catalog)) {
                                             }
                                             return reactiveContents;
                                         }),
-                                        this.html(`div-5-ul-2-for-1-${i}-li-1`, "li", parentElement, {}, (parentElement: any) => [
-                                            this.output(`div-5-ul-2-for-1-${i}-li-1-output-1`, parentElement, true, ["catalog"], (parentElement: any) => catalog[i].name),
+                                        this.html(`11279227-${i}`, "li", parentElement, {}, (parentElement: any) => [
+                                            this.output(`f95db8df-${i}`, parentElement, true, ["catalog"], (parentElement: any) => catalog[i].name),
                                             this.text(' - $'),
-                                            this.output(`div-5-ul-2-for-1-${i}-li-1-output-2`, parentElement, true, ["catalog"], (parentElement: any) => catalog[i].price),
-                                            this.reactive(`div-5-ul-2-for-1-${i}-li-1-rc-if-1`, "if", parentReactive, parentElement, ["catalog"], (parentReactive: any, parentElement: any) => {
+                                            this.output(`2fa1fe3e-${i}`, parentElement, true, ["catalog"], (parentElement: any) => catalog[i].price),
+                                            this.reactive(`dd829808-${i}`, "if", parentReactive, parentElement, ["catalog"], (parentReactive: any, parentElement: any) => {
                                                 const reactiveContents = [];
                                                 if (catalog[i].tags && App.Helper.count(catalog[i].tags) > 0) {
                                                     reactiveContents.push(
-                                                    this.html(`div-5-ul-2-for-1-${i}-li-1-rc-if-1-case_1-div-1`, "div", parentElement,
+                                                    this.html(`1aa7593b-${i}`, "div", parentElement,
                                                         { classes: [{ type: 'static', value: "tags" }] },
                                                         (parentElement: any) => [
-                                                        this.reactive(`div-5-ul-2-for-1-${i}-li-1-rc-if-1-case_1-div-1-for-1`, "for", parentReactive, parentElement, ["catalog"], (parentReactive: any, parentElement: any) => {
+                                                        this.reactive(`3c930e17-${i}`, "for", parentReactive, parentElement, ["catalog"], (parentReactive: any, parentElement: any) => {
                                                             return this.__for("increment", 0, App.Helper.count(catalog[i].tags), (__loop: any) => {
                                                                 let __forOutput = [];
                                                                 for (let j = 0; j < App.Helper.count(catalog[i].tags); j++) {
                                                                     __loop.setCurrentTimes(j);
                                                                     __forOutput.push(
-                                                                    this.html(`div-5-ul-2-for-1-${i}-li-1-rc-if-1-case_1-div-1-for-1-${j}-span-1`, "span", parentElement,
+                                                                    this.html(`b5b8a19f-${i}-${j}`, "span", parentElement,
                                                                         { classes: [{ type: 'static', value: "tag" }] },
                                                                         (parentElement: any) => [
-                                                                        this.output(`div-5-ul-2-for-1-${i}-li-1-rc-if-1-case_1-div-1-for-1-${j}-span-1-output-1`, parentElement, true, ["catalog"], (parentElement: any) => catalog[i].tags[j])
+                                                                        this.output(`41c63ad1-${i}-${j}`, parentElement, true, ["catalog"], (parentElement: any) => catalog[i].tags[j])
                                                                         ])
                                                                     );
                                                                 }
@@ -484,20 +484,20 @@ class InputView extends View {
                     );
                     n = 0;
                     __execArr.push(
-                        this.html(`div-5-h3-3`, "h3", parentElement, {}, (parentElement: any) => [
+                        this.html(`098c0117`, "h3", parentElement, {}, (parentElement: any) => [
                             this.text('While Loop Example')
                         ])
                     );
                     __execArr.push(
-                        this.html(`div-5-ul-4`, "ul", parentElement, {}, (parentElement: any) => [
+                        this.html(`03dc9e8b`, "ul", parentElement, {}, (parentElement: any) => [
                             this.__while((loopCtx) => {
                                 let __whileOutput = [];
                                 while (n < MAX_COUNT) {
                                     loopCtx.setCurrentTimes(n);
                                     __whileOutput.push(
-                                        this.html(`div-5-ul-4-while-1-${n}-li-1`, "li", parentElement, {}, (parentElement: any) => [
+                                        this.html(`62fd1c37-${n}`, "li", parentElement, {}, (parentElement: any) => [
                                             this.text('Item #'),
-                                            this.output(`div-5-ul-4-while-1-${n}-li-1-output-1`, parentElement, true, ["n"], (parentElement: any) => n + 1)
+                                            this.output(`effacc62-${n}`, parentElement, true, ["n"], (parentElement: any) => n + 1)
                                         ])
                                     );
                                         n++;
@@ -508,7 +508,7 @@ class InputView extends View {
                     );
                     return __execArr;
                 }),
-            this.include("component-1", esamples/partial.sao, parentElement, [], (parentElement: any) => ({"data": products}))
+            this.include(`68594f9a`, esamples/partial.sao, parentElement, [], (parentElement: any) => ({"data": products}))
             ]);
             }
         });

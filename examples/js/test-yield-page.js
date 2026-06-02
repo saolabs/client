@@ -164,34 +164,34 @@ class TestYieldPageView extends View {
             let parentReactive = null;
             this.block('block-title', 'title', (parentElement) => [
             this.text('Page Title - '),
-            this.output(`block-title-output-1`, parentElement, true, ["name"], (parentElement) => name)
+            this.output(`ee7f8e00`, parentElement, true, ["name"], (parentElement) => name)
             ]);
             this.block('block-nav', 'nav', (parentElement) => [
-            this.html(`block-nav-a-1`, "a", parentElement,
+            this.html(`2627e073`, "a", parentElement,
                 { attrs: { "href": { type: 'static', value: "/" } } },
                 (parentElement) => [
                 this.text('Home')
                 ]),
-            this.html(`block-nav-a-2`, "a", parentElement,
+            this.html(`098bef20`, "a", parentElement,
                 { attrs: { "href": { type: 'static', value: "/about" } } },
                 (parentElement) => [
                 this.text('About')
                 ])
             ]);
             this.block('block-content', 'content', (parentElement) => [
-            this.html(`block-content-div-1`, "div", parentElement,
+            this.html(`e085b222`, "div", parentElement,
                 { classes: [{ type: 'static', value: "content-area" }] },
                 (parentElement) => [
-                this.html(`block-content-div-1-h2-1`, "h2", parentElement, {}, (parentElement) => [
+                this.html(`dea81b3e`, "h2", parentElement, {}, (parentElement) => [
                     this.text('Hello, '),
-                    this.output(`block-content-div-1-h2-1-output-1`, parentElement, true, ["name"], (parentElement) => name),
+                    this.output(`2ecb12cd`, parentElement, true, ["name"], (parentElement) => name),
                     this.text('!')
                 ]),
-                this.html(`block-content-div-1-p-2`, "p", parentElement, {}, (parentElement) => [
+                this.html(`f0393273`, "p", parentElement, {}, (parentElement) => [
                     this.text('Count: '),
-                    this.output(`block-content-div-1-p-2-output-1`, parentElement, true, ["count"], (parentElement) => count)
+                    this.output(`4a27f886`, parentElement, true, ["count"], (parentElement) => count)
                 ]),
-                this.html(`block-content-div-1-button-3`, "button", parentElement,
+                this.html(`21f51b84`, "button", parentElement,
                     { events: { click: [(event) => setCount(count + 1)] } },
                     (parentElement) => [
                     this.text('Increment')
@@ -199,9 +199,9 @@ class TestYieldPageView extends View {
                 ])
             ]);
             this.block('block-footer', 'footer', (parentElement) => [
-            this.html(`block-footer-p-1`, "p", parentElement, {}, (parentElement) => [
+            this.html(`cd16ec4a`, "p", parentElement, {}, (parentElement) => [
                 this.text('Custom Footer for '),
-                this.output(`block-footer-p-1-output-1`, parentElement, true, ["name"], (parentElement) => name)
+                this.output(`8cfe315a`, parentElement, true, ["name"], (parentElement) => name)
             ])
             ]);
             this.superViewPath = `${__layout__+'test-yield-layout'}`;

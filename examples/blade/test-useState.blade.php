@@ -4,7 +4,7 @@
 @const([$userList, $setUserList] = useState([]))
 @let([$loading, $setLoading] = useState(false))
 @wrapper
-<div @class([$__VIEW_ID__ . '-div-1', 'test'])>
-    <h2 @class([$__VIEW_ID__ . '-div-1-h2-1'])>Test @startMarker('output', 'div-1-h2-1-output-1'){{ $users }}@endMarker('output', 'div-1-h2-1-output-1')</h2>
+<div @class([$__VIEW_ID__ . '-d69e6b1d', 'test'])>
+    <h2 @class([$__VIEW_ID__ . '-9d70118d'])>Test @startMarker('output', '57d9b60b'){{ $users }}@endMarker('output', '57d9b60b')</h2>
 </div>
 @endWrapper

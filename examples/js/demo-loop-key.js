@@ -146,7 +146,7 @@ class DemoLoopKeyView extends View {
             let parentElement = this.parentElement;
             let parentReactive = null;
             return this.wrapper((parentElement) => [
-            this.html(`div-1`, "div", parentElement,
+            this.html(`d69e6b1d`, "div", parentElement,
                 { classes: [{ type: 'static', value: "flex" }, { type: 'static', value: "flex-col" }, { type: 'static', value: "gap-2" }] },
                 (parentElement) => [
                 this.__for("increment", 0, 10, (__loop) => {
@@ -154,41 +154,41 @@ class DemoLoopKeyView extends View {
                         for (let i = 0; i < 10; i++) {
                             __loop.setCurrentTimes(i);
                             __forOutput.push(
-                            this.html(`div-1-for-1-${i}-div-1`, "div", parentElement,
+                            this.html(`75512120-${i}`, "div", parentElement,
                                 { classes: [{ type: 'static', value: "flex" }, { type: 'static', value: "items-center" }, { type: 'static', value: "gap-2" }] },
                                 (parentElement) => [
-                                this.html(`div-1-for-1-${i}-div-1-h2-1`, "h2", parentElement,
+                                this.html(`7ac578e1-${i}`, "h2", parentElement,
                                     { classes: [{ type: 'static', value: "text-sm" }] },
                                     (parentElement) => [
                                     this.text('Title '),
-                                    this.output(`div-1-for-1-${i}-div-1-h2-1-output-1`, parentElement, true, ["i"], (parentElement) => i)
+                                    this.output(`1eebdc03-${i}`, parentElement, true, ["i"], (parentElement) => i)
                                     ]),
-                                this.reactive(`div-1-for-1-${i}-div-1-foreach-1`, "foreach", parentReactive, parentElement, ["categoryList"], (parentReactive, parentElement) => {
+                                this.reactive(`042330d2-${i}`, "foreach", parentReactive, parentElement, ["categoryList"], (parentReactive, parentElement) => {
                                     return this.__foreach(categoryList, (categoryItem, __loopKey, __loopIndex, __loop) => [
-                                        this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1`, "div", parentElement,
+                                        this.html(`af0882bc-${i}-${categoryItem.id}`, "div", parentElement,
                                             { classes: [{ type: 'static', value: "category-item" }] },
                                             (parentElement) => [
-                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-h3-1`, "h3", parentElement,
+                                            this.html(`e8dfa113-${i}-${categoryItem.id}`, "h3", parentElement,
                                                 { classes: [{ type: 'static', value: "category-name" }] },
                                                 (parentElement) => [
-                                                this.output(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-h3-1-output-1`, parentElement, true, [], (parentElement) => categoryItem.name)
+                                                this.output(`07ace25f-${i}-${categoryItem.id}`, parentElement, true, [], (parentElement) => categoryItem.name)
                                                 ]),
-                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2`, "div", parentElement,
+                                            this.html(`155bb96c-${i}-${categoryItem.id}`, "div", parentElement,
                                                 { classes: [{ type: 'static', value: "post-list" }] },
                                                 (parentElement) => [
                                                 this.__foreach(categoryItem.posts, (postItem, __loopKey, __loopIndex, __loop) => [
-                                                        this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-div-1`, "div", parentElement,
+                                                        this.html(`89e1e39d-${i}-${categoryItem.id}-${postItem.id}`, "div", parentElement,
                                                             { classes: [{ type: 'static', value: "post-item" }] },
                                                             (parentElement) => [
-                                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-div-1-h4-1`, "h4", parentElement,
+                                                            this.html(`5a44d3c4-${i}-${categoryItem.id}-${postItem.id}`, "h4", parentElement,
                                                                 { classes: [{ type: 'static', value: "post-title" }] },
                                                                 (parentElement) => [
-                                                                this.output(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-div-1-h4-1-output-1`, parentElement, true, [], (parentElement) => postItem.title)
+                                                                this.output(`9a1192be-${i}-${categoryItem.id}-${postItem.id}`, parentElement, true, [], (parentElement) => postItem.title)
                                                                 ]),
-                                                            this.html(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-div-1-p-2`, "p", parentElement,
+                                                            this.html(`2b659ba4-${i}-${categoryItem.id}-${postItem.id}`, "p", parentElement,
                                                                 { classes: [{ type: 'static', value: "post-content" }] },
                                                                 (parentElement) => [
-                                                                this.output(`div-1-for-1-${i}-div-1-foreach-1-${__loopIndex + 1}-div-1-div-2-foreach-1-${__loopIndex + 1}-div-1-p-2-output-1`, parentElement, true, [], (parentElement) => postItem.content)
+                                                                this.output(`6584e3ba-${i}-${categoryItem.id}-${postItem.id}`, parentElement, true, [], (parentElement) => postItem.content)
                                                                 ])
                                                             ])
                                                 ])

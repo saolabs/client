@@ -4,22 +4,22 @@
 @await
 @extends('layout')
 @block('content')
-    <div @class([$__VIEW_ID__ . '-block-content-div-1'])>
-        @startMarker('reactive', 'block-content-div-1-rc-if-1', ['stateKey' => [], 'type' => 'if'])
+    <div @class([$__VIEW_ID__ . '-e085b222'])>
+        @startMarker('reactive', '97d74020', ['stateKey' => [], 'type' => 'if'])
         @if($user)
-            <h1 @class([$__VIEW_ID__ . '-block-content-div-1-rc-if-1-case_1-h1-1'])>Welcome {{ $user->name }}</h1>
+            <h1 @class([$__VIEW_ID__ . '-31dfc4e0'])>Welcome {{ $user->name }}</h1>
         @else
-            <p @class([$__VIEW_ID__ . '-block-content-div-1-rc-if-1-case_2-p-1'])>Please login first</p>
+            <p @class([$__VIEW_ID__ . '-b1b84f18'])>Please login first</p>
         @endif
-        @endMarker('reactive', 'block-content-div-1-rc-if-1')
+        @endMarker('reactive', '97d74020')
     </div>
-    <div @class([$__VIEW_ID__ . '-block-content-div-2'])>
-        <button @class([$__VIEW_ID__ . '-block-content-div-2-button-1'])>Login</button>
-        <button @class([$__VIEW_ID__ . '-block-content-div-2-button-2'])>Increment Counter</button>
-        <p @class([$__VIEW_ID__ . '-block-content-div-2-p-3'])>Counter: {{ $counter }}</p>
+    <div @class([$__VIEW_ID__ . '-d30ec74f'])>
+        <button @class([$__VIEW_ID__ . '-225bae8d'])>Login</button>
+        <button @class([$__VIEW_ID__ . '-b284f53d'])>Increment Counter</button>
+        <p @class([$__VIEW_ID__ . '-732603d4'])>Counter: {{ $counter }}</p>
     </div>
 @endblock
 @block('footer')
-    <footer @class([$__VIEW_ID__ . '-block-footer-footer-1'])>Copyright 2026</footer>
+    <footer @class([$__VIEW_ID__ . '-7b697647'])>Copyright 2026</footer>
 @endblock
 @section('sidebar', 'posts')

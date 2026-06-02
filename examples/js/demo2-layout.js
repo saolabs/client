@@ -38,7 +38,7 @@ class Demo2LayoutView extends View {
         super(__VIEW_PATH__, __VIEW_TYPE__, Demo2LayoutViewController);
         const App = app("App");
         const __STATE__ = this.__ctrl__.states;
-        const {__base__, __layout__, __page__, __component__, __template__, __context__, __partial__, __system__, __env = {}, __helper = {}} = systemData;
+        const { __base__, __layout__, __page__, __component__, __template__, __context__, __partial__, __system__, __env = {}, __helper = {} } = systemData;
         const __VIEW_ID__ = __data__.__SSR_VIEW_ID__ || App.View.generateViewId();
 
         const useState = (value) => {
@@ -74,13 +74,13 @@ class Demo2LayoutView extends View {
             scripts: [],
             styles: [],
             resources: [],
-            commitConstructorData: function() {
+            commitConstructorData: function () {
                 // Then update states from data
 
                 // Finally lock state updates
 
             },
-            updateVariableData: function(data) {
+            updateVariableData: function (data) {
                 // Update all variables first
                 for (const key in data) {
                     if (data.hasOwnProperty(key)) {
@@ -95,25 +95,25 @@ class Demo2LayoutView extends View {
                 // Finally lock state updates
 
             },
-            updateVariableItemData: function(key, value) {
+            updateVariableItemData: function (key, value) {
                 this.data[key] = value;
                 if (typeof __UPDATE_DATA_TRAIT__[key] === "function") {
                     __UPDATE_DATA_TRAIT__[key](value);
                 }
             },
-            prerender: function() {
-            return null;
+            prerender: function () {
+                return null;
             },
             render: function () {
-            let parentElement = this.parentElement;
-            let parentReactive = null;
-            return this.wrapper((parentElement) => [
-            this.html(`div-1`, "div", parentElement,
-                { classes: [{ type: 'static', value: "container" }] },
-                (parentElement) => [
-                this.blockOutlet("div-1-block-outlet", "content", parentElement)
-                ])
-            ]);
+                let parentElement = this.parentElement;
+                let parentReactive = null;
+                return this.wrapper((parentElement) => [
+                    this.html(`d69e6b1d`, "div", parentElement,
+                        { classes: [{ type: 'static', value: "container" }] },
+                        (parentElement) => [
+                            this.blockOutlet(`d9c86768`, "content", parentElement)
+                        ])
+                ]);
             }
         });
 
