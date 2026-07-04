@@ -1,4 +1,7 @@
 import { InitModes } from "../contracts/common";
+import { app } from "../helpers/app";
+import { mountElementList } from "../helpers/view";
+import { TextElement } from "./TextElement";
 /**
  * Wrapper — renders multiple root nodes into a parent without a wrapping tag.
  *
@@ -21,13 +24,80 @@ export class Wrapper {
         this.childrenFactory = childrenFactory;
         this.id = ctx.viewId;
         this.initMode = initMode;
-        this.openTag = document.createComment('wrapper-start');
-        this.closeTag = document.createComment('wrapper-end');
+        this.init();
+        const registry = app("Registry");
+        if (this.initMode === InitModes.HYDRATE) {
+            // ── Hydrate: tìm view markers SSR trong DOM ─────────────────
+            // Format MarkerRegistry: open = `v:id`, close = `/v:id`
+            // (v = shortcut cho 'view'). Nếu không có (vd partial hydration
+            // khi root element CHÍNH là boundary của view) → tạo markers mới,
+            // không cảnh báo vì đây là trường hợp hợp lệ.
+            const claimed = this.claimSSRMarkers(registry);
+            if (claimed) {
+                this.openTag = claimed.open;
+                this.closeTag = claimed.close;
+            }
+            else {
+                this.openTag = registry.createMarkerStart('view', this.id);
+                this.closeTag = registry.createMarkerEnd('view', this.id);
+            }
+        }
+        else {
+            this.openTag = registry.createMarkerStart('view', this.id);
+            this.closeTag = registry.createMarkerEnd('view', this.id);
+        }
+    }
+    /**
+     * Tìm cặp view markers từ server-rendered HTML.
+     * Format MarkerRegistry: open = `v:id`, close = `/v:id`.
+     * Quét comment nodes trong parent element (fallback document.body).
+     */
+    claimSSRMarkers(registry) {
+        const searchRoot = this.parent?.element ?? document.body;
+        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
+        const openText = registry.openComment('view', this.id);
+        const closeText = registry.closeComment('view', this.id);
+        let openNode = null;
+        let node;
+        while ((node = walker.nextNode())) {
+            const value = node.nodeValue?.trim() ?? '';
+            if (!openNode && value === openText) {
+                openNode = node;
+                continue;
+            }
+            if (openNode && value === closeText) {
+                return { open: openNode, close: node };
+            }
+        }
+        return null;
+    }
+    init() {
     }
     setParentElement(parent) {
         this.parent = parent;
     }
     render() {
+        this.children = [];
+        const children = this.childrenFactory(this.parent);
+        this.children = children
+            .filter((child) => child !== null && child !== undefined)
+            .map((child) => {
+            if (typeof child === 'string' || typeof child === 'number') {
+                return new TextElement({ ctx: this.ctx, parent: this.parent, stateKeys: [], generateText: () => String(child) });
+            }
+            return child;
+        });
+        return this.children;
+    }
+    appendTo(parent) {
+        this.parent = parent;
+        this.parent.appendElement(this.openTag);
+        mountElementList(this.parent, this.render());
+        this.parent.appendElement(this.closeTag);
+    }
+    mountTo(parent) {
+        parent.clearHTML();
+        this.appendTo(parent);
     }
     setChildrenFactory(factory) {
         this.childrenFactory = factory;

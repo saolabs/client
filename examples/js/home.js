@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.home';
@@ -90,7 +90,7 @@ class HomeView extends View {
                         }
                     }
                 }
-                // Then update states from data
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
 
                 // Finally lock state updates
 

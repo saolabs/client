@@ -17,10 +17,14 @@
  *   - Compiler — to know tag shortcut mappings for generated code
  *   - DevTools (future) — to inspect/debug the element tree via markers
  */
-import { MarkerRegistryRecord } from "../contracts/MarkerInterface";
-export declare class MarkerRegistryService {
+import { MarkerRegistryInterface, MarkerRegistryRecord } from "../contracts/MarkerInterface";
+export declare class MarkerRegistryService implements MarkerRegistryInterface {
     static class: string;
-    /** Tag name → short abbreviation (for compact DOM comments) */
+    /**
+     * Tag name → short abbreviation (for compact DOM comments).
+     * PHẢI khớp 1-1 với server core/ViewStorageManager::$markerTagShortcut —
+     * lệch shortcut nào thì marker loại đó không claim được khi hydrate.
+     */
     private shortcuts;
     /** Reverse lookup: shortcut → full tag name */
     private reverseShortcuts;
@@ -28,6 +32,16 @@ export declare class MarkerRegistryService {
     private records;
     /** Delimiter between tag shortcut and ID in keys */
     private delimiter;
+    /**
+     * Saola marker prefix — format chuẩn (RUNTIME_CONTRACT.md §5.1):
+     *   open:  <!--s:{type}:{id}-s-->
+     *   close: <!--s:{type}:{id}-e-->
+     * Phải khớp server (core ViewStorageManager) để hydration claim đúng.
+     */
+    private prefix;
+    /** Hậu tố đánh dấu open/close marker */
+    private openSuffix;
+    private closeSuffix;
     /** Auto-increment counter for generating unique IDs */
     private counter;
     constructor();
@@ -67,18 +81,18 @@ export declare class MarkerRegistryService {
     get size(): number;
     /**
      * Create a comment string for a marker (open).
-     * e.g. 'r:abc123' for <!--r:abc123-->
+     * Format chuẩn: 's:r:abc123-s' cho <!--s:r:abc123-s-->
      */
     openComment(tag: string, id?: string): string;
     /**
      * Create a comment string for a closing marker.
-     * e.g. '/r:abc123' for <!--/r:abc123-->
+     * Format chuẩn: 's:r:abc123-e' cho <!--s:r:abc123-e-->
      */
     closeComment(tag: string, id?: string): string;
     /**
-     * Parse a comment node's text to extract tag and id.
-     * '  r:abc123  ' → { tag: 'reactive', id: 'abc123', isClose: false }
-     * ' /r:abc123 '  → { tag: 'reactive', id: 'abc123', isClose: true }
+     * Parse a comment node's text to extract tag and id (format chuẩn §5.1).
+     * 's:r:abc123-s' → { tag: 'reactive', id: 'abc123', isClose: false }
+     * 's:r:abc123-e' → { tag: 'reactive', id: 'abc123', isClose: true }
      */
     parseComment(text: string): {
         tag: string;

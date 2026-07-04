@@ -1,4 +1,5 @@
-import { app } from "../../hellpers/app";
+import { app } from "../../helpers/app";
+import { MarkerRegistry } from "../../services";
 import { EventService } from "../../services/EventService";
 import { HttpService } from "../../services/HttpService";
 import { MarkerService } from "../../services/MarkerService";
@@ -16,6 +17,7 @@ export class CoreServiceProvider extends ServiceProvider {
         this.app.set("Storage", StoreService.instance(), true);
         this.app.set("Event", EventService.instance(), true);
         this.app.set("Http", HttpService.instance(), true);
+        this.app.set("Registry", MarkerRegistry, true);
     }
 }
 //# sourceMappingURL=CoreServiceProvider.js.map

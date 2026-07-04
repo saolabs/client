@@ -8,6 +8,12 @@ import { AppFactory, ServiceKey } from "../contracts/ApplicationInterface";
  */
 const AppInstance = new Application();
 
+// Tự đăng ký container dưới key 'App' — compiled view luôn gọi `app("App")`
+// để lấy Application (App.View, App.Helper, App.Router...). Thiếu dòng này thì
+// mọi view compiled ném "Cannot resolve: App". (Unit test cũ dùng `new View()`
+// trực tiếp nên không lộ; chỉ lộ khi chạy view compiled thật trên trình duyệt.)
+AppInstance.instance('App', AppInstance);
+
 /**
  * Helper function để lấy/đăng ký services
  * Cách dùng:

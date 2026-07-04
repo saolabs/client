@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.test-directives';
@@ -74,9 +74,9 @@ class TestDirectivesView extends View {
         let message = 'Hello';
         const MAX = 100;
         let {temp} = __data__;
-        __UPDATE_DATA_TRAIT__.message = value => message = value;
-        __UPDATE_DATA_TRAIT__.temp = value => temp = value;
-        const __VARIABLE_LIST__ = ["message", "temp"];
+        __STATE__.__.register('temp', temp);
+        __UPDATE_DATA_TRAIT__.temp = value => { temp = value; updateStateByKey('temp', value); };
+        const __VARIABLE_LIST__ = ["temp"];
 
 
         this.__ctrl__.setUserDefinedConfig({
@@ -109,8 +109,8 @@ class TestDirectivesView extends View {
                         }
                     }
                 }
-                // Then update states from data
-                update$count(0);
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
+
                 // Finally lock state updates
                 lockUpdateRealState();
             },

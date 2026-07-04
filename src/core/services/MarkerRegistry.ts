@@ -23,7 +23,11 @@ import { MarkerRegistryInterface, MarkerRegistryRecord } from "../contracts/Mark
 
 export class MarkerRegistryService implements MarkerRegistryInterface {
     static class: string = 'MarkerRegistryService';
-    /** Tag name → short abbreviation (for compact DOM comments) */
+    /**
+     * Tag name → short abbreviation (for compact DOM comments).
+     * PHẢI khớp 1-1 với server core/ViewStorageManager::$markerTagShortcut —
+     * lệch shortcut nào thì marker loại đó không claim được khi hydrate.
+     */
     private shortcuts: Record<string, string> = {
         view:         'v',
         component:    'c',
@@ -34,9 +38,12 @@ export class MarkerRegistryService implements MarkerRegistryInterface {
         section:      's',
         fragment:     'frg',
         blockoutlet:  'bo',
+        output:       'o',
         for:          'fo',
         forin:        'fi',
         foreach:      'fe',
+        forelse:      'fls',
+        each:         'ea',
         while:        'wh',
         if:           'if',
         switch:       'sw',
@@ -59,6 +66,17 @@ export class MarkerRegistryService implements MarkerRegistryInterface {
 
     /** Delimiter between tag shortcut and ID in keys */
     private delimiter: string = ':';
+
+    /**
+     * Saola marker prefix — format chuẩn (RUNTIME_CONTRACT.md §5.1):
+     *   open:  <!--s:{type}:{id}-s-->
+     *   close: <!--s:{type}:{id}-e-->
+     * Phải khớp server (core ViewStorageManager) để hydration claim đúng.
+     */
+    private prefix: string = 's';
+    /** Hậu tố đánh dấu open/close marker */
+    private openSuffix: string = '-s';
+    private closeSuffix: string = '-e';
 
     /** Auto-increment counter for generating unique IDs */
     private counter: number = 0;
@@ -176,37 +194,53 @@ export class MarkerRegistryService implements MarkerRegistryInterface {
 
     /**
      * Create a comment string for a marker (open).
-     * e.g. 'r:abc123' for <!--r:abc123-->
+     * Format chuẩn: 's:r:abc123-s' cho <!--s:r:abc123-s-->
      */
     openComment(tag: string, id?: string): string {
-        return `${this.shortcut(tag)}${id ? this.delimiter + id : ''}`;
+        const body = id ? `${this.shortcut(tag)}${this.delimiter}${id}` : this.shortcut(tag);
+        return `${this.prefix}${this.delimiter}${body}${this.openSuffix}`;
     }
 
     /**
      * Create a comment string for a closing marker.
-     * e.g. '/r:abc123' for <!--/r:abc123-->
+     * Format chuẩn: 's:r:abc123-e' cho <!--s:r:abc123-e-->
      */
     closeComment(tag: string, id?: string): string {
-        return `/${this.shortcut(tag)}${id ? this.delimiter + id : ''}`;
+        const body = id ? `${this.shortcut(tag)}${this.delimiter}${id}` : this.shortcut(tag);
+        return `${this.prefix}${this.delimiter}${body}${this.closeSuffix}`;
     }
 
     /**
-     * Parse a comment node's text to extract tag and id.
-     * '  r:abc123  ' → { tag: 'reactive', id: 'abc123', isClose: false }
-     * ' /r:abc123 '  → { tag: 'reactive', id: 'abc123', isClose: true }
+     * Parse a comment node's text to extract tag and id (format chuẩn §5.1).
+     * 's:r:abc123-s' → { tag: 'reactive', id: 'abc123', isClose: false }
+     * 's:r:abc123-e' → { tag: 'reactive', id: 'abc123', isClose: true }
      */
     parseComment(text: string): { tag: string; id: string; isClose: boolean } | null {
         const trimmed = text.trim();
         if (!trimmed) return null;
 
-        const isClose = trimmed.startsWith('/');
-        const content = isClose ? trimmed.slice(1) : trimmed;
-        const delimIdx = content.indexOf(this.delimiter);
+        const head = this.prefix + this.delimiter; // "s:"
+        if (!trimmed.startsWith(head)) return null;
 
-        if (delimIdx === -1) return null;
+        let body = trimmed.slice(head.length); // "r:abc123-s"
+        let isClose: boolean;
+        if (body.endsWith(this.openSuffix)) {
+            isClose = false;
+            body = body.slice(0, -this.openSuffix.length);
+        } else if (body.endsWith(this.closeSuffix)) {
+            isClose = true;
+            body = body.slice(0, -this.closeSuffix.length);
+        } else {
+            return null;
+        }
 
-        const shortTag = content.slice(0, delimIdx);
-        const id = content.slice(delimIdx + 1);
+        const delimIdx = body.indexOf(this.delimiter);
+        if (delimIdx === -1) {
+            return { tag: this.fullTag(body), id: '', isClose };
+        }
+
+        const shortTag = body.slice(0, delimIdx);
+        const id = body.slice(delimIdx + 1);
 
         return {
             tag: this.fullTag(shortTag),

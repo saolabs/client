@@ -137,11 +137,10 @@
             @endwhile
         </ul>
     </div>
-    @include('esamples/partial.sao', {data: products})
+    @include('esamples.partial', {data: products})
     {{-- Level 1: @if block --}}
 </template>
 <script setup lang="ts">
-    import { ref } from 'saola';
     export default {
         methods: {
             handleNewTodoKeyDown(event: KeyboardEvent) {

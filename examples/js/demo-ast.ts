@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 import {_} from 'saola';
 
@@ -61,8 +61,7 @@ class DemoAstView extends View {
 
         const __UPDATE_DATA_TRAIT__: any = {};
         let name = 'John Doe';
-        __UPDATE_DATA_TRAIT__.name = (value: any) => name = value;
-        const __VARIABLE_LIST__: any = ["name"];
+        const __VARIABLE_LIST__: any = [];
 
 
         this.__ctrl__.setUserDefinedConfig({
@@ -111,7 +110,7 @@ class DemoAstView extends View {
                         }
                     }
                 }
-                // Then update states from data
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
 
                 // Finally lock state updates
 

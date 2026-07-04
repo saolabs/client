@@ -1,14 +1,11 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, expect } from "vitest";
 import { NamedServiceProvider, resolveProviderOrder, PROVIDER_NAMES } from "./provider-order";
 
 function provider(name: string, dependsOn: string[] = []): NamedServiceProvider {
     return {
         name,
         dependsOn,
-        register() {
-            // noop for ordering test
-        }
+        register() {},
     };
 }
 
@@ -22,7 +19,7 @@ describe("resolveProviderOrder", () => {
         ]);
 
         const names = ordered.map((item) => item.name);
-        assert.deepEqual(names, ["core", "view", "router", "api"]);
+        expect(names).toEqual(["core", "view", "router", "api"]);
     });
 
     it("works with PROVIDER_NAMES constants", () => {
@@ -33,35 +30,27 @@ describe("resolveProviderOrder", () => {
         ]);
 
         const names = ordered.map((p) => p.name);
-        assert.equal(names.indexOf(PROVIDER_NAMES.CORE), 0);
-        assert.ok(names.indexOf(PROVIDER_NAMES.VIEW) < names.indexOf(PROVIDER_NAMES.ROUTER));
+        expect(names.indexOf(PROVIDER_NAMES.CORE)).toBe(0);
+        expect(names.indexOf(PROVIDER_NAMES.VIEW)).toBeLessThan(names.indexOf(PROVIDER_NAMES.ROUTER));
     });
 
     it("throws for missing dependency", () => {
-        assert.throws(
-            () => resolveProviderOrder([provider("view", ["core"])]),
-            /Missing provider dependency/
-        );
+        expect(() => resolveProviderOrder([provider("view", ["core"])]))
+            .toThrow(/Missing provider dependency/);
     });
 
     it("throws for circular dependency", () => {
-        assert.throws(
-            () => resolveProviderOrder([
-                provider("a", ["b"]),
-                provider("b", ["c"]),
-                provider("c", ["a"])
-            ]),
-            /Circular service provider dependency/
-        );
+        expect(() => resolveProviderOrder([
+            provider("a", ["b"]),
+            provider("b", ["c"]),
+            provider("c", ["a"])
+        ])).toThrow(/Circular service provider dependency/);
     });
 
     it("throws for duplicate provider names", () => {
-        assert.throws(
-            () => resolveProviderOrder([
-                provider("core"),
-                provider("core")
-            ]),
-            /Duplicate provider name/
-        );
+        expect(() => resolveProviderOrder([
+            provider("core"),
+            provider("core")
+        ])).toThrow(/Duplicate provider name/);
     });
 });

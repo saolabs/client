@@ -1,6 +1,7 @@
 import type { SaoObjectType } from "../types/utils";
 import type { ViewControllerInterface } from "./ViewControllerInterface";
 import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren, SaoNodeInterface } from "./ElementInterface";
+import { MarkerModelInterface } from "./MarkerInterface";
 /** Reactive region bounded by comment markers — re-renders when deps change */
 export interface ReactiveInterface extends SaoNodeInterface {
     saoType: SaoObjectType;
@@ -21,6 +22,7 @@ export interface ReactiveInterface extends SaoNodeInterface {
     destroy(): void;
     isSaoElement: boolean;
     isOneReactive: boolean;
+    marker: MarkerModelInterface | null;
 }
 /** Function called by Reactive to produce DOM content between markers */
 export type ReactiveRenderFn = (ctx: ViewControllerInterface, parentElement: HtmlInterface | null) => SaoChildrenFactoryOutput;

@@ -1,6 +1,6 @@
 import { HtmlInterface } from "../contracts/ElementInterface";
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/views";
+import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface";
 export declare class Section implements SectionInterface {
     ctx: ViewControllerInterface | undefined | null;
     name: string;

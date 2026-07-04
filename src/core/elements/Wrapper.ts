@@ -5,7 +5,6 @@ import { app } from "../helpers/app";
 import { generateUUID } from "../helpers/utils";
 import { mountElementList } from "../helpers/view";
 import { MarkerRegistryService } from "../services";
-import { MarkerService } from "../services/MarkerService";
 import type { SaoObjectType } from "../types/utils";
 import { Html } from "./Html";
 import { TextElement } from "./TextElement";
@@ -54,16 +53,18 @@ export class Wrapper implements WrapperInterface {
         this.init();
         const registry = app<MarkerRegistryService>("Registry");
         if (this.initMode === InitModes.HYDRATE) {
-            const markerService: MarkerService = app<MarkerService>(MarkerService);
-            const viewMarker = markerService.first('view', this.id);
-            if (viewMarker) {
-                this.openTag = viewMarker.openTag;
-                this.closeTag = viewMarker.closeTag;
+            // ── Hydrate: tìm view markers SSR trong DOM ─────────────────
+            // Format MarkerRegistry: open = `v:id`, close = `/v:id`
+            // (v = shortcut cho 'view'). Nếu không có (vd partial hydration
+            // khi root element CHÍNH là boundary của view) → tạo markers mới,
+            // không cảnh báo vì đây là trường hợp hợp lệ.
+            const claimed = this.claimSSRMarkers(registry);
+            if (claimed) {
+                this.openTag = claimed.open;
+                this.closeTag = claimed.close;
             } else {
                 this.openTag = registry.createMarkerStart('view', this.id);
                 this.closeTag = registry.createMarkerEnd('view', this.id);
-                console.warn(`Wrapper hydration failed: no marker found for view ID ${this.id}`);
-
             }
         }
         else {
@@ -71,6 +72,35 @@ export class Wrapper implements WrapperInterface {
             this.closeTag = registry.createMarkerEnd('view', this.id);
         }
 
+    }
+
+    /**
+     * Tìm cặp view markers từ server-rendered HTML.
+     * Format MarkerRegistry: open = `v:id`, close = `/v:id`.
+     * Quét comment nodes trong parent element (fallback document.body).
+     */
+    private claimSSRMarkers(
+        registry: MarkerRegistryService
+    ): { open: Comment; close: Comment } | null {
+        const searchRoot = this.parent?.element ?? document.body;
+        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
+
+        const openText = registry.openComment('view', this.id);
+        const closeText = registry.closeComment('view', this.id);
+        let openNode: Comment | null = null;
+
+        let node: Comment | null;
+        while ((node = walker.nextNode() as Comment | null)) {
+            const value = node.nodeValue?.trim() ?? '';
+            if (!openNode && value === openText) {
+                openNode = node;
+                continue;
+            }
+            if (openNode && value === closeText) {
+                return { open: openNode, close: node };
+            }
+        }
+        return null;
     }
 
     init() {
@@ -84,12 +114,14 @@ export class Wrapper implements WrapperInterface {
     render(): SaoElementChildren {
         this.children = [];
         const children = this.childrenFactory(this.parent);
-        this.children = children.map((child: SaoElement | DOMElement | string | number) => {
-            if (typeof child === 'string' || typeof child === 'number') {
-                return new TextElement({ ctx: this.ctx, parent: this.parent, stateKeys: [], generateText: () => String(child) });
-            }
-            return child;
-        });
+        this.children = children
+            .filter((child): child is NonNullable<typeof child> => child !== null && child !== undefined)
+            .map((child) => {
+                if (typeof child === 'string' || typeof child === 'number') {
+                    return new TextElement({ ctx: this.ctx, parent: this.parent, stateKeys: [], generateText: () => String(child) });
+                }
+                return child;
+            });
         return this.children;
     }
     appendTo(parent: HtmlInterface): void {
@@ -156,7 +188,11 @@ export class Wrapper implements WrapperInterface {
         this.nodes = [];
     }
 
+    /** Registry guard — wrapper đã destroy không được reuse (ViewController.wrapper) */
+    public __destroyed__: boolean = false;
+
     destroy(): void {
+        this.__destroyed__ = true;
         this.clear();
         this.openTag.remove();
         this.closeTag.remove();

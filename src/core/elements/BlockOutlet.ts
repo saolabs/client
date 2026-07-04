@@ -6,7 +6,6 @@ import type { ViewControllerInterface } from "../contracts/ViewControllerInterfa
 import { generateUUID } from "../helpers/utils";
 import { MarkerModel } from "../services/MarkerModel";
 import markerRegistry from "../services/MarkerRegistry";
-import { SaoMarker } from "../services/MarkerService";
 import type { SaoObjectType } from "../types/utils";
 
 export class BlockOutlet implements BlockOutletInterface {
@@ -29,24 +28,16 @@ export class BlockOutlet implements BlockOutletInterface {
         this.initMode = initMode;
 
         if (this.initMode === InitModes.HYDRATE) {
-            let marker = SaoMarker.first('blockoutlet', this.id);
-            if (marker) {
-                this.marker = marker;
-                this.openTag = marker.openTag as Comment;
-                this.closeTag = marker.closeTag as Comment;
+            // Claim cặp marker server <!--s:bo:{id}-s--> ... <!--s:bo:{id}-e-->
+            // bằng fresh TreeWalker (tránh exhaust walker dùng chung của SaoMarker).
+            const claimed = this.claimSSRMarkers();
+            if (claimed) {
+                this.openTag = claimed.open;
+                this.closeTag = claimed.close;
             } else {
                 this.openTag = markerRegistry.createMarkerStart('blockoutlet', this.id);
                 this.closeTag = markerRegistry.createMarkerEnd('blockoutlet', this.id);
-                markerRegistry.register('blockoutlet', this.id, { name, viewId: ctx.viewId }); // Register this outlet in the MarkerRegistry
-                this.marker = new MarkerModel({
-                    tagName: "s:bo",
-                    name: "blockoutlet",
-                    markerID: this.id,
-                    openTag: this.openTag,
-                    closeTag: this.closeTag,
-                    children: [],
-                    attributes: {}
-                })
+                markerRegistry.register('blockoutlet', this.id, { name, viewId: ctx.viewId });
             }
         }
         else {
@@ -66,23 +57,60 @@ export class BlockOutlet implements BlockOutletInterface {
 
     }
 
+    /**
+     * Tìm cặp marker outlet từ server-rendered HTML (format chuẩn §5.1):
+     *   open:  s:bo:{id}-s   close: s:bo:{id}-e
+     * Quét trong parentElement (fallback document.body) bằng fresh TreeWalker.
+     */
+    private claimSSRMarkers(): { open: Comment; close: Comment } | null {
+        const searchRoot = this.parentElement?.element ?? document.body;
+        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
+
+        const openText = markerRegistry.openComment('blockoutlet', this.id);
+        const closeText = markerRegistry.closeComment('blockoutlet', this.id);
+        let openNode: Comment | null = null;
+
+        let node: Comment | null;
+        while ((node = walker.nextNode() as Comment | null)) {
+            const value = node.nodeValue?.trim() ?? '';
+            if (!openNode && value === openText) {
+                openNode = node;
+                continue;
+            }
+            if (openNode && value === closeText) {
+                return { open: openNode, close: node };
+            }
+        }
+        return null;
+    }
+
     hydrate(): void {
         // Hydration logic if needed (e.g. reattach event listeners)
     }
 
+    /** Registry guard */
+    public __destroyed__: boolean = false;
+
+    /** Render — idempotent: markers đã trong DOM thì giữ nguyên (same-layout reuse) */
     render(): void {
+        if (this.__destroyed__) return;
+        if (this.openTag.parentNode) return; // đã đặt — không đặt lại
+
         if (!this.parentElement || !this.parentElement.element) return;
-
         const parentEl = this.parentElement.element;
-
-        // Place markers
         parentEl.appendChild(this.openTag);
-        // Register this outlet in the MarkerRegistry for block mounting
         parentEl.appendChild(this.closeTag);
-
     }
 
     destroy(): void {
+        this.__destroyed__ = true;
+        // Clear nội dung giữa markers (block content nếu còn)
+        let current: Node | null = this.openTag.nextSibling;
+        while (current && current !== this.closeTag) {
+            const next: Node | null = current.nextSibling;
+            (current as ChildNode).remove();
+            current = next;
+        }
         // Remove markers from DOM
         this.openTag.remove();
         this.closeTag.remove();

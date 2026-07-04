@@ -1,4 +1,3 @@
-import { escapeHTML } from "../hellpers/utils";
 /**
  * TextElement — wraps a DOM Text node.
  *
@@ -16,15 +15,16 @@ export class TextElement {
         this.shouldEscapeHTML = true; // Whether to escape HTML in text content
         this.isStarted = false;
         this.domChildren = []; // For compatibility with HtmlInterface; Text itself doesn't have a single root element
+        /** Registry guard — element đã destroy không được reuse */
+        this.__destroyed__ = false;
         this.ctx = ctx;
         this.generateText = generateText;
         this.parent = parent;
         this.statekeys = stateKeys;
         this.shouldEscapeHTML = isEscapeHTML;
+        // FIX(baseline#3): KHÔNG escapeHTML khi ghi vào Text node — text node tự an toàn,
+        // escape thủ công gây double-escape. shouldEscapeHTML chỉ dùng cho SSR string path.
         this._text = this.generateText();
-        if (this.shouldEscapeHTML) {
-            this._text = escapeHTML(this._text);
-        }
         this.element = document.createTextNode(this._text);
     }
     /** Start reactive text updates */
@@ -48,23 +48,26 @@ export class TextElement {
         }
     }
     setParentElement(parent) {
+        this.parent = parent;
     }
     /** Update text content in-place */
     update(newText) {
         if (this._text !== newText) {
             this._text = newText;
-            this.element.textContent = this.shouldEscapeHTML ? escapeHTML(newText) : newText;
+            this.element.textContent = newText;
         }
     }
     render() {
-        if (this.parent && this.parent.element) {
-            this.parent.element.appendChild(this.element);
-        }
+        const text = this.generateText();
+        this._text = text;
+        this.element.textContent = text;
+        return this.element;
     }
     remove() {
         this.element.remove();
     }
     destroy() {
+        this.__destroyed__ = true;
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;

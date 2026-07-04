@@ -61,7 +61,6 @@
     <alert type="success" message="This is a custom alert component!"></alert>
 </template>
 <script setup lang="ts">
-    import {_} from 'saola';
     export default {
         name: 'DemoAst',
 

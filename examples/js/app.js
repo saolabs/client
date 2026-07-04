@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.app';
@@ -83,6 +83,9 @@ class AppView extends View {
 
         const __UPDATE_DATA_TRAIT__ = {};
         let {title = 'test', description = 'Mô tả', user = App.Helper.request().user()} = __data__;
+        __STATE__.__.register('title', title);
+        __STATE__.__.register('description', description);
+        __STATE__.__.register('user', user);
         let test = 'demo';
         const set$userState = __STATE__.__.register('userState');
         let userState = null;
@@ -140,11 +143,10 @@ class AppView extends View {
                 userAvatar = value;
             }
         };
-        __UPDATE_DATA_TRAIT__.title = value => title = value;
-        __UPDATE_DATA_TRAIT__.description = value => description = value;
-        __UPDATE_DATA_TRAIT__.user = value => user = value;
-        __UPDATE_DATA_TRAIT__.test = value => test = value;
-        const __VARIABLE_LIST__ = ["title", "description", "user", "test"];
+        __UPDATE_DATA_TRAIT__.title = value => { title = value; updateStateByKey('title', value); };
+        __UPDATE_DATA_TRAIT__.description = value => { description = value; updateStateByKey('description', value); };
+        __UPDATE_DATA_TRAIT__.user = value => { user = value; updateStateByKey('user', value); };
+        const __VARIABLE_LIST__ = ["title", "description", "user"];
 
 
         this.__ctrl__.setUserDefinedConfig({
@@ -192,11 +194,9 @@ class AppView extends View {
                         }
                     }
                 }
-                // Then update states from data
-                update$userState(user);
-                update$counter(0);
-                update$posts([{"title": "title 1", "description": "Mô tả 1"}, {"title": "title 2", "description": "Mô tả 2"}, {"title": "title 3", "description": "Mô tả 3"}]);
-                update$userAvatar(App.Helper.getUserAvatar(user));
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
+                if (data.hasOwnProperty('user')) { update$userState(user); }
+                if (data.hasOwnProperty('user')) { update$userAvatar(App.Helper.getUserAvatar(user)); }
                 // Finally lock state updates
                 lockUpdateRealState();
             },
@@ -241,7 +241,7 @@ class AppView extends View {
                                         this.html(`2c9814f7-${__loopIndex + 1}`, "a", parentElement,
                                             { classes: [{ type: 'static', value: "nav-link" }], attrs: { "href": { type: 'binding', value: `${App.Helper.webPostUrl(post)}`, factory: () => `${App.Helper.webPostUrl(post)}`, stateKeys: [] } } },
                                             (parentElement) => [
-                                            this.output(`728bab78-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => post.title)
+                                            this.output(`728bab78-${__loopIndex + 1}`, parentElement, true, ["title"], (parentElement) => post.title)
                                             ])
                                         ])
                                 ])
@@ -315,10 +315,10 @@ class AppView extends View {
                 this.html(`52349a0a`, "h1", parentElement,
                     { classes: [{ type: 'static', value: "page-title" }] },
                     (parentElement) => [
-                    this.output(`8133a4eb`, parentElement, true, [], (parentElement) => title)
+                    this.output(`8133a4eb`, parentElement, true, ["title"], (parentElement) => title)
                     ]),
                 this.html(`5f02fa6e`, "p", parentElement, {}, (parentElement) => [
-                    this.output(`ad9346e1`, parentElement, true, [], (parentElement) => description)
+                    this.output(`ad9346e1`, parentElement, true, ["description"], (parentElement) => description)
                 ]),
                 this.html(`4478f7d8`, "div", parentElement,
                     { classes: [{ type: 'static', value: "card" }] },

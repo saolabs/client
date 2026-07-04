@@ -1,5 +1,5 @@
 import { InitModes } from "../contracts/common";
-import { generateUUID } from "../hellpers/utils";
+import { generateUUID } from "../helpers/utils";
 /**
  * Fragment — renders multiple root nodes into a parent without a wrapping tag.
  *
@@ -17,6 +17,8 @@ export class Fragment {
         this.children = [];
         this.initMode = InitModes.CREATE;
         this.domChildren = []; // For compatibility with HtmlInterface; Fragment itself doesn't have a single root element
+        /** Registry guard — element đã destroy không được reuse */
+        this.__destroyed__ = false;
         this.ctx = ctx;
         this.parent = parentElement;
         this.childrenFactory = childrenFactory;
@@ -28,43 +30,62 @@ export class Fragment {
     setParentElement(parent) {
         this.parent = parent;
     }
+    /**
+     * Render — idempotent + position-aware (RUNTIME_CONTRACT.md §2),
+     * cùng pattern với Reactive.render().
+     */
     render() {
-        if (!this.parent || !this.parent.element)
+        if (this.__destroyed__)
             return;
-        const parentEl = this.parent.element;
-        // Place start marker
-        parentEl.appendChild(this.openTag);
+        if (!this.openTag.parentNode) {
+            if (!this.parent || !this.parent.element)
+                return;
+            const parentEl = this.parent.element;
+            parentEl.appendChild(this.openTag);
+            parentEl.appendChild(this.closeTag);
+        }
+        else {
+            this.clear(false);
+        }
         // Build children — compiled output uses (parentElement) => [...] signature
         const output = this.childrenFactory(this.parent);
+        const insertBeforeClose = (node) => {
+            this.closeTag.parentNode?.insertBefore(node, this.closeTag);
+        };
         for (const child of output) {
+            if (child === null || child === undefined)
+                continue;
             if (typeof child === 'string' || typeof child === 'number') {
                 const textNode = document.createTextNode(String(child));
-                parentEl.appendChild(textNode);
+                insertBeforeClose(textNode);
                 this.nodes.push(textNode);
             }
-            else if (child && typeof child === 'object') {
-                if ('element' in child) {
-                    // HtmlInterface, TextInterface — append their DOM element
-                    parentEl.appendChild(child.element);
+            else if (child instanceof Node) {
+                insertBeforeClose(child);
+                this.nodes.push(child);
+            }
+            else if (typeof child === 'object') {
+                if ('element' in child && child.element) {
+                    insertBeforeClose(child.element);
                     this.nodes.push(child.element);
                     this.children.push(child);
                     child.render();
                 }
                 else if ('openTag' in child) {
-                    // Reactive, nested Fragment, Output — they self-append markers
+                    // Marker-based: đặt markers đúng vị trí trước, render sau
                     if ('parent' in child) {
                         child.parent = this.parent;
                     }
                     if ('parentElement' in child) {
                         child.parentElement = this.parent;
                     }
+                    insertBeforeClose(child.openTag);
+                    insertBeforeClose(child.closeTag);
                     this.children.push(child);
                     child.render();
                 }
             }
         }
-        // Place end marker
-        parentEl.appendChild(this.closeTag);
     }
     setChildrenFactory(factory) {
         this.childrenFactory = factory;
@@ -94,7 +115,7 @@ export class Fragment {
         }
     }
     /** Remove all nodes between markers from the DOM */
-    clear() {
+    clear(_destroyChildren = true) {
         // Destroy managed children first
         for (const child of this.children) {
             if ('destroy' in child && typeof child.destroy === 'function') {
@@ -112,6 +133,7 @@ export class Fragment {
         this.nodes = [];
     }
     destroy() {
+        this.__destroyed__ = true;
         this.clear();
         this.openTag.remove();
         this.closeTag.remove();

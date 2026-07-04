@@ -83,59 +83,162 @@ export class BlockManagerService {
      * viewId:blockName), and inserts block content between outlet markers.
      */
     mountAll() {
-        for (const [name, block] of this.activeBlocks) {
-            // Try to find an outlet that matches this block name
-            for (const [outletKey, outlet] of this.blockOutlets) {
-                if (outletKey.endsWith(`:${name}`) || outlet.name === name) {
-                    if (block.contentRenderFactory) {
-                        this.mountBlockIntoOutlet(block, outlet);
-                    }
-                    break;
-                }
+        // Mount block content vào outlet cùng tên; outlet không có block active → clear về rỗng
+        for (const [, outlet] of this.blockOutlets) {
+            const block = this.activeBlocks.get(outlet.name);
+            if (block && block.contentRenderFactory) {
+                this.mountBlockIntoOutlet(block, outlet);
+            }
+            else {
+                this.clearOutlet(outlet.name);
             }
         }
     }
     /**
      * Mount a single block's content into an outlet.
-     * Content is rendered and inserted between the outlet's open/close markers.
+     * Clear nội dung cũ trước, render content mới GIỮA outlet markers
+     * (cùng insertion model với Reactive — RUNTIME_CONTRACT.md §2).
      */
     mountBlockIntoOutlet(block, outlet) {
-        if (!outlet.parentElement?.element)
-            return;
-        const parentEl = outlet.parentElement.element;
+        if (!outlet.openTag.parentNode)
+            return; // outlet chưa nằm trong DOM
+        // Clear nội dung cũ (page trước) trước khi mount page mới
+        this.clearOutlet(outlet.name);
         const children = [];
-        // Render block content using the factory
-        const content = block.contentRenderFactory(block.ctx);
+        const insertBeforeClose = (node) => {
+            outlet.closeTag.parentNode?.insertBefore(node, outlet.closeTag);
+        };
+        // Render block content using the factory — elements thuộc về PAGE ctrl
+        const content = block.contentRenderFactory(outlet.parentElement);
         if (!Array.isArray(content))
             return;
-        // Insert each child between outlet markers
         for (const child of content) {
+            if (child === null || child === undefined)
+                continue;
             if (typeof child === 'string' || typeof child === 'number') {
-                const textNode = document.createTextNode(String(child));
-                parentEl.insertBefore(textNode, outlet.closeTag);
+                insertBeforeClose(document.createTextNode(String(child)));
             }
-            else if (child && typeof child === 'object') {
-                if ('element' in child) {
-                    // HtmlInterface, TextInterface
-                    parentEl.insertBefore(child.element, outlet.closeTag);
+            else if (child instanceof Node) {
+                insertBeforeClose(child);
+            }
+            else if (typeof child === 'object') {
+                if ('element' in child && child.element) {
+                    insertBeforeClose(child.element);
                     children.push(child);
                     child.render();
                 }
                 else if ('openTag' in child) {
-                    // Reactive, Fragment, Output — set parent, render
+                    // Marker-based: đặt markers đúng vị trí trước, render sau (idempotent)
                     if ('parent' in child) {
                         child.parent = outlet.parentElement;
                     }
                     if ('parentElement' in child) {
                         child.parentElement = outlet.parentElement;
                     }
+                    insertBeforeClose(child.openTag);
+                    insertBeforeClose(child.closeTag);
                     children.push(child);
                     child.render();
                 }
             }
         }
-        // Track mounted children for cleanup
+        // Track mounted children for lifecycle (start/stop/destroy)
         this.mountedChildren.set(outlet.name, children);
+    }
+    /**
+     * Hydrate version của mountAll — dùng khi SSR.
+     * KHÁC mountAll: KHÔNG clearOutlet (giữ DOM server), KHÔNG insertBefore.
+     * Chạy block factory ở HYDRATE mode → Html/Output/Reactive con CLAIM
+     * DOM server đã render sẵn giữa cặp marker của outlet.
+     *
+     * Tiền đề: page ctrl.initMode === HYDRATE khi gọi (để this.html() trong
+     * factory tạo element claim DOM thay vì tạo mới).
+     */
+    mountAllHydrate() {
+        for (const [, outlet] of this.blockOutlets) {
+            const block = this.activeBlocks.get(outlet.name);
+            if (block && block.contentRenderFactory) {
+                this.hydrateBlockIntoOutlet(block, outlet);
+            }
+            // outlet không có block active → để nguyên DOM server (thường rỗng)
+        }
+    }
+    /**
+     * Claim block content vào outlet (hydrate). Chạy factory, gọi render() đệ quy
+     * trên children để claim DOM, KHÔNG chèn node mới. Track children cho lifecycle.
+     */
+    hydrateBlockIntoOutlet(block, outlet) {
+        const children = [];
+        const content = block.contentRenderFactory(outlet.parentElement);
+        if (!Array.isArray(content))
+            return;
+        for (const child of content) {
+            if (child === null || child === undefined)
+                continue;
+            if (typeof child === 'string' || typeof child === 'number')
+                continue; // text: giữ server
+            if (child instanceof Node)
+                continue;
+            if (typeof child === 'object') {
+                if ('element' in child && child.element) {
+                    children.push(child);
+                    child.render(); // HYDRATE: Html claim DOM, không chèn
+                }
+                else if ('openTag' in child) {
+                    if ('parent' in child)
+                        child.parent = outlet.parentElement;
+                    if ('parentElement' in child)
+                        child.parentElement = outlet.parentElement;
+                    children.push(child);
+                    child.render(); // HYDRATE: Output/Reactive claim markers
+                }
+            }
+        }
+        this.mountedChildren.set(outlet.name, children);
+    }
+    /** Start toàn bộ block content đang mounted (gọi sau mountAll) */
+    startAll() {
+        for (const [, children] of this.mountedChildren) {
+            for (const child of children) {
+                if (child && typeof child.start === 'function')
+                    child.start();
+            }
+        }
+    }
+    /** Stop toàn bộ block content (trước khi swap page) */
+    stopAll() {
+        for (const [, children] of this.mountedChildren) {
+            for (const child of children) {
+                if (child && typeof child.stop === 'function')
+                    child.stop();
+            }
+        }
+    }
+    /**
+     * Gỡ mọi dấu vết của một view (page bị destroy):
+     * clear outlet đang chứa content của nó + xoá block đăng ký.
+     */
+    unmountView(viewId) {
+        for (const [name, block] of this.activeBlocks) {
+            if (block.viewId === viewId) {
+                this.clearOutlet(name);
+                this.activeBlocks.delete(name);
+            }
+        }
+        for (const [key, block] of this.blocks) {
+            if (block.viewId === viewId) {
+                this.blocks.delete(key);
+            }
+        }
+    }
+    /** Gỡ outlets của một layout bị destroy */
+    removeOutletsOfView(viewId) {
+        for (const [key, outlet] of this.blockOutlets) {
+            if (outlet.ctx?.viewId === viewId) {
+                this.mountedChildren.delete(outlet.name);
+                this.blockOutlets.delete(key);
+            }
+        }
     }
     /**
      * Clear content from a specific outlet (for page swap).

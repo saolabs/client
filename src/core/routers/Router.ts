@@ -65,6 +65,8 @@ export type AfterNavigationHook = (to: Route, from: ActiveRoute | null) => void;
 export class ActiveRoute {
     public readonly $route: Route;
     public readonly $urlPath: string;
+    /** Request URI = path + query string (KHÔNG gồm hash) — dùng làm cache key */
+    public readonly $uri: string;
     public readonly $params: Record<string, string>;
     public readonly $query: Record<string, string>;
     public readonly $fragment: string;
@@ -74,10 +76,12 @@ export class ActiveRoute {
         urlPath: string,
         params: Record<string, string> = {},
         query: Record<string, string> = {},
-        fragment: string = ''
+        fragment: string = '',
+        uri?: string
     ) {
         this.$route = route;
         this.$urlPath = urlPath;
+        this.$uri = uri ?? urlPath;
         this.$params = params;
         this.$query = query;
         this.$fragment = fragment;
@@ -183,8 +187,25 @@ export class Router {
 
     // ─── Configuration ──────────────────────────────────────────
 
+    /**
+     * init — nạp config và wire các dependency.
+     * Gọi bởi RouteServiceProvider.boot() sau khi tất cả providers đã boot.
+     *
+     * Thực hiện:
+     *   1. configure() — load routes, mode, guards từ config
+     *   2. Wire ViewManager — lấy từ App.View nếu chưa set thủ công
+     */
     init(config: RouterConfig): this {
-
+        if (config && Object.keys(config).length > 0) {
+            this.configure(config);
+        }
+        // Auto-wire ViewManager nếu App đã có View registered
+        if (this.App && !this.viewManager) {
+            try {
+                const vm = (this.App as any).View ?? this.App.get?.('View') ?? null;
+                if (vm) this.viewManager = vm;
+            } catch (_) { /* View chưa sẵn sàng — sẽ fallback lúc handleRoute */ }
+        }
         return this;
     }
 
@@ -278,15 +299,11 @@ export class Router {
 
     /**
      * Navigate to a URL path.
+     * History chỉ được cập nhật SAU khi guard cho phép (trong handleRoute) —
+     * guard chặn thì URL không đổi, tránh desync URL ↔ view.
      */
     navigate(path: string): void {
-        if (this.mode === 'history') {
-            window.history.pushState({}, '', path);
-        } else {
-            window.location.hash = path;
-        }
-        this.handleRoute(path);
-        this.currentUri = path;
+        this.requestNavigation(path, 'push');
     }
 
     /** Alias for navigate */
@@ -310,13 +327,7 @@ export class Router {
      * Replace current history entry without adding to stack.
      */
     replace(path: string): void {
-        if (this.mode === 'history') {
-            window.history.replaceState({}, '', path);
-        } else {
-            window.location.hash = path;
-        }
-        this.handleRoute(path);
-        this.currentUri = path;
+        this.requestNavigation(path, 'replace');
     }
 
     /**
@@ -449,7 +460,7 @@ export class Router {
 
         // Handle initial route
         if (!skipInitial) {
-            this.handleRoute(initialPath);
+            this.requestNavigation(initialPath, 'initial');
         }
 
         this.isStarted = true;
@@ -486,17 +497,59 @@ export class Router {
     }
     // ─── Internal: Route Handling ────────────────────────────────
 
+    /** Kiểu navigation nội bộ — quyết định thao tác history + nav type xuống ViewManager */
+    private pendingNavigation: { path: string; type: 'push' | 'replace' | 'pop' | 'initial' } | null = null;
+
     /**
-     * Core route handler — match route, run guards, mount view.
+     * Tách một URL string thành pathname / query string / fragment.
+     * PHẢI tách query + hash TRƯỚC khi match route — pattern chỉ match pathname.
      */
-    private async handleRoute(path: string): Promise<void> {
-        if (this.isNavigating) return;
+    private splitLocation(raw: string): { pathname: string; queryString: string; fragment: string } {
+        let rest = raw ?? '';
+        let fragment = '';
+        const hashIdx = rest.indexOf('#');
+        if (hashIdx !== -1) {
+            fragment = rest.slice(hashIdx + 1);
+            rest = rest.slice(0, hashIdx);
+        }
+        let queryString = '';
+        const queryIdx = rest.indexOf('?');
+        if (queryIdx !== -1) {
+            queryString = rest.slice(queryIdx + 1);
+            rest = rest.slice(0, queryIdx);
+        }
+        return { pathname: rest, queryString, fragment };
+    }
+
+    /**
+     * Điểm vào duy nhất cho mọi navigation (navigate/replace/popstate/initial).
+     * Đang navigate dở → ghi nhận request MỚI NHẤT, xử lý sau khi xong
+     * (không drop im lặng như trước).
+     */
+    private requestNavigation(path: string, type: 'push' | 'replace' | 'pop' | 'initial'): void {
+        if (this.isNavigating) {
+            this.pendingNavigation = { path, type };
+            return;
+        }
+        void this.handleRoute(path, type);
+    }
+
+    /**
+     * Core route handler — tách query → match route → guard → cập nhật history →
+     * mount/hydrate view → afterEach.
+     */
+    private async handleRoute(path: string, type: 'push' | 'replace' | 'pop' | 'initial' = 'push'): Promise<void> {
         this.isNavigating = true;
 
         try {
-            const normalizedPath = this.normalizePath(path);
-            const query = this.parseQuery(window.location.search);
-            const fragment = window.location.hash.substring(1);
+            const { pathname, queryString, fragment } = this.splitLocation(path);
+            const normalizedPath = this.normalizePath(pathname);
+            // Request URI = path + query, KHÔNG gồm hash — cache key của ViewManager
+            const uri = queryString ? `${normalizedPath}?${queryString}` : normalizedPath;
+            const query = this.parseQuery(queryString);
+
+            // popstate/hashchange echo về đúng URI đang đứng → bỏ qua
+            if (type === 'pop' && uri === this.currentUri) return;
 
             const match = this.matchRoute(normalizedPath);
             if (!match) {
@@ -508,26 +561,44 @@ export class Router {
             const from = this.currentRoute;
 
             // Create ActiveRoute
-            const activeRoute = new ActiveRoute(route, normalizedPath, params, query, fragment);
+            const activeRoute = new ActiveRoute(route, normalizedPath, params, query, fragment, uri);
 
-            // Before guard
+            // Before guard — chạy TRƯỚC khi đụng vào history: guard chặn thì URL giữ nguyên
             if (this._beforeEach) {
                 const allow = await this._beforeEach(route, from, normalizedPath);
                 if (allow === false) return;
             }
 
+            // Cập nhật history sau khi guard cho phép
+            const historyTarget = fragment ? `${uri}#${fragment}` : uri;
+            if (this.mode === 'history') {
+                if (type === 'push') window.history.pushState({}, '', historyTarget);
+                else if (type === 'replace') window.history.replaceState({}, '', historyTarget);
+                // pop/initial: URL đã đúng, không đụng history
+            } else if (type === 'push' || type === 'replace') {
+                // hash mode: đặt hash; hashchange echo bị chặn bởi guard `uri === currentUri`
+                window.location.hash = historyTarget;
+            }
+
             // Update global state
             Router.activeRoute = activeRoute;
             this.currentRoute = activeRoute;
+            this.currentUri = uri;
 
-            // Mount view via ViewManager
+            // Mount view via ViewManager.
+            // Route ĐẦU TIÊN sau SSR: nếu view khớp entry server đã render →
+            // hydrateView (claim DOM) thay vì mountView. consumeSSRViewId() chỉ
+            // trả id 1 lần → các navigate sau là CSR (SPA takeover).
             const viewComponent = route.component || route.view;
             if (viewComponent) {
-                if (this.viewManager) {
-                    await this.viewManager.mountView(viewComponent, params, activeRoute);
-                } else if (this.App?.View) {
-                    // Fallback: App.View is the ViewManager (registered on app)
-                    await this.App.View.mountView(viewComponent, params, activeRoute);
+                const vm = this.viewManager ?? this.App?.View;
+                if (vm) {
+                    const ssrViewId = vm.consumeSSRViewId?.(viewComponent) ?? null;
+                    if (ssrViewId) {
+                        await vm.hydrateView(viewComponent, { __SSR_VIEW_ID__: ssrViewId, ...params }, activeRoute);
+                    } else {
+                        await vm.mountView(viewComponent, params, activeRoute, type === 'pop' ? 'pop' : 'push');
+                    }
                 }
             }
 
@@ -539,6 +610,12 @@ export class Router {
             console.error('[Router] Navigation error:', error);
         } finally {
             this.isNavigating = false;
+            // Có navigation đến trong lúc đang xử lý → chạy request mới nhất
+            const pending = this.pendingNavigation;
+            this.pendingNavigation = null;
+            if (pending) {
+                void this.handleRoute(pending.path, pending.type);
+            }
         }
     }
 
@@ -549,7 +626,7 @@ export class Router {
         const path = this.mode === 'history'
             ? window.location.pathname + window.location.search
             : window.location.hash.slice(1) || this.defaultRoute;
-        this.handleRoute(path);
+        this.requestNavigation(path, 'pop');
     }
 
     /**
@@ -615,7 +692,8 @@ export class Router {
     // ─── Internal: Pattern Matching ─────────────────────────────
 
     private matchRoute(path: string): RouteMatch | null {
-        const normalizedPath = this.normalizePath(path);
+        // Defensive: strip query/hash nếu caller truyền URI đầy đủ
+        const normalizedPath = this.normalizePath(this.splitLocation(path).pathname);
 
         if (this.routeCache.has(normalizedPath)) {
             return this.routeCache.get(normalizedPath)!;
@@ -681,7 +759,9 @@ export class Router {
             regexParts.push('\\/' + escaped);
         }
 
-        const regex = new RegExp(`^${regexParts.join('')}$`);
+        // Root path '/' → mọi segment rỗng → regexParts rỗng. Phải khớp '\/'
+        // (nếu để '^$' thì route '/' không bao giờ match — bug gốc).
+        const regex = new RegExp(`^${regexParts.join('') || '\\/'}$`);
         const match = normalizedPath.match(regex);
         if (!match) return null;
 
@@ -714,12 +794,16 @@ export class Router {
     }
 
     private setActiveRouteForPath(path: string): void {
-        const normalizedPath = this.normalizePath(path);
+        const { pathname, queryString, fragment } = this.splitLocation(path);
+        const normalizedPath = this.normalizePath(pathname);
         const match = this.matchRoute(normalizedPath);
         if (match) {
-            const query = this.parseQuery(window.location.search);
-            const fragment = window.location.hash.substring(1);
-            const activeRoute = new ActiveRoute(match.route, normalizedPath, match.params, query, fragment);
+            const uri = queryString ? `${normalizedPath}?${queryString}` : normalizedPath;
+            const query = this.parseQuery(queryString || window.location.search);
+            const activeRoute = new ActiveRoute(
+                match.route, normalizedPath, match.params, query,
+                fragment || window.location.hash.substring(1), uri
+            );
             Router.activeRoute = activeRoute;
             this.currentRoute = activeRoute;
         }

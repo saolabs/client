@@ -50,9 +50,32 @@ export declare class Component implements ComponentInterface {
     setParentElement(parent: HtmlInterface | null): void;
     setView(view: ViewInterface): void;
     setParent(parent: HtmlInterface | null): void;
+    /** Registry guard */
+    __destroyed__: boolean;
+    private _isStarted;
+    private unsubscribeData;
+    private unsubscribeCondition;
+    /** 'when' type: trạng thái mounted hiện tại của child */
+    private _childMounted;
+    /**
+     * Render — @include (RUNTIME_CONTRACT.md §2):
+     *   1. Đặt component markers (idempotent — caller có thể đã đặt đúng vị trí)
+     *   2. Resolve child view từ registry (App.View)
+     *   3. Render child wrapper GIỮA markers, liên kết parent ↔ child
+     *   4. commitData cho child (start sẽ do lifecycle cascade gọi)
+     */
+    render(): void;
+    /** Tạo + mount child view giữa markers (nếu chưa có) */
+    private mountChild;
+    /** Gỡ child (when=false hoặc destroy) */
+    private unmountChild;
+    /**
+     * Start — kích hoạt child + subscribe:
+     *   - stateKeys: props reactive — đổi → dataFactory mới → child.updateData()
+     *   - condition (type 'when'): đổi → mount/unmount child
+     */
     start(): void;
     stop(): void;
-    render(): void;
     destroy(): void;
     get isSaoElement(): boolean;
     set isSaoElement(value: boolean);

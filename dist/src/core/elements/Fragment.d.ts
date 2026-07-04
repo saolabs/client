@@ -32,6 +32,12 @@ export declare class Fragment implements FragmentInterface {
         childrenFactory: SaoChildrenFactory;
     });
     setParentElement(parent: HtmlInterface | null): void;
+    /** Registry guard — element đã destroy không được reuse */
+    __destroyed__: boolean;
+    /**
+     * Render — idempotent + position-aware (RUNTIME_CONTRACT.md §2),
+     * cùng pattern với Reactive.render().
+     */
     render(): void;
     setChildrenFactory(factory: SaoChildrenFactory): void;
     /** Hydrate lifecycle — reattach event listeners or perform other setup */
@@ -41,7 +47,7 @@ export declare class Fragment implements FragmentInterface {
     /** Stop lifecycle — recursively deactivate children's reactive subscriptions */
     stop(): void;
     /** Remove all nodes between markers from the DOM */
-    clear(): void;
+    clear(_destroyChildren?: boolean): void;
     destroy(): void;
     get isSaoElement(): boolean;
     set isSaoElement(value: boolean);

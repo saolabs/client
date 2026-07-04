@@ -18,6 +18,8 @@ export { LoggerService } from './src/core/services/LoggerService.js';
 export { HelperService, CollectionProxy } from './src/core/services/HelperService.js';
 export { BlockManagerService, BlockManager } from './src/core/services/BlockManager.js';
 export { MarkerRegistry, MarkerRegistryService } from './src/core/services/MarkerRegistry.js';
+export { PageCache, PageCacheService, detachWrapperDOM } from './src/core/services/PageCache.js';
+export type { PageCacheEntry, PageCacheSetOptions } from './src/core/services/PageCache.js';
 
 // View System
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';

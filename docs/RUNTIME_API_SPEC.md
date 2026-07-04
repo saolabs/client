@@ -200,21 +200,27 @@ onDeactivated?(): void | Promise<void>;
 
 ## 5. TỔNG KẾT TRẠNG THÁI
 
-> **Cập nhật sau Phase 1–8**: Tất cả API đã implement xong.
+> **Cập nhật sau Phase 1–6 (2026-06-13)**
 
 | API | ✅ Có | ❌ Thiếu | ⚠️ Partial |
 |-----|-------|---------|-----------|
-| StateManager | 10 | 0 | 0 |
-| ViewController | 9 | 0 | 0 |
-| Element Factories | 7 | 0 | 0 |
+| StateManager (register 1-arg, setters, canUpdateStateByKey, lock/unlock) | 13 | 0 | 0 |
+| ViewController (__foreach cache-aware, _currentForeachCache) | 11 | 0 | 0 |
+| Element Factories (Html camelCase norm, @bind, ForeachSlotCache) | 9 | 0 | 0 |
 | View | 3 | 0 | 0 |
-| **Tổng** | **29** | **0** | **0** |
+| ViewManager (isViewMounted, destroy, prerender→main swap) | 8 | 0 | 0 |
+| **Tổng** | **44** | **0** | **0** |
 
-**Còn lại (Phase 9–12)**:
-1. `ViewManager` — orchestrator quản lý view lifecycle (chưa tạo)
-2. `Router` — navigation + URL binding (chưa port)
-3. Reconciliation — keyed list diff (chưa implement)
-4. SSR Hydration — server-side rendering (chưa implement)
+**Đã hoàn thành (Phase 4–6)**:
+- Phase 4: Compiler contract alignment — `register(1-arg)`, `generateViewId()`, camelCase attrs, `@bind`, named handler
+- Phase 5: `ForeachSlotCache` — identity-keyed reconciliation, DOM state preservation
+- Phase 6a: `isViewMounted()`, `destroy()` trong ViewManager
+- Phase 6b: Prerender → mainElement DOM swap (async data flow)
+
+**Còn lại**:
+1. SSR Hydration — elements claim existing server-rendered DOM (initMode: 'hydrate')
+2. Keyed reconciliation theo field (`@key="id"`) — cần compiler emit `__foreachKeyed()`
+3. `Router` integration — navigation binding đầy đủ
 
 ---
 

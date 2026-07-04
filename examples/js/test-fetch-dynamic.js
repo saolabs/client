@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.test-fetch-dynamic';
@@ -58,7 +58,8 @@ class TestFetchDynamicView extends View {
 
         const __UPDATE_DATA_TRAIT__ = {};
         let {items = []} = __data__;
-        __UPDATE_DATA_TRAIT__.items = value => items = value;
+        __STATE__.__.register('items', items);
+        __UPDATE_DATA_TRAIT__.items = value => { items = value; updateStateByKey('items', value); };
         const __VARIABLE_LIST__ = ["items"];
 
 
@@ -92,7 +93,7 @@ class TestFetchDynamicView extends View {
                         }
                     }
                 }
-                // Then update states from data
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
 
                 // Finally lock state updates
 
@@ -114,11 +115,13 @@ class TestFetchDynamicView extends View {
                 this.html(`9d70118d`, "h2", parentElement, {}, (parentElement) => [
                     this.text('Items')
                 ]),
-                this.__foreach(items, (item, __loopKey, __loopIndex, __loop) => [
+                this.reactive(`d3123714`, "foreach", parentReactive, parentElement, ["items"], (parentReactive, parentElement) => {
+                    return this.__foreach(items, (item, __loopKey, __loopIndex, __loop) => [
                         this.html(`c88c9722-${__loopIndex + 1}`, "p", parentElement, {}, (parentElement) => [
                             this.output(`bae8de25-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => item.name)
                         ])
-                ])
+                    ])
+                })
             ])
             ]);
             }

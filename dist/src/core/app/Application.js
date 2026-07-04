@@ -136,6 +136,18 @@ export class Application {
      */
     instance(key, value) {
         this.singletons.set(key, value);
+        if (typeof key === 'string' && !this.ownProperties.includes(key)) {
+            this.__store.set(key, { value, isOverridable: true });
+            Object.defineProperty(this, key, {
+                get: () => this.__store.get(key)?.value,
+                set: (newValue) => {
+                    this.__store.set(key, { value: newValue, isOverridable: true });
+                    this.singletons.set(key, newValue);
+                },
+                configurable: true,
+                enumerable: false,
+            });
+        }
         return this;
     }
     // ─── Alias ──────────────────────────────────────────────────
@@ -274,29 +286,33 @@ export class Application {
         return this.singletons;
     }
     set(name, value, isOne = false) {
-        if (this.ownProperties.includes(name)) {
-            return; // Không cho ghi đè lên thuộc tính có sẵn
-        }
         if (this.__store.has(name) && this.__store.get(name)?.isOverridable === false) {
             return; // Không cho ghi đè lên thuộc tính không thể override
         }
+        const isString = typeof name === 'string';
+        if (isString && this.ownProperties.includes(name)) {
+            return; // Không cho ghi đè lên thuộc tính có sẵn
+        }
         this.__store.set(name, { value, isOverridable: !isOne });
         this.singletons.set(name, value); // Sync → DI container
-        Object.defineProperty(this, name, {
-            get: () => this.__store.get(name)?.value,
-            set: (newValue) => {
-                if (this.__store.has(name) && this.__store.get(name)?.isOverridable === false) {
-                    return; // Không cho ghi đè nếu isOverridable là false
-                }
-                this.__store.set(name, { value: newValue, isOverridable: !isOne });
-                this.singletons.set(name, newValue); // Sync → DI container
-            },
-            configurable: isOne ? false : true,
-            enumerable: false,
-        });
+        if (isString) {
+            Object.defineProperty(this, name, {
+                get: () => this.__store.get(name)?.value,
+                set: (newValue) => {
+                    if (this.__store.has(name) && this.__store.get(name)?.isOverridable === false) {
+                        return; // Không cho ghi đè nếu isOverridable là false
+                    }
+                    this.__store.set(name, { value: newValue, isOverridable: !isOne });
+                    this.singletons.set(name, newValue); // Sync → DI container
+                },
+                configurable: isOne ? false : true,
+                enumerable: false,
+            });
+        }
     }
     get(name) {
-        if (this.ownProperties.includes(name)) {
+        const isString = typeof name === 'string';
+        if (isString && this.ownProperties.includes(name)) {
             return this[name]; // Trả về thuộc tính có sẵn
         }
         // Check __store first (registered via set())

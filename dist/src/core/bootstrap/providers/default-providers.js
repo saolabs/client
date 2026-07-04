@@ -1,4 +1,4 @@
-import { app } from "../../hellpers/app";
+import { app } from "../../helpers/app";
 import { PROVIDER_NAMES } from "./provider-order";
 import { ApiServiceProvider } from "./ApiServiceProvider";
 import { CoreServiceProvider } from "./CoreServiceProvider";

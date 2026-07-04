@@ -1,5 +1,8 @@
-import { generateUUID } from "../hellpers/utils";
+import { InitModes } from "../contracts/common";
+import { generateUUID } from "../helpers/utils";
+import { MarkerModel } from "../services/MarkerModel";
 import markerRegistry from "../services/MarkerRegistry";
+import { SaoMarker } from "../services/MarkerService";
 /**
  * Block — a named mounting slot used in layout views.
  *
@@ -24,19 +27,53 @@ export class Block {
         this.viewId = null;
         this.fragment = null;
         this.contentRenderFactory = null;
+        this.marker = null;
         this.domChildren = [];
         this.parentElement = null;
         this.isOneBlock = true;
         this.isSaoElement = false;
-        this.id = `${this.viewId}-${id ?? generateUUID(10)}`; // Unique ID for debugging
+        this.id = id ?? generateUUID(10); // Unique ID for debugging
         this.ctx = ctx;
         this.name = name;
         this.viewId = viewId ?? ctx.viewId; // Associate block with current viewId
         this.initMode = initMode;
         this.contentRenderFactory = contentRenderFactory || ((parentElement) => []);
-        markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
-        this.openTag = markerRegistry.createMarkerStart('block', this.id);
-        this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
+        if (this.initMode === InitModes.HYDRATE) {
+            let marker = SaoMarker.first('block', this.id);
+            if (marker) {
+                this.marker = marker;
+                this.openTag = marker.openTag;
+                this.closeTag = marker.closeTag;
+            }
+            else {
+                this.openTag = markerRegistry.createMarkerStart('block', this.id);
+                this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
+                markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
+                this.marker = new MarkerModel({
+                    tagName: "s:b",
+                    name: "block",
+                    markerID: this.id,
+                    openTag: this.openTag,
+                    closeTag: this.closeTag,
+                    children: [],
+                    attributes: {}
+                });
+            }
+        }
+        else {
+            this.openTag = markerRegistry.createMarkerStart('block', this.id);
+            this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
+            markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
+            this.marker = new MarkerModel({
+                tagName: "s:b",
+                name: "block",
+                markerID: this.id,
+                openTag: this.openTag,
+                closeTag: this.closeTag,
+                children: [],
+                attributes: {}
+            });
+        }
     }
     /** Initialize the block */
     init() {

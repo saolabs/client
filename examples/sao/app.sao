@@ -83,6 +83,49 @@
                 setAvatar(newAvatar);
                 console.log('Avatar updated:', newAvatar);
             }
+        },
+        // lifecycle hooks
+        mounting() {
+            console.log('App component mounting');
+        },
+        mounted() {
+            console.log('App component mounted');
+        },
+        unmounting() {
+            console.log('App component unmounting');
+        },
+        unmounted() {
+            console.log('App component unmounted');
+        },
+        pausing() {
+            console.log('App component pausing');
+        },
+        paused() {
+            console.log('App component paused');
+        },
+        resuming() {
+            console.log('App component resuming');
+        },
+        resumed() {
+            console.log('App component resumed');
+        },
+        starting() {
+            console.log('App component starting');
+        },
+        started() {
+            console.log('App component started');
+        },
+        stopping() {
+            console.log('App component stopping');
+        },
+        stopped() {
+            console.log('App component stopped');
+        },
+        destroying() {
+            console.log('App component destroying');
+        },
+        destroyed() {
+            console.log('App component destroyed');
         }
 
     }

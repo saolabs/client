@@ -4,7 +4,7 @@
  */
 // App
 export { Application } from './src/core/app/Application.js';
-export { app } from './src/core/hellpers/app.js';
+export { app } from './src/core/helpers/app.js';
 export { default as App } from './src/core/bootstrap/app.js';
 // Services
 export { MarkerService } from './src/core/services/MarkerService.js';
@@ -16,6 +16,7 @@ export { LoggerService } from './src/core/services/LoggerService.js';
 export { HelperService, CollectionProxy } from './src/core/services/HelperService.js';
 export { BlockManagerService, BlockManager } from './src/core/services/BlockManager.js';
 export { MarkerRegistry, MarkerRegistryService } from './src/core/services/MarkerRegistry.js';
+export { PageCache, PageCacheService, detachWrapperDOM } from './src/core/services/PageCache.js';
 // View System
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';
 // Router
@@ -34,5 +35,5 @@ export { ElementManager } from './src/core/elements/ElementManager.js';
 // DOM
 export { Dom, DomService } from './src/core/services/DomService.js';
 // Helpers
-export { ApiClient } from './src/core/hellpers/ApiClient.js';
+export { ApiClient } from './src/core/helpers/ApiClient.js';
 //# sourceMappingURL=index.js.map

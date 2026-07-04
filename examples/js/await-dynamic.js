@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.await-dynamic';
@@ -58,8 +58,10 @@ class AwaitDynamicView extends View {
 
         const __UPDATE_DATA_TRAIT__ = {};
         let {users = null, posts = []} = __data__;
-        __UPDATE_DATA_TRAIT__.users = value => users = value;
-        __UPDATE_DATA_TRAIT__.posts = value => posts = value;
+        __STATE__.__.register('users', users);
+        __STATE__.__.register('posts', posts);
+        __UPDATE_DATA_TRAIT__.users = value => { users = value; updateStateByKey('users', value); };
+        __UPDATE_DATA_TRAIT__.posts = value => { posts = value; updateStateByKey('posts', value); };
         const __VARIABLE_LIST__ = ["users", "posts"];
 
 
@@ -93,7 +95,7 @@ class AwaitDynamicView extends View {
                         }
                     }
                 }
-                // Then update states from data
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
 
                 // Finally lock state updates
 

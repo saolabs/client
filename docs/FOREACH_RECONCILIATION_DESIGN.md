@@ -551,50 +551,47 @@ Không di chuyển DOM, chỉ morph in-place. State nội bộ có thể "lệch
 
 ---
 
-## 12. Implementation Phases (Cập nhật)
+## 12. Implementation Phases (Cập nhật — 2026-06-13)
 
-### Phase 0: DOM Morphing Engine ⭐ (Ưu tiên cao nhất)
-- [ ] `DomMorpher` class — core morph algorithm
-- [ ] `morphNode()`, `morphChildren()`, `patchAttributes()`
-- [ ] Form element protection (skip value/checked khi focused)
-- [ ] Comment marker awareness (skip `<!--reactive:...-->` nodes)
-- [ ] Integrate vào `OneMarkerModel.morphContent()` thay cho `replaceContent()`
-- [ ] Áp dụng cho TẤT CẢ reactive types
+### Phase 0 (Đã implement — Phase 5): Identity-keyed Slot Cache ✅
+- [x] `ForeachSlotCache` class — `Map<itemRef, elements[]>`
+- [x] Identity keying — object reference làm cache key, không cần `@key`
+- [x] `ViewController.__foreach()` cache-aware — hit → reuse, miss → create + store
+- [x] `Reactive.renderForeach()` — reconcile: snapshot → run factory → destroy removed → reorder DOM → cleanup orphans
+- [x] `Reactive._moveMarkerBlock()` — move marker-based slots (Output, nested Reactive)
+- [x] `Reactive._cleanOrphanNodes()` — remove DOM nodes của items đã destroy
+- [x] DOM state preservation — focus/input value giữ nguyên khi item ref unchanged
+- [x] Tests: 9 cases (initial, same-ref reuse, grow, shrink, replace, reorder, lifecycle, DOM state)
 
-### Phase 1: Core Keyed Reconciliation
-- [ ] `@key` directive — compiler (one2js + one2blade)
-- [ ] `KeyedChildMap` class — runtime
-- [ ] `ForeachReactive.reconcile()` — diff old/new keys, destroy/create/move
-- [ ] Key comment markers — `<!--key:xxx-->...<!--/key:xxx-->`
-- [ ] DOM move via `insertBefore`
+### Phase 1: Keyed Reconciliation theo field (`@key`)
+- [ ] `@key` directive — compiler emit `__foreachKeyed(list, keyField, factory)`
+- [ ] `ViewController.__foreachKeyed()` — keyed by item[keyField] string/number
+- [ ] Stable identity kể cả khi item ref thay đổi (new object, same id)
+- [ ] DOM move via `insertBefore` (đã có trong renderForeach)
 
-### Phase 2: View Instance Reuse
-- [ ] `__include()` implementation — create View instance
-- [ ] `renderView()` implementation — render View → HTML string
-- [ ] View instance caching per key trong `childMap`
+### Phase 2: View Instance Reuse trong foreach
+- [ ] Keyed `@include` — `__include()` tạo View instance per key
 - [ ] `View.__updateProps()` — patch props without destroy
+- [ ] View instance cache trong `ForeachSlotCache` (mở rộng để lưu ViewInterface)
 
-### Phase 3: Lifecycle Integration
-- [ ] `onBeforeDestroy()` — gọi trước khi remove child view
-- [ ] `onMove()` — gọi khi view được di chuyển vị trí
-- [ ] `onPropsUpdate()` — gọi khi props thay đổi
-- [ ] Memory cleanup — WeakRef cho view instances
+### Phase 3: DOM Morphing Engine (for non-foreach reactive)
+- [ ] `DomMorpher` class — morph text/attr nodes in-place cho `@if`, `@switch`
+- [ ] Form element protection (skip value/checked khi focused)
+- [ ] Áp dụng cho Reactive type != 'foreach'
 
 ### Phase 4: Optimization
-- [ ] Auto-detect key (`id`, `_id`, value for primitives)
-- [ ] Batch DOM moves (minimize reflow)
-- [ ] LIS (Longest Increasing Subsequence) algorithm cho optimal moves
+- [ ] LIS (Longest Increasing Subsequence) algorithm cho optimal DOM moves trong reorder
 - [ ] Development mode warnings khi `@foreach` + `@include` thiếu `@key`
+- [ ] Batch DOM moves (minimize reflow)
 
 ---
 
-## 13. Trạng thái hiện tại cần hoàn thiện trước
+## 13. Trạng thái sau Phase 5–6
 
-Trước khi triển khai reconciliation, cần hoàn thiện:
-
-- [ ] `Reactive.refresh()` — hiện đang empty
-- [ ] State → re-render wiring (subscribe stateKeys → trigger re-render)
-- [ ] `__include()` implementation
-- [ ] `renderView()` implementation
-- [ ] Child view lifecycle management (create/destroy)
+- [x] `Reactive.renderForeach()` — đã implement với ForeachSlotCache
+- [x] State → re-render wiring — subscribe stateKeys → trigger renderForeach()
+- [x] `__include()` implementation (Phase 3c)
+- [x] Child view lifecycle management (create/destroy) — Phase 3a/3b
+- [ ] Field-keyed reconciliation (`@key`) — Phase 1 trên
+- [ ] SSR Hydration — Phase 7 (tương lai)
 - [ ] `View`, `ViewController` hoàn thiện

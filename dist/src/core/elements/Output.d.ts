@@ -36,13 +36,34 @@ export declare class Output implements OutputInterface {
         isEscapeHTML?: boolean;
         initMode?: InitMode;
     });
+    /**
+     * Tìm cặp comment markers và text node từ server-rendered HTML.
+     *
+     * Duyệt comment nodes trong parent element, tìm cặp khớp format chuẩn §5.1:
+     *   open:  `s:o:{this.id}-s`
+     *   close: `s:o:{this.id}-e`
+     *
+     * Nếu có text node giữa 2 markers → claim luôn để không tạo thừa.
+     */
+    private claimSSRMarkers;
     setParentElement(parent: HtmlInterface | null): void;
     setContentFactory(factory: () => string): void;
     setStateKeys(stateKeys: string[]): void;
+    /** Nodes của raw HTML mode ({!! !!}) — track để clear khi update */
+    private rawNodes;
     /**
-     * Render — insert markers + initial text into parent element.
+     * Render — idempotent + position-aware (RUNTIME_CONTRACT.md §2):
+     *   - Markers chưa nằm trong DOM → caller chưa đặt → tự append vào parent
+     *     (đường mountElementList: thứ tự duyệt tuần tự nên vị trí đúng).
+     *   - Markers ĐÃ nằm trong DOM (caller như Reactive đã chèn đúng chỗ)
+     *     → chỉ render nội dung GIỮA markers. FIX(baseline#6).
      */
     render(): void;
+    /** Xoá toàn bộ nodes giữa open/close markers */
+    private clearContent;
+    private insertBeforeClose;
+    /** Parse HTML string → DOM nodes thật, chèn giữa markers */
+    private renderRaw;
     /**
      * Start — subscribe to state changes for reactive updates.
      * Called during START phase of view lifecycle.
@@ -53,13 +74,16 @@ export declare class Output implements OutputInterface {
      */
     stop(): void;
     /**
-     * Update — re-evaluate contentFactory and update text node in-place.
-     * O(1) — chỉ thay textContent, không tạo/xóa DOM nodes.
+     * Update — re-evaluate contentFactory.
+     * Escaped mode: O(1) — chỉ thay textContent.
+     * Raw mode: clear giữa markers → parse + chèn lại.
      */
     private update;
     /**
      * Destroy — cleanup everything.
      */
+    /** Registry guard — alias của _isDestroyed cho ViewController.aliveFromRegistry */
+    get __destroyed__(): boolean;
     destroy(): void;
     get isSaoElement(): boolean;
     set isSaoElement(_: boolean);

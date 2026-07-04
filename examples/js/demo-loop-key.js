@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.demo-loop-key';
@@ -58,6 +58,11 @@ class DemoLoopKeyView extends View {
 
         const __UPDATE_DATA_TRAIT__ = {};
         let {posts = [], categories = [], postCategories = [], postTags = [], postAuthors = []} = __data__;
+        __STATE__.__.register('posts', posts);
+        __STATE__.__.register('categories', categories);
+        __STATE__.__.register('postCategories', postCategories);
+        __STATE__.__.register('postTags', postTags);
+        __STATE__.__.register('postAuthors', postAuthors);
         const set$postList = __STATE__.__.register('postList');
         let postList = null;
         const setPostList = (state) => {
@@ -87,13 +92,12 @@ class DemoLoopKeyView extends View {
             }
         };
         let i = 0;
-        __UPDATE_DATA_TRAIT__.posts = value => posts = value;
-        __UPDATE_DATA_TRAIT__.categories = value => categories = value;
-        __UPDATE_DATA_TRAIT__.postCategories = value => postCategories = value;
-        __UPDATE_DATA_TRAIT__.postTags = value => postTags = value;
-        __UPDATE_DATA_TRAIT__.postAuthors = value => postAuthors = value;
-        __UPDATE_DATA_TRAIT__.i = value => i = value;
-        const __VARIABLE_LIST__ = ["posts", "categories", "postCategories", "postTags", "postAuthors", "i"];
+        __UPDATE_DATA_TRAIT__.posts = value => { posts = value; updateStateByKey('posts', value); };
+        __UPDATE_DATA_TRAIT__.categories = value => { categories = value; updateStateByKey('categories', value); };
+        __UPDATE_DATA_TRAIT__.postCategories = value => { postCategories = value; updateStateByKey('postCategories', value); };
+        __UPDATE_DATA_TRAIT__.postTags = value => { postTags = value; updateStateByKey('postTags', value); };
+        __UPDATE_DATA_TRAIT__.postAuthors = value => { postAuthors = value; updateStateByKey('postAuthors', value); };
+        const __VARIABLE_LIST__ = ["posts", "categories", "postCategories", "postTags", "postAuthors"];
 
 
         this.__ctrl__.setUserDefinedConfig({
@@ -127,9 +131,9 @@ class DemoLoopKeyView extends View {
                         }
                     }
                 }
-                // Then update states from data
-                update$postList(posts);
-                update$categoryList(categories);
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
+                if (data.hasOwnProperty('posts')) { update$postList(posts); }
+                if (data.hasOwnProperty('categories')) { update$categoryList(categories); }
                 // Finally lock state updates
                 lockUpdateRealState();
             },
@@ -176,7 +180,8 @@ class DemoLoopKeyView extends View {
                                             this.html(`155bb96c-${i}-${categoryItem.id}`, "div", parentElement,
                                                 { classes: [{ type: 'static', value: "post-list" }] },
                                                 (parentElement) => [
-                                                this.__foreach(categoryItem.posts, (postItem, __loopKey, __loopIndex, __loop) => [
+                                                this.reactive(`807a32cb-${i}-${categoryItem.id}`, "foreach", parentReactive, parentElement, ["posts"], (parentReactive, parentElement) => {
+                                                    return this.__foreach(categoryItem.posts, (postItem, __loopKey, __loopIndex, __loop) => [
                                                         this.html(`89e1e39d-${i}-${categoryItem.id}-${postItem.id}`, "div", parentElement,
                                                             { classes: [{ type: 'static', value: "post-item" }] },
                                                             (parentElement) => [
@@ -191,10 +196,11 @@ class DemoLoopKeyView extends View {
                                                                 this.output(`6584e3ba-${i}-${categoryItem.id}-${postItem.id}`, parentElement, true, [], (parentElement) => postItem.content)
                                                                 ])
                                                             ])
-                                                ])
+                                                    ], (postItem) => postItem.id)
+                                                })
                                                 ])
                                             ])
-                                    ])
+                                    ], (categoryItem) => categoryItem.id)
                                 })
                                 ])
                             );

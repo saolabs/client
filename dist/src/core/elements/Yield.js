@@ -1,5 +1,5 @@
 import { InitModes } from "../contracts/common";
-import { generateUUID } from "../hellpers/utils";
+import { generateUUID } from "../helpers/utils";
 import { SaoMarker } from "../services/MarkerService";
 export class YieldElement {
     constructor({ ctx, name = '', initMode = InitModes.CREATE, id = null, defaultValue = '' }) {

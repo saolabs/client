@@ -21,7 +21,7 @@ import { Block } from "../elements/Block";
  *   5. When layout deactivates, manager.unmountAll() hides all content
  */
 export class SectionManagerService implements BlockManagerInterface {
-    sections: Map<string, BlockInterface> = new Map();
+    blocks: Map<string, BlockInterface> = new Map();
     blockOutlets: Map<string, BlockOutletInterface> = new Map();
     activeBlocks: Map<string, BlockInterface> = new Map();
     listeners: Map<string, ((block: BlockInterface) => void)[]> = new Map();

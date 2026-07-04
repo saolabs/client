@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.demo-systax-error';
@@ -58,8 +58,10 @@ class DemoSystaxErrorView extends View {
 
         const __UPDATE_DATA_TRAIT__ = {};
         let {title, content} = __data__;
-        __UPDATE_DATA_TRAIT__.title = value => title = value;
-        __UPDATE_DATA_TRAIT__.content = value => content = value;
+        __STATE__.__.register('title', title);
+        __STATE__.__.register('content', content);
+        __UPDATE_DATA_TRAIT__.title = value => { title = value; updateStateByKey('title', value); };
+        __UPDATE_DATA_TRAIT__.content = value => { content = value; updateStateByKey('content', value); };
         const __VARIABLE_LIST__ = ["title", "content"];
 
 
@@ -93,7 +95,7 @@ class DemoSystaxErrorView extends View {
                         }
                     }
                 }
-                // Then update states from data
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
 
                 // Finally lock state updates
 
@@ -112,10 +114,10 @@ class DemoSystaxErrorView extends View {
             let parentReactive = null;
             return this.wrapper((parentElement) => [
             this.html(`bca678f9`, "h1", parentElement, {}, (parentElement) => [
-                this.output(`d11262e8`, parentElement, true, [], (parentElement) => title)
+                this.output(`d11262e8`, parentElement, true, ["title"], (parentElement) => title)
             ]),
             this.html(`3d142d4a`, "p", parentElement, {}, (parentElement) => [
-                this.output(`6139101f`, parentElement, true, [], (parentElement) => content)
+                this.output(`6139101f`, parentElement, true, ["content"], (parentElement) => content)
             ])
             ]);
             }

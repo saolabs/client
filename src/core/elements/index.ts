@@ -22,5 +22,6 @@ export * from "./helpers";
 export * from "./Html";
 export * from "./Output";
 export * from './Reactive';
+export * from './ForeachSlotCache';
 export * from "./TextElement";
 export * from "./Yield";

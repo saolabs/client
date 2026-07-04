@@ -1,3 +1,4 @@
+export * from "./AssetManager";
 export * from "./BlockManager";
 export * from "./EventService";
 export * from "./LoggerService";

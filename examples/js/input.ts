@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 import { ref } from 'saola';
 
@@ -61,6 +61,8 @@ class InputView extends View {
 
         const __UPDATE_DATA_TRAIT__: any = {};
         let {users, posts} = __data__;
+        __STATE__.__.register('users', users);
+        __STATE__.__.register('posts', posts);
         const set$editMode = __STATE__.__.register('editMode');
         let editMode: any = null;
         const setEditMode = (state: any) => {
@@ -161,10 +163,9 @@ class InputView extends View {
         };
         const MAX_COUNT = 10;
         let n = 0;
-        __UPDATE_DATA_TRAIT__.users = (value: any) => users = value;
-        __UPDATE_DATA_TRAIT__.posts = (value: any) => posts = value;
-        __UPDATE_DATA_TRAIT__.n = (value: any) => n = value;
-        const __VARIABLE_LIST__: any = ["users", "posts", "n"];
+        __UPDATE_DATA_TRAIT__.users = (value: any) => { users = value; updateStateByKey('users', value); };
+        __UPDATE_DATA_TRAIT__.posts = (value: any) => { posts = value; updateStateByKey('posts', value); };
+        const __VARIABLE_LIST__: any = ["users", "posts"];
 
 
         this.__ctrl__.setUserDefinedConfig({
@@ -220,14 +221,8 @@ class InputView extends View {
                         }
                     }
                 }
-                // Then update states from data
-                update$editMode(false);
-                update$todos([{"id": 1, "task": "Buy groceries", "completed": false}, {"id": 2, "task": "Walk the dog", "completed": true}, {"id": 3, "task": "Read a book", "completed": false}]);
-                update$newTodo('');
-                update$nextTodoIndex(4);
-                update$products([{"id": 1, "name": "Apple", "category": "fruit", "price": 2, "tags": ["red", "sweet"]}, {"id": 2, "name": "Carrot", "category": "vegetable", "price": 1, "tags": ['orange']}, {"id": 3, "name": "Banana", "category": "fruit", "price": 3, "tags": ["yellow", "sweet", "tropical"]}, {"id": 4, "name": "Broccoli", "category": "vegetable", "price": 4, "tags": ["green", "healthy"]}]);
-                update$inventory([{"id": 1, "name": "Apple", "category": "fruit", "price": 2, "tags": ["red", "sweet"]}, {"id": 2, "name": "Carrot", "category": "vegetable", "price": 1, "tags": ['orange']}, {"id": 3, "name": "Banana", "category": "fruit", "price": 3, "tags": ["yellow", "sweet", "tropical"]}, {"id": 4, "name": "Broccoli", "category": "vegetable", "price": 4, "tags": ["green", "healthy"]}]);
-                update$catalog([{"id": 1, "name": "Apple", "category": "fruit", "price": 2, "tags": ["red", "sweet"]}, {"id": 2, "name": "Carrot", "category": "vegetable", "price": 1, "tags": ['orange']}, {"id": 3, "name": "Banana", "category": "fruit", "price": 3, "tags": ["yellow", "sweet", "tropical"]}, {"id": 4, "name": "Broccoli", "category": "vegetable", "price": 4, "tags": ["green", "healthy"]}]);
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
+
                 // Finally lock state updates
                 lockUpdateRealState();
             },
@@ -257,14 +252,16 @@ class InputView extends View {
                         this.text('Users')
                     ]),
                     this.html(`fabeb0e6`, "ul", parentElement, {}, (parentElement: any) => [
-                        this.__foreach(users, (user: any, __loopKey: any, __loopIndex: any, __loop: any) => [
+                        this.reactive(`feb8d2aa`, "foreach", parentReactive, parentElement, ["users"], (parentReactive: any, parentElement: any) => {
+                            return this.__foreach(users, (user: any, __loopKey: any, __loopIndex: any, __loop: any) => [
                                 this.html(`51785291-${__loopIndex + 1}`, "li", parentElement, {}, (parentElement: any) => [
                                     this.output(`2eba362a-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => user.name),
                                     this.text(' ('),
                                     this.output(`158fdf32-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => user.email),
                                     this.text(')')
                                 ])
-                        ])
+                            ])
+                        })
                     ])
                     ]),
                 this.html(`6b7c3ec4`, "div", parentElement,
@@ -274,7 +271,8 @@ class InputView extends View {
                         this.text('Posts')
                     ]),
                     this.html(`03a5e96a`, "ul", parentElement, {}, (parentElement: any) => [
-                        this.__foreach(posts, (post: any, __loopKey: any, __loopIndex: any, __loop: any) => [
+                        this.reactive(`ff83d1ec`, "foreach", parentReactive, parentElement, ["posts"], (parentReactive: any, parentElement: any) => {
+                            return this.__foreach(posts, (post: any, __loopKey: any, __loopIndex: any, __loop: any) => [
                                 this.html(`4f286c4f-${__loopIndex + 1}`, "li", parentElement, {}, (parentElement: any) => [
                                     this.html(`b2511220-${__loopIndex + 1}`, "strong", parentElement, {}, (parentElement: any) => [
                                         this.output(`134a7ae9-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => post.title)
@@ -282,7 +280,8 @@ class InputView extends View {
                                     this.text(': '),
                                     this.output(`90ab339b-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => post.content)
                                 ])
-                        ])
+                            ])
+                        })
                     ])
                     ])
                 ]),
@@ -297,7 +296,7 @@ class InputView extends View {
                         return this.__foreach(todos, (todo: any, __loopKey: any, __loopIndex: any, __loop: any) => [
                             this.html(`d8484f9d-${__loopIndex + 1}`, "li", parentElement, {}, (parentElement: any) => [
                                 this.html(`9d96460a-${__loopIndex + 1}`, "label", parentElement, {}, (parentElement: any) => [
-                                    this.html(`f73b73c3-${__loopIndex + 1}`, "input", parentElement, { attrs: { "type": { type: 'static', value: "checkbox" }, "bind": { type: 'static', value: true }, "todo": { type: 'static', value: true }, "completed": { type: 'static', value: true }, "checked": { type: 'static', value: true } } }),
+                                    this.html(`f73b73c3-${__loopIndex + 1}`, "input", parentElement, { attrs: { "type": { type: 'static', value: "checkbox" }, "bind": { type: 'static', value: true }, "todo.completed": { type: 'static', value: true } }, props: { "checked": { type: 'binding', factory: () => todo.completed, stateKeys: [] } } }),
                                     this.output(`22697e74-${__loopIndex + 1}`, parentElement, true, [], (parentElement: any) => todo.task)
                                 ])
                             ])
@@ -482,7 +481,7 @@ class InputView extends View {
                                 })
                         ])
                     );
-                    n = 0;
+                    let n = 0;
                     __execArr.push(
                         this.html(`098c0117`, "h3", parentElement, {}, (parentElement: any) => [
                             this.text('While Loop Example')

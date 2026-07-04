@@ -1,0 +1,18 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "module": "CommonJS",
+        "outDir": "../../.test-build",
+        "rootDir": "../..",
+        "declaration": false,
+        "declarationMap": false,
+        "declarationDir": null,
+        "sourceMap": false,
+        "noEmitOnError": false,
+        "paths": {
+            "vitest": ["./tests/_runner/vitest.d.ts"]
+        }
+    },
+    "include": ["../../src/**/*", "../../tests/**/*.ts", "../../tests/_runner/vitest.d.ts"],
+    "exclude": ["../../node_modules", "../../dist"]
+}

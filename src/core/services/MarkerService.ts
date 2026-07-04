@@ -175,9 +175,9 @@ export class MarkerService {
         for (let i = 0; i < commentNodes.length; i++) {
             const commentText = commentNodes[i].nodeValue?.trim() || '';
 
-            // Check if open tag: prefix:shortcut:registryID
+            // Check if open tag (format chuẩn §5.1): s:{shortcut}:{id}-s
             const openMatch = commentText.match(
-                new RegExp(`^${this.prefix}${this.delimiter}([^${this.delimiter}/]+)${this.delimiter}(.+)$`)
+                new RegExp(`^${this.prefix}${this.delimiter}([^${this.delimiter}]+)${this.delimiter}(.+)-s$`)
             );
             if (openMatch) {
                 const shortcut = openMatch[1];
@@ -204,9 +204,9 @@ export class MarkerService {
                 continue;
             }
 
-            // Check if close tag: /prefix:shortcut:registryID
+            // Check if close tag (format chuẩn §5.1): s:{shortcut}:{id}-e
             const closeMatch = commentText.match(
-                new RegExp(`^${this.closeTagSuffix}${this.prefix}${this.delimiter}([^${this.delimiter}/]+)${this.delimiter}(.+)$`)
+                new RegExp(`^${this.prefix}${this.delimiter}([^${this.delimiter}]+)${this.delimiter}(.+)-e$`)
             );
             if (closeMatch) {
                 const shortcut = closeMatch[1];

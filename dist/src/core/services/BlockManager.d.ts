@@ -41,9 +41,36 @@ export declare class BlockManagerService implements BlockManagerInterface {
     mountAll(): void;
     /**
      * Mount a single block's content into an outlet.
-     * Content is rendered and inserted between the outlet's open/close markers.
+     * Clear nội dung cũ trước, render content mới GIỮA outlet markers
+     * (cùng insertion model với Reactive — RUNTIME_CONTRACT.md §2).
      */
     private mountBlockIntoOutlet;
+    /**
+     * Hydrate version của mountAll — dùng khi SSR.
+     * KHÁC mountAll: KHÔNG clearOutlet (giữ DOM server), KHÔNG insertBefore.
+     * Chạy block factory ở HYDRATE mode → Html/Output/Reactive con CLAIM
+     * DOM server đã render sẵn giữa cặp marker của outlet.
+     *
+     * Tiền đề: page ctrl.initMode === HYDRATE khi gọi (để this.html() trong
+     * factory tạo element claim DOM thay vì tạo mới).
+     */
+    mountAllHydrate(): void;
+    /**
+     * Claim block content vào outlet (hydrate). Chạy factory, gọi render() đệ quy
+     * trên children để claim DOM, KHÔNG chèn node mới. Track children cho lifecycle.
+     */
+    private hydrateBlockIntoOutlet;
+    /** Start toàn bộ block content đang mounted (gọi sau mountAll) */
+    startAll(): void;
+    /** Stop toàn bộ block content (trước khi swap page) */
+    stopAll(): void;
+    /**
+     * Gỡ mọi dấu vết của một view (page bị destroy):
+     * clear outlet đang chứa content của nó + xoá block đăng ký.
+     */
+    unmountView(viewId: string): void;
+    /** Gỡ outlets của một layout bị destroy */
+    removeOutletsOfView(viewId: string): void;
     /**
      * Clear content from a specific outlet (for page swap).
      * Removes all DOM nodes between a named outlet's markers.

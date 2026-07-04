@@ -1,6 +1,7 @@
 import type { BlockOutletInterface } from "../contracts/BlockInterface";
 import { InitMode } from "../contracts/common";
 import type { HtmlInterface } from "../contracts/ElementInterface";
+import { MarkerModelInterface } from "../contracts/MarkerInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import type { SaoObjectType } from "../types/utils";
 export declare class BlockOutlet implements BlockOutletInterface {
@@ -13,6 +14,7 @@ export declare class BlockOutlet implements BlockOutletInterface {
     parentElement: HtmlInterface | null;
     ctx: ViewControllerInterface;
     initMode: InitMode;
+    marker: MarkerModelInterface | null;
     constructor({ ctx, parentElement, name, id, initMode }: {
         ctx: ViewControllerInterface;
         parentElement?: HtmlInterface | null;
@@ -20,7 +22,16 @@ export declare class BlockOutlet implements BlockOutletInterface {
         id?: string | null;
         initMode?: InitMode;
     });
+    /**
+     * Tìm cặp marker outlet từ server-rendered HTML (format chuẩn §5.1):
+     *   open:  s:bo:{id}-s   close: s:bo:{id}-e
+     * Quét trong parentElement (fallback document.body) bằng fresh TreeWalker.
+     */
+    private claimSSRMarkers;
     hydrate(): void;
+    /** Registry guard */
+    __destroyed__: boolean;
+    /** Render — idempotent: markers đã trong DOM thì giữ nguyên (same-layout reuse) */
     render(): void;
     destroy(): void;
     start(): void;

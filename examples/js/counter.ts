@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.counter';
@@ -58,7 +58,11 @@ class CounterView extends View {
 
         const __UPDATE_DATA_TRAIT__: any = {};
         let {a = 0, cProp = 0} = __data__;
+        __STATE__.__.register('a', a);
+        __STATE__.__.register('cProp', cProp);
         let {b = 0, d = 0} = __data__;
+        __STATE__.__.register('b', b);
+        __STATE__.__.register('d', d);
         const set$countState = __STATE__.__.register('countState');
         let countState: any = null;
         const setCountState = (state: any) => {
@@ -117,13 +121,11 @@ class CounterView extends View {
             }
         };
         let textContent = message+' Count is '+count;
-        __UPDATE_DATA_TRAIT__.a = (value: any) => a = value;
-        __UPDATE_DATA_TRAIT__.cProp = (value: any) => cProp = value;
-        __UPDATE_DATA_TRAIT__.b = (value: any) => b = value;
-        __UPDATE_DATA_TRAIT__.d = (value: any) => d = value;
-        __UPDATE_DATA_TRAIT__.testVar = (value: any) => testVar = value;
-        __UPDATE_DATA_TRAIT__.textContent = (value: any) => textContent = value;
-        const __VARIABLE_LIST__: any = ["a", "cProp", "b", "d", "testVar", "textContent"];
+        __UPDATE_DATA_TRAIT__.a = (value: any) => { a = value; updateStateByKey('a', value); };
+        __UPDATE_DATA_TRAIT__.cProp = (value: any) => { cProp = value; updateStateByKey('cProp', value); };
+        __UPDATE_DATA_TRAIT__.b = (value: any) => { b = value; updateStateByKey('b', value); };
+        __UPDATE_DATA_TRAIT__.d = (value: any) => { d = value; updateStateByKey('d', value); };
+        const __VARIABLE_LIST__: any = ["a", "cProp", "b", "d"];
 
 
         this.__ctrl__.setUserDefinedConfig({
@@ -147,7 +149,7 @@ class CounterView extends View {
             viewId: __VIEW_ID__,
             path: __VIEW_PATH__,
             scripts: [],
-            styles: [{"type":"code","content":".counter-component {\n        text-align: center;\n        margin: 20px 0;\n    }.btn-group {\n        margin-top: 10px;\n    }\n    .btn {\n        margin: 0 5px;\n    }","attributes":{"scoped":true}}],
+            styles: [{"type":"code","scoped":true,"content":".counter-component {\n        text-align: center;\n        margin: 20px 0;\n    }.btn-group {\n        margin-top: 10px;\n    }\n    .btn {\n        margin: 0 5px;\n    }"}],
             resources: [],
             commitConstructorData: function(this: any) {
                 // Then update states from data
@@ -168,11 +170,8 @@ class CounterView extends View {
                         }
                     }
                 }
-                // Then update states from data
-                update$countState(0);
-                update$eState(b);
-                update$count(0);
-                update$message('Hello, Saola!');
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
+                if (data.hasOwnProperty('b')) { update$eState(b); }
                 // Finally lock state updates
                 lockUpdateRealState();
             },

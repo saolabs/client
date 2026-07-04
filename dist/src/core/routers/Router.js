@@ -97,7 +97,27 @@ export class Router {
         this._handleAutoNavigation = this.handleAutoNavigation.bind(this);
     }
     // ─── Configuration ──────────────────────────────────────────
+    /**
+     * init — nạp config và wire các dependency.
+     * Gọi bởi RouteServiceProvider.boot() sau khi tất cả providers đã boot.
+     *
+     * Thực hiện:
+     *   1. configure() — load routes, mode, guards từ config
+     *   2. Wire ViewManager — lấy từ App.View nếu chưa set thủ công
+     */
     init(config) {
+        if (config && Object.keys(config).length > 0) {
+            this.configure(config);
+        }
+        // Auto-wire ViewManager nếu App đã có View registered
+        if (this.App && !this.viewManager) {
+            try {
+                const vm = this.App.View ?? this.App.get?.('View') ?? null;
+                if (vm)
+                    this.viewManager = vm;
+            }
+            catch (_) { /* View chưa sẵn sàng — sẽ fallback lúc handleRoute */ }
+        }
         return this;
     }
     setApp(app) {
@@ -397,15 +417,21 @@ export class Router {
             // Update global state
             Router.activeRoute = activeRoute;
             this.currentRoute = activeRoute;
-            // Mount view via ViewManager
+            // Mount view via ViewManager.
+            // Route ĐẦU TIÊN sau SSR: nếu view khớp entry server đã render →
+            // hydrateView (claim DOM) thay vì mountView. consumeSSRViewId() chỉ
+            // trả id 1 lần → các navigate sau là CSR (SPA takeover).
             const viewComponent = route.component || route.view;
             if (viewComponent) {
-                if (this.viewManager) {
-                    await this.viewManager.mountView(viewComponent, params, activeRoute);
-                }
-                else if (this.App?.View) {
-                    // Fallback: App.View is the ViewManager (registered on app)
-                    await this.App.View.mountView(viewComponent, params, activeRoute);
+                const vm = this.viewManager ?? this.App?.View;
+                if (vm) {
+                    const ssrViewId = vm.consumeSSRViewId?.(viewComponent) ?? null;
+                    if (ssrViewId) {
+                        await vm.hydrateView(viewComponent, { __SSR_VIEW_ID__: ssrViewId, ...params }, activeRoute);
+                    }
+                    else {
+                        await vm.mountView(viewComponent, params, activeRoute);
+                    }
                 }
             }
             // After hook
@@ -550,7 +576,9 @@ export class Router {
             const escaped = seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             regexParts.push('\\/' + escaped);
         }
-        const regex = new RegExp(`^${regexParts.join('')}$`);
+        // Root path '/' → mọi segment rỗng → regexParts rỗng. Phải khớp '\/'
+        // (nếu để '^$' thì route '/' không bao giờ match — bug gốc).
+        const regex = new RegExp(`^${regexParts.join('') || '\\/'}$`);
         const match = normalizedPath.match(regex);
         if (!match)
             return null;

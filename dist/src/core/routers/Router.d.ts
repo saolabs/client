@@ -99,6 +99,14 @@ export declare class Router {
     private _handlePopState;
     private _handleAutoNavigation;
     constructor(app?: any);
+    /**
+     * init — nạp config và wire các dependency.
+     * Gọi bởi RouteServiceProvider.boot() sau khi tất cả providers đã boot.
+     *
+     * Thực hiện:
+     *   1. configure() — load routes, mode, guards từ config
+     *   2. Wire ViewManager — lấy từ App.View nếu chưa set thủ công
+     */
     init(config: RouterConfig): this;
     setApp(app: any): this;
     setViewManager(vm: ViewManagerInterface): this;

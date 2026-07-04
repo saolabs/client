@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.todo-list';
@@ -58,6 +58,7 @@ class TodoListView extends View {
 
         const __UPDATE_DATA_TRAIT__ = {};
         let {users = []} = __data__;
+        __STATE__.__.register('users', users);
         const set$todos = __STATE__.__.register('todos');
         let todos = null;
         const setTodos = (state) => {
@@ -100,7 +101,7 @@ class TodoListView extends View {
                 todoIndex = value;
             }
         };
-        __UPDATE_DATA_TRAIT__.users = value => users = value;
+        __UPDATE_DATA_TRAIT__.users = value => { users = value; updateStateByKey('users', value); };
         const __VARIABLE_LIST__ = ["users"];
 
 
@@ -161,10 +162,8 @@ class TodoListView extends View {
                         }
                     }
                 }
-                // Then update states from data
-                update$todos([]);
-                update$newTodo('');
-                update$todoIndex(0);
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
+
                 // Finally lock state updates
                 lockUpdateRealState();
             },
@@ -247,7 +246,7 @@ class TodoListView extends View {
                                             this.html(`cfcc0d01-${__loopIndex + 1}`, "li", parentElement,
                                                 { classes: [{ type: 'static', value: "todo-item" }, { type: 'static', value: "{{" }, { type: 'static', value: "$todo->completed" }, { type: 'static', value: "?" }, { type: 'static', value: "'completed'" }, { type: 'static', value: ":" }, { type: 'static', value: "''" }, { type: 'static', value: "}}" }] },
                                                 (parentElement) => [
-                                                this.html(`1c9bd3d5-${__loopIndex + 1}`, "input", parentElement, { attrs: { "type": { type: 'static', value: "checkbox" }, "checked": { type: 'static', value: true }, "todo": { type: 'static', value: true }, "completed": { type: 'static', value: true } }, events: { change: [{"handler":"toggleTodo","params":[todo.id]}] } }),
+                                                this.html(`1c9bd3d5-${__loopIndex + 1}`, "input", parentElement, { attrs: { "type": { type: 'static', value: "checkbox" } }, props: { "checked": { type: 'binding', factory: () => todo.completed, stateKeys: [] } }, events: { change: [{"handler":"toggleTodo","params":[todo.id]}] } }),
                                                 this.output(`a5cbb2ad-${__loopIndex + 1}`, parentElement, true, [], (parentElement) => todo.text),
                                                 this.html(`57d15225-${__loopIndex + 1}`, "button", parentElement,
                                                     { classes: [{ type: 'static', value: "btn" }, { type: 'static', value: "btn-sm" }, { type: 'static', value: "btn-outline-danger" }], events: { click: [{"handler":"deleteTodo","params":[todo.id]}] } },

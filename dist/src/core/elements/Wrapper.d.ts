@@ -30,8 +30,17 @@ export declare class Wrapper implements WrapperInterface {
         parentElement?: HtmlInterface | null;
         childrenFactory: SaoChildrenFactory;
     });
+    /**
+     * Tìm cặp view markers từ server-rendered HTML.
+     * Format MarkerRegistry: open = `v:id`, close = `/v:id`.
+     * Quét comment nodes trong parent element (fallback document.body).
+     */
+    private claimSSRMarkers;
+    init(): void;
     setParentElement(parent: HtmlInterface | null): void;
-    render(): void;
+    render(): SaoElementChildren;
+    appendTo(parent: HtmlInterface): void;
+    mountTo(parent: HtmlInterface): void;
     setChildrenFactory(factory: SaoChildrenFactory): void;
     /** Hydrate lifecycle — reattach event listeners or perform other setup */
     hydrate(): void;

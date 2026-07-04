@@ -3,7 +3,7 @@
  * TypeScript Core with Optimizations
  */
 export { Application } from './src/core/app/Application.js';
-export { app } from './src/core/hellpers/app.js';
+export { app } from './src/core/helpers/app.js';
 export { default as App } from './src/core/bootstrap/app.js';
 export { MarkerService } from './src/core/services/MarkerService.js';
 export { EventService } from './src/core/services/EventService.js';
@@ -14,6 +14,8 @@ export { LoggerService } from './src/core/services/LoggerService.js';
 export { HelperService, CollectionProxy } from './src/core/services/HelperService.js';
 export { BlockManagerService, BlockManager } from './src/core/services/BlockManager.js';
 export { MarkerRegistry, MarkerRegistryService } from './src/core/services/MarkerRegistry.js';
+export { PageCache, PageCacheService, detachWrapperDOM } from './src/core/services/PageCache.js';
+export type { PageCacheEntry, PageCacheSetOptions } from './src/core/services/PageCache.js';
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';
 export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
 export { Reactive } from './src/core/elements/Reactive.js';
@@ -27,7 +29,7 @@ export { Output } from './src/core/elements/Output.js';
 export { Wrapper } from './src/core/elements/Wrapper.js';
 export { ElementManager } from './src/core/elements/ElementManager.js';
 export { Dom, DomService } from './src/core/services/DomService.js';
-export { ApiClient } from './src/core/hellpers/ApiClient.js';
+export { ApiClient } from './src/core/helpers/ApiClient.js';
 export type { ApplicationInterface } from './src/core/contracts/ApplicationInterface.js';
 export type { HelperInterface, CollectionProxyInterface } from './src/core/contracts/HelperInterface.js';
 export type { EventServiceInterface } from './src/core/contracts/EventServiceInterface.js';
@@ -42,5 +44,5 @@ export type { ReactiveInterface } from './src/core/contracts/ReactiveInterface.j
 export type { RouterInterface } from './src/core/contracts/RouterInterface.js';
 export type { RouteDefinition, Route, RouteMatch, RouterConfig } from './src/core/routers/Router.js';
 export type { MarkerRecord, MarkerTagName } from './src/core/contracts/MarkerInterface.js';
-export type { APIEndpoints } from './src/core/hellpers/ApiClient.js';
+export type { APIEndpoints } from './src/core/helpers/ApiClient.js';
 //# sourceMappingURL=index.d.ts.map

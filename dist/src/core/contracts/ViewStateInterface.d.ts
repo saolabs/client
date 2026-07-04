@@ -18,8 +18,36 @@ export interface StateManagerInterface {
     subscribe(key: string | number | string[] | Record<string, (value: any) => void>, callback?: (value: any) => void): () => void;
     /** Unsubscribe */
     unsubscribe(key: string | number | string[] | Record<string, (value: any) => void>, callback?: (value: any) => void): void;
-    /** Register shorthand — useState alias */
-    register(key: string | number, value: any): (newValue: any) => void;
+    /**
+     * Register shorthand — pre-declare a state slot, returns setter.
+     * Value is optional — compiler calls register(key) with 1 arg;
+     * initial value is set later via update$xxx() in commitConstructorData.
+     */
+    register(key: string | number, value?: any): (newValue: any) => void;
+    /**
+     * Setter map — exposed for direct access by compiled views.
+     * e.g. __STATE__.__.setters.setCount = setCount;
+     */
+    setters: Record<string | number, (value: any) => void>;
+    /**
+     * Flag — true while commitConstructorData is running, false after lockUpdateRealState().
+     * Compiler-generated update$xxx() checks this before calling updateStateByKey.
+     */
+    readonly canUpdateStateByKey: boolean;
+    /**
+     * Lock — called at end of commitConstructorData() to prevent update$xxx from
+     * being accidentally triggered after initialization.
+     */
+    lockUpdateRealState(): void;
+    /**
+     * Unlock — called before updateVariableData() to allow update$xxx again.
+     */
+    unlockUpdateRealState(): void;
+    /**
+     * Flush đồng bộ pending state changes (huỷ RAF đang chờ nếu có).
+     * Dùng sau commitData()/mount để DOM phản ánh state ngay trong cùng tick.
+     */
+    flushNow(): void;
     /** Destroy — cleanup all listeners and states */
     destroy(): void;
 }

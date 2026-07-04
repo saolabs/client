@@ -1,5 +1,6 @@
-import { app } from "../hellpers/app";
+import { app } from "../helpers/app";
 import { buildDefaultProviders, resolveProviderOrder } from "./providers";
+import { readSSRBoot, readBootConfig, mergeBootConfig } from "./ssr";
 const App = app();
 // ⚠️ Flags PHẢI dùng isOne=false để có thể cập nhật sau init/start
 App.set('isInitialized', false);
@@ -30,6 +31,9 @@ App.setMethod('init', function (config = {}) {
 /**
  * Start app — init nếu chưa, rồi start Router.
  *
+ * Nếu phát hiện SSR boot (script saola-ssr), inject vào config.view.ssr để
+ * ViewManager + Router hydrate route đầu tiên thay vì mount mới.
+ *
  * @example
  * App.start(); // init với config mặc định
  * App.start({ view: { container: '#app' } }); // init với config tùy chỉnh
@@ -40,7 +44,20 @@ App.setMethod('start', function (config) {
         return;
     }
     if (!App.isInitialized) {
-        App.init(config || {});
+        // Config app truyền có ưu tiên hơn boot config (window.APP_CONFIGS:
+        // routes + container từ server). Thiếu APP_CONFIGS → chỉ dùng config app.
+        const boot = readBootConfig() || {};
+        const cfg = mergeBootConfig(boot, config || {});
+        // SSR boot (script saola-ssr) → ssr + container cho hydrate route đầu.
+        const ssr = readSSRBoot();
+        if (ssr) {
+            cfg.view = {
+                ...(cfg.view || {}),
+                ssr: { view: ssr.view, viewId: ssr.viewId },
+                container: (cfg.view && cfg.view.container) || ssr.container,
+            };
+        }
+        App.init(cfg);
     }
     App.get('Router').start();
     App.isStarted = true;

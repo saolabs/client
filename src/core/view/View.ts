@@ -59,14 +59,32 @@ export class View implements ViewInterface, ViewLifecycleHooks {
     }
 
     // ─── Lifecycle Hooks ────────────────────────────────────────
-    // Users can override these in their view class
+    // Users can override these in their view class (mẫu examples/sao/app.sao).
+    // Cặp before/after cho mỗi transition:
+    mounting?(): void | Promise<void>;
+    mounted?(): void | Promise<void>;
+    starting?(): void | Promise<void>;
+    started?(): void | Promise<void>;
+    pausing?(): void | Promise<void>;
+    paused?(): void | Promise<void>;
+    resuming?(): void | Promise<void>;
+    resumed?(): void | Promise<void>;
+    stopping?(): void | Promise<void>;
+    stopped?(): void | Promise<void>;
+    unmounting?(): void | Promise<void>;
+    unmounted?(): void | Promise<void>;
+    destroying?(): void | Promise<void>;
+    destroyed?(): void | Promise<void>;
 
+    // Legacy alias (tương thích cũ):
     onInit?(): void | Promise<void>;
     onMounted?(): void | Promise<void>;
     onUpdated?(): void | Promise<void>;
     onDestroy?(): void | Promise<void>;
     onActivated?(): void | Promise<void>;
     onDeactivated?(): void | Promise<void>;
+    onPause?(): void | Promise<void>;
+    onResume?(): void | Promise<void>;
 
     // ─── Convenience Accessors ──────────────────────────────────
 

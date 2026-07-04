@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.test-yield-page';
@@ -144,9 +144,8 @@ class TestYieldPageView extends View {
                         }
                     }
                 }
-                // Then update states from data
-                update$count(0);
-                update$name('World');
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
+
                 // Finally lock state updates
                 lockUpdateRealState();
             },

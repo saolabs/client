@@ -8,10 +8,10 @@ import { ViewState } from "./ViewState";
 import { LoopContext } from "./LoopContext";
 import { Component } from "../elements/Component";
 import { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/views";
+import { SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface";
 import { InitMode } from "../contracts/common";
-import { BlockOutlet } from "../elements";
 import { ComponentInterface } from "../contracts/ComponentInterface";
+import { ForeachSlotCache } from "../elements/ForeachSlotCache";
 type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | SaoNodeInterface;
 /**
  * ViewController — the brain behind a View.
@@ -91,6 +91,13 @@ export declare class ViewController implements ViewControllerInterface {
     private eventAbortController;
     /** Current loop context stack (@foreach, @for, @while) */
     loopContext: LoopContext | null;
+    /**
+     * Active ForeachSlotCache — được set bởi Reactive.renderForeach() trước khi
+     * gọi childrenFactory. __foreach() đọc cache này để quyết định reuse hay create.
+     * Reset về null ngay sau khi childrenFactory trả về.
+     */
+    _currentForeachCache: ForeachSlotCache | null;
+    _foreachSkipRegistry: boolean;
     /** Section management across views */
     sections: Map<string, SectionInterface>;
     /** Block slots in layout views */
@@ -98,6 +105,7 @@ export declare class ViewController implements ViewControllerInterface {
     elements: Map<string, ElementChild>;
     preloadElement: WrapperInterface | null;
     mainElement: WrapperInterface | null;
+    private wrapperInstance;
     /** Whether this view is currently active (mounted in DOM) */
     isActive: boolean;
     /** Whether initial data has been committed */
@@ -106,6 +114,9 @@ export declare class ViewController implements ViewControllerInterface {
     private _isMounted;
     /** Whether the view has been fully destroyed */
     private _isDestroyed;
+    /** Whether this instance's styles/scripts are currently counted in AssetManager
+     *  (true = đang góp 1 ref vào real DOM). Giữ acquire/release cân bằng. */
+    private _assetsLive;
     /** For future use: scanning DOM for bindings */
     protected isScanMode: boolean;
     urlPath: string | null;
@@ -140,8 +151,24 @@ export declare class ViewController implements ViewControllerInterface {
     hydrate(): any;
     hydrateRender(): any;
     hydratePrerender(): any;
-    mount(root: HTMLElement): void;
+    /** Gọi an toàn một lifecycle hook nếu user có định nghĩa trên View. */
+    private callHook;
+    /**
+     * Mount — instance vào real DOM.
+     *   - root != null: gắn DOM tree (mainElement/preloadElement) vào root.
+     *   - root == null: nội dung đã được đặt sẵn (block outlets / component markers),
+     *     chỉ fire hook + acquire asset.
+     * Fire mounting/mounted MỘT lần mỗi vòng đời; pause→resume dùng resuming/resumed.
+     */
+    mount(root?: HtmlInterface | null): void;
+    /** Unmount — gỡ instance khỏi real DOM (fire hook + release asset). */
     unmount(): void;
+    /** Đăng ký style/script của component vào real DOM (insert khi ref 0→1). */
+    private acquireAssets;
+    /** Gỡ đăng ký style/script (remove khi ref 1→0). */
+    private releaseAssets;
+    /** Các Element gốc của instance (giữa markers của Wrapper) — để tag scoped style. */
+    private getSubtreeRoots;
     /**
      * Start — activate reactive subscriptions throughout the element tree.
      * Called AFTER render() and commitData().
@@ -150,6 +177,27 @@ export declare class ViewController implements ViewControllerInterface {
      * This ensures initial state values are set before subscriptions fire.
      */
     start(): void;
+    private _lifecycleState;
+    /** Data nhận được trong lúc paused (async fetch về muộn) — apply khi resume */
+    private _bufferedData;
+    get lifecycleState(): string;
+    /**
+     * Pause — tạm dừng để vào PageCache:
+     *   1. Flush nốt RAF pending (không mất update đang chờ)
+     *   2. State listeners → dirty-mode (KHÔNG unsubscribe — ghi sổ key đổi)
+     *   3. Hook onPause cho user dọn tài nguyên thô
+     * DOM event listeners giữ nguyên — DOM sẽ bị detach nên vô hại.
+     */
+    pause(): void;
+    /**
+     * Resume — khôi phục từ PageCache:
+     *   1. Apply buffered data (async về trong lúc paused)
+     *   2. Thoát dirty-mode → flush đúng các vùng phụ thuộc dirty keys
+     *   3. Hook onResume — nơi user quyết định refetch (theo TTL riêng...)
+     */
+    resume(): void;
+    /** Flush đồng bộ các reactive update đang chờ RAF */
+    flushReactiveUpdatesNow(): void;
     /**
      * Stop — deactivate reactive subscriptions (for caching/deactivation).
      * DOM stays intact but reactive updates are paused.
@@ -157,16 +205,26 @@ export declare class ViewController implements ViewControllerInterface {
     stop(): void;
     /** Full destroy — cleanup everything */
     destroy(): void;
+    active(): void;
+    deactive(): void;
+    /**
+     * `this` context cho các hàm compiled config (updateVariableData dùng
+     * this.config.updateVariableItemData và this.data).
+     */
+    private makeConfigThis;
     /**
      * Commit initial data — set initial state values.
      * Called by ViewManager AFTER render + block mounting.
      *
      * Flow: commitConstructorData() → update$xxx(initial) → lockUpdateRealState()
+     * FIX(Phase2): trước đây method này RỖNG — compiled commitConstructorData
+     * không bao giờ được gọi.
      */
     commitData(): void;
     /**
      * Update data from external source (navigate same view, different params).
-     * Flow: unlock → updateVariableData(newData) → re-set states → lock
+     * Flow: unlock → updateVariableData(newData) → re-set states → lock.
+     * Khi paused: buffer lại, apply lúc resume (ROUTE_RENDER_FLOW §8.2).
      */
     updateData(newData: Record<string, any>): void;
     /**
@@ -189,6 +247,14 @@ export declare class ViewController implements ViewControllerInterface {
      */
     scheduleUpdate(reactive: ReactiveInterface): void;
     private flushReactiveUpdates;
+    pushBlockAndSections(): void;
+    /**
+     *
+     * @param name
+     * @param config
+     * @param contentRenderFactory
+     * @returns
+     */
     section(name: string, config: {
         type: SectionItemType;
         contentType?: SectionContentType;
@@ -203,7 +269,7 @@ export declare class ViewController implements ViewControllerInterface {
      * Creates a Reactive region between markers that will hold the block content.
      * BlockManager.mountAll() later inserts the page view's block content here.
      */
-    useBlock(id: string | null | undefined, name: string, parent: HtmlInterface): BlockOutlet;
+    useBlock(id: string | null | undefined, name: string, parent: HtmlInterface): BlockOutletInterface;
     yield(id: string, name: string, defaultValue?: any, parentElement?: HtmlInterface | null): YieldInterface;
     yieldContent(name: string, defaultValue?: any): any;
     wrapper(factory: SaoChildrenFactory): WrapperInterface;
@@ -215,7 +281,17 @@ export declare class ViewController implements ViewControllerInterface {
     html(id: string | null | undefined, tagName: string, parentElement: HtmlInterface | null, config: any, childrenFactory?: SaoChildrenFactory): SaoNodeInterface;
     reactive(id: string | null, type: string, parentReactive: ReactiveInterface | null, parentElement: HtmlInterface | null, stateKeys: string[], childrenFactory: ReactiveChildrenFactory): ReactiveInterface;
     output(id: string | null, parent: HtmlInterface | null, isEscapeHTML?: boolean, stateKeys?: string[], contentFactory?: () => string): OutputInterface;
-    text(text: string): Text;
+    /**
+     * FIX(baseline#2): trả về TextElement (có saoType) thay vì raw Text node.
+     * Raw Text node bị mountElementList/Reactive.render bỏ qua → text tĩnh biến mất.
+     */
+    text(text: string): TextInterface;
+    /**
+     * Registry guard: element đã destroy không được reuse — trả về corpse
+     * (events đã abort, markers đã gỡ) gây render rỗng / stale closure.
+     * Xem docs/RUNTIME_CONTRACT.md §2.
+     */
+    private aliveFromRegistry;
     include(id: string | null | undefined, path: string | undefined, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component;
     includeIf(id: string | null | undefined, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component;
     includeWhen(id: string | null, condition: {
@@ -231,9 +307,19 @@ export declare class ViewController implements ViewControllerInterface {
      * @foreach directive — iterate over array or object.
      * Returns array of children (not HTML string like the old system).
      *
+     * # Cache-aware re-render (Phase 5)
+     * Khi `_currentForeachCache` được set (bởi Reactive.renderForeach()), __foreach
+     * kiểm tra cache trước mỗi item:
+     *   - Cache hit (item ref giống) → trả về elements cũ (reuse, không recreate DOM)
+     *   - Cache miss (item mới)     → gọi callback → tạo elements mới → lưu vào cache
+     *
+     * Identity keying: cache key là object reference của item, không phải index.
+     * → Reorder list giữ nguyên elements cho từng item (chỉ thay đổi vị trí DOM).
+     * → Immutable-data patterns (mỗi update tạo object mới) được handle tự động.
+     *
      * @example Compiled output:
      * ctrl.__foreach(items, (item, key, index, loop) => [
-     *     em.h(ctrl, parent, 'div', {}, () => [em.t(`Item: ${item}`)])
+     *     this.html('id', 'div', p, {}, () => [this.text(item.name)])
      * ])
      */
     __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContext) => any): any[];
@@ -247,6 +333,70 @@ export declare class ViewController implements ViewControllerInterface {
      * @while directive
      */
     __while(execute: (loop: LoopContext) => any, maxIterations?: number): any;
+    /**
+     * __showBinding — tính CSS style string cho @show directive.
+     *
+     * Compiler emit (pre-process trước AST):
+     *   @show($isVisible)  →  style="${this.__showBinding(['isVisible'], isVisible)}"
+     *
+     * Hành vi:
+     *   - condition truthy  → '' (element hiện, style="" hoặc style bị remove)
+     *   - condition falsy   → 'display: none;' (element ẩn)
+     *
+     * Reactivity được xử lý bởi Html._applyAttr() — nó subscribe stateKeys
+     * và gọi lại factory khi state thay đổi. Method này chỉ compute giá trị hiện tại.
+     *
+     * @param _stateKeys - Danh sách state keys (đã được encode trong compiled config, không dùng ở đây)
+     * @param condition  - Điều kiện hiện/ẩn (truthy = show, falsy = hide)
+     */
+    __showBinding(_stateKeys: string[], condition: any): string;
+    /**
+     * __styleBinding — tính inline CSS style string cho @style directive.
+     *
+     * Compiler emit (pre-process trước AST):
+     *   @style(['color' => $textColor, 'font-size' => $fontSize])
+     *   →  ${this.__styleBinding(['textColor', 'fontSize'], [['color', textColor], ['font-size', fontSize]])}
+     *
+     * Hành vi:
+     *   - Lọc bỏ entries có value null / undefined / false / '' (không set prop đó)
+     *   - Join thành "prop: value; prop: value" string
+     *
+     * @param _stateKeys - Danh sách state keys (đã encode trong config, không dùng ở đây)
+     * @param styles     - Mảng [cssProperty, value] pairs
+     *
+     * @example
+     *   __styleBinding([], [['color', 'red'], ['font-size', null], ['display', 'block']])
+     *   // → "color: red; display: block"
+     */
+    __styleBinding(_stateKeys: string[], styles: [string, any][]): string;
+    /**
+     * __classBinding — tính CSS class string cho @class binding (legacy template path).
+     *
+     * Chỉ được gọi bởi OLD template_processor (flat compiler) fallback path.
+     * New AST path (RenderGenerator) emit class config trực tiếp vào options.classes[]
+     * → Html.initializeClasses() xử lý, KHÔNG dùng __classBinding.
+     *
+     * Format input (từ class_binding_handler.py):
+     *   [{ type: 'static', value: 'foo' },
+     *    { type: 'binding', value: 'is-active', states: ['isActive'], checker: () => isActive }]
+     *
+     * @param configs - Mảng class config objects
+     * @returns Space-joined class string
+     *
+     * @example
+     *   __classBinding([
+     *     { type: 'static', value: 'btn' },
+     *     { type: 'binding', value: 'btn-primary', checker: () => isPrimary }
+     *   ])
+     *   // isPrimary = true → "btn btn-primary"
+     *   // isPrimary = false → "btn"
+     */
+    __classBinding(configs: Array<{
+        type: 'static' | 'binding';
+        value: string;
+        states?: string[];
+        checker?: () => any;
+    }>): string;
     setApp(app: ApplicationInterface): void;
     getParentView(): ViewInterface | null;
     getChildrenViews(): ViewInterface[];

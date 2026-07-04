@@ -179,6 +179,18 @@ export class Application implements ApplicationInterface {
      */
     instance<T>(key: ServiceKey<T>, value: T): this {
         this.singletons.set(key, value);
+        if (typeof key === 'string' && !this.ownProperties.includes(key)) {
+            this.__store.set(key, { value, isOverridable: true });
+            Object.defineProperty(this, key, {
+                get: () => this.__store.get(key)?.value,
+                set: (newValue) => {
+                    this.__store.set(key, { value: newValue, isOverridable: true });
+                    this.singletons.set(key, newValue);
+                },
+                configurable: true,
+                enumerable: false,
+            });
+        }
         return this;
     }
 

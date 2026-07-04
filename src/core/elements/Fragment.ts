@@ -52,45 +52,61 @@ export class Fragment implements FragmentInterface {
     setParentElement(parent: HtmlInterface | null): void {
         this.parent = parent;
     }
+    /** Registry guard — element đã destroy không được reuse */
+    public __destroyed__: boolean = false;
+
+    /**
+     * Render — idempotent + position-aware (RUNTIME_CONTRACT.md §2),
+     * cùng pattern với Reactive.render().
+     */
     render(): void {
-        if (!this.parent || !this.parent.element) return;
+        if (this.__destroyed__) return;
 
-        const parentEl = this.parent.element;
-
-        // Place start marker
-        parentEl.appendChild(this.openTag);
+        if (!this.openTag.parentNode) {
+            if (!this.parent || !this.parent.element) return;
+            const parentEl = this.parent.element;
+            parentEl.appendChild(this.openTag);
+            parentEl.appendChild(this.closeTag);
+        } else {
+            this.clear(false);
+        }
 
         // Build children — compiled output uses (parentElement) => [...] signature
         const output: SaoChildrenFactoryOutput = this.childrenFactory(this.parent);
+        const insertBeforeClose = (node: Node) => {
+            this.closeTag.parentNode?.insertBefore(node, this.closeTag);
+        };
 
         for (const child of output) {
+            if (child === null || child === undefined) continue;
             if (typeof child === 'string' || typeof child === 'number') {
                 const textNode = document.createTextNode(String(child));
-                parentEl.appendChild(textNode);
+                insertBeforeClose(textNode);
                 this.nodes.push(textNode);
-            } else if (child && typeof child === 'object') {
-                if ('element' in child) {
-                    // HtmlInterface, TextInterface — append their DOM element
-                    parentEl.appendChild(child.element);
-                    this.nodes.push(child.element);
+            } else if (child instanceof Node) {
+                insertBeforeClose(child);
+                this.nodes.push(child);
+            } else if (typeof child === 'object') {
+                if ('element' in child && (child as any).element) {
+                    insertBeforeClose((child as any).element);
+                    this.nodes.push((child as any).element);
                     this.children.push(child);
                     child.render();
                 } else if ('openTag' in child) {
-                    // Reactive, nested Fragment, Output — they self-append markers
+                    // Marker-based: đặt markers đúng vị trí trước, render sau
                     if ('parent' in child) {
                         (child as any).parent = this.parent;
                     }
                     if ('parentElement' in child) {
                         (child as any).parentElement = this.parent;
                     }
+                    insertBeforeClose((child as any).openTag);
+                    insertBeforeClose((child as any).closeTag);
                     this.children.push(child);
                     child.render();
                 }
             }
         }
-
-        // Place end marker
-        parentEl.appendChild(this.closeTag);
     }
 
     setChildrenFactory(factory: SaoChildrenFactory): void {
@@ -126,7 +142,7 @@ export class Fragment implements FragmentInterface {
     }
 
     /** Remove all nodes between markers from the DOM */
-    clear(): void {
+    clear(_destroyChildren: boolean = true): void {
         // Destroy managed children first
         for (const child of this.children) {
             if ('destroy' in child && typeof child.destroy === 'function') {
@@ -146,6 +162,7 @@ export class Fragment implements FragmentInterface {
     }
 
     destroy(): void {
+        this.__destroyed__ = true;
         this.clear();
         this.openTag.remove();
         this.closeTag.remove();

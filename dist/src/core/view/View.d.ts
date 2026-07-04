@@ -41,12 +41,28 @@ export declare class View implements ViewInterface, ViewLifecycleHooks {
      * @param systemData  — System-level data (SSR data, global config, etc.)
      */
     $__setup__(__data__?: Record<string, any>, systemData?: Record<string, any>): void;
+    mounting?(): void | Promise<void>;
+    mounted?(): void | Promise<void>;
+    starting?(): void | Promise<void>;
+    started?(): void | Promise<void>;
+    pausing?(): void | Promise<void>;
+    paused?(): void | Promise<void>;
+    resuming?(): void | Promise<void>;
+    resumed?(): void | Promise<void>;
+    stopping?(): void | Promise<void>;
+    stopped?(): void | Promise<void>;
+    unmounting?(): void | Promise<void>;
+    unmounted?(): void | Promise<void>;
+    destroying?(): void | Promise<void>;
+    destroyed?(): void | Promise<void>;
     onInit?(): void | Promise<void>;
     onMounted?(): void | Promise<void>;
     onUpdated?(): void | Promise<void>;
     onDestroy?(): void | Promise<void>;
     onActivated?(): void | Promise<void>;
     onDeactivated?(): void | Promise<void>;
+    onPause?(): void | Promise<void>;
+    onResume?(): void | Promise<void>;
     get path(): string;
     get viewType(): ViewType;
     /** Shortcut to controller */

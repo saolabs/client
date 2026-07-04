@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.test-useState';
@@ -134,10 +134,8 @@ class TestUseStateView extends View {
                         }
                     }
                 }
-                // Then update states from data
-                update$users([]);
-                update$userList([]);
-                update$loading(false);
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
+
                 // Finally lock state updates
                 lockUpdateRealState();
             },

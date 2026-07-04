@@ -65,8 +65,17 @@ export declare class StateManager implements StateManagerInterface {
      * `viewState.count` reads/writes the state reactively.
      */
     useState(value: any, key?: string | number): [any, (newValue: any) => void, string | number];
-    /** Register shorthand — just returns the setter */
-    register(key: string | number, value: any): (newValue: any) => void;
+    /**
+     * Register shorthand — pre-declare a state slot, returns setter.
+     *
+     * Compiler pattern:
+     *   const set$count = __STATE__.__.register('count');
+     *   // initial value set later in commitConstructorData:
+     *   update$count(0);  →  updateStateByKey('count', 0)
+     *
+     * Value is optional (defaults to undefined until commitConstructorData runs).
+     */
+    register(key: string | number, value?: any): (newValue: any) => void;
     /** Update state by key */
     updateStateByKey(key: string | number, value: any): any;
     /**
@@ -79,6 +88,18 @@ export declare class StateManager implements StateManagerInterface {
     updateStateAddressKey(key: string | number, value: any): void;
     subscribe(key: string | number | string[] | Record<string, StateListener>, callback?: StateListener): () => void;
     unsubscribe(key: string | number | string[] | Record<string, StateListener>, callback?: StateListener): void;
+    private _isPaused;
+    private dirtyKeys;
+    get isPaused(): boolean;
+    /** Chuyển sang dirty-mode. Flush nốt pending changes trước để DOM là snapshot nhất quán. */
+    pause(): void;
+    /**
+     * Thoát dirty-mode. Notify listeners cho đúng các key đã đổi trong lúc paused.
+     * Trả về danh sách dirty keys (rỗng = không có gì thay đổi, không render).
+     */
+    resume(): Array<string | number>;
+    /** Flush đồng bộ pending changes (huỷ RAF đang chờ nếu có). */
+    flushNow(): void;
     private commitStateChange;
     private executeFlush;
     private flushChanges;

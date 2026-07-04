@@ -1,4 +1,4 @@
-import { ApiClient } from "../../hellpers/ApiClient";
+import { ApiClient } from "../../helpers/ApiClient";
 import { PROVIDER_NAMES } from "./provider-order";
 import { ServiceProvider } from "./ServiceProvider";
 export class ApiServiceProvider extends ServiceProvider {

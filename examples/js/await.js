@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.await';
@@ -77,8 +77,10 @@ class AwaitView extends View {
 
         const __UPDATE_DATA_TRAIT__ = {};
         let {user = null, counter = 0} = __data__;
-        __UPDATE_DATA_TRAIT__.user = value => user = value;
-        __UPDATE_DATA_TRAIT__.counter = value => counter = value;
+        __STATE__.__.register('user', user);
+        __STATE__.__.register('counter', counter);
+        __UPDATE_DATA_TRAIT__.user = value => { user = value; updateStateByKey('user', value); };
+        __UPDATE_DATA_TRAIT__.counter = value => { counter = value; updateStateByKey('counter', value); };
         const __VARIABLE_LIST__ = ["user", "counter"];
 
 
@@ -112,7 +114,7 @@ class AwaitView extends View {
                         }
                     }
                 }
-                // Then update states from data
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
 
                 // Finally lock state updates
 
@@ -136,13 +138,13 @@ class AwaitView extends View {
             let parentReactive = null;
             this.block('block-content', 'content', (parentElement) => [
             this.html(`e085b222`, "div", parentElement, {}, (parentElement) => [
-                this.reactive(`97d74020`, "if", parentReactive, parentElement, [], (parentReactive, parentElement) => {
+                this.reactive(`97d74020`, "if", parentReactive, parentElement, ["user"], (parentReactive, parentElement) => {
                     const reactiveContents = [];
                     if (user) {
                         reactiveContents.push(
                         this.html(`31dfc4e0`, "h1", parentElement, {}, (parentElement) => [
                             this.text('Welcome '),
-                            this.output(`79b5b43f`, parentElement, true, [], (parentElement) => user.name)
+                            this.output(`79b5b43f`, parentElement, true, ["user"], (parentElement) => user.name)
                         ])
                         );
                     }
@@ -169,7 +171,7 @@ class AwaitView extends View {
                     ]),
                 this.html(`732603d4`, "p", parentElement, {}, (parentElement) => [
                     this.text('Counter: '),
-                    this.output(`e10fbb5c`, parentElement, true, [], (parentElement) => counter)
+                    this.output(`e10fbb5c`, parentElement, true, ["counter"], (parentElement) => counter)
                 ])
             ])
             ]);

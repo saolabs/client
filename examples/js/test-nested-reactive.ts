@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.test-nested-reactive';
@@ -167,11 +167,8 @@ class TestNestedReactiveView extends View {
                         }
                     }
                 }
-                // Then update states from data
-                update$items([{"id": 1, "name": "Apple", "category": "fruit", "price": 2, "tags": ["red", "sweet"]}, {"id": 2, "name": "Carrot", "category": "vegetable", "price": 1, "tags": ['orange']}, {"id": 3, "name": "Banana", "category": "fruit", "price": 3, "tags": ["yellow", "sweet", "tropical"]}, {"id": 4, "name": "Broccoli", "category": "vegetable", "price": 4, "tags": ["green", "healthy"]}]);
-                update$status('active');
-                update$count(0);
-                update$showDetails(true);
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
+
                 // Finally lock state updates
                 lockUpdateRealState();
             },
@@ -193,7 +190,7 @@ class TestNestedReactiveView extends View {
                 (parentElement: any) => [
                 this.html(`9d70118d`, "h2", parentElement, {}, (parentElement: any) => [
                     this.text('Total items: '),
-                    this.output(`57d9b60b`, parentElement, true, ["items"], (parentElement: any) => App.Helper.count(items))
+                    this.output(`57d9b60b`, parentElement, true, ["count", "items"], (parentElement: any) => App.Helper.count(items))
                 ]),
                 this.html(`96323a6c`, "p", parentElement, {}, (parentElement: any) => [
                     this.text('Status: '),
@@ -385,7 +382,7 @@ class TestNestedReactiveView extends View {
                                     }
                                     return reactiveContents;
                                 }),
-                                this.reactive(`6600da4e-${__loopIndex + 1}`, "if", parentReactive, parentElement, [], (parentReactive: any, parentElement: any) => {
+                                this.reactive(`6600da4e-${__loopIndex + 1}`, "if", parentReactive, parentElement, ["count"], (parentReactive: any, parentElement: any) => {
                                     const reactiveContents = [];
                                     if (App.Helper.count(item.tags) > 1) {
                                         reactiveContents.push(

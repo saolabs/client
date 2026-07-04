@@ -1,6 +1,5 @@
 import type { HtmlInterface, TextInterface } from "../contracts/ElementInterface";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { escapeHTML } from "../helpers/utils";
 import { SaoObjectType } from "../types/utils";
 
 /**
@@ -31,10 +30,9 @@ export class TextElement implements TextInterface {
         this.parent = parent;
         this.statekeys = stateKeys;
         this.shouldEscapeHTML = isEscapeHTML;
+        // FIX(baseline#3): KHÔNG escapeHTML khi ghi vào Text node — text node tự an toàn,
+        // escape thủ công gây double-escape. shouldEscapeHTML chỉ dùng cho SSR string path.
         this._text = this.generateText();
-        if (this.shouldEscapeHTML) {
-            this._text = escapeHTML(this._text);
-        }
         this.element = document.createTextNode(this._text);
     }
 
@@ -64,15 +62,12 @@ export class TextElement implements TextInterface {
     update(newText: string): void {
         if (this._text !== newText) {
             this._text = newText;
-            this.element.textContent = this.shouldEscapeHTML ? escapeHTML(newText) : newText;
+            this.element.textContent = newText;
         }
     }
 
     render(): HTMLElement | Text | Comment {
-        let text = this.generateText();
-        if (this.shouldEscapeHTML) {
-            text = escapeHTML(text);
-        }
+        const text = this.generateText();
         this._text = text;
         this.element.textContent = text;
         return this.element;
@@ -82,7 +77,11 @@ export class TextElement implements TextInterface {
         this.element.remove();
     }
 
+    /** Registry guard — element đã destroy không được reuse */
+    public __destroyed__: boolean = false;
+
     destroy(): void {
+        this.__destroyed__ = true;
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;

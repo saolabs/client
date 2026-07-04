@@ -3,9 +3,26 @@ import type { DOMElement, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryO
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
 import { hasData } from "../helpers/utils";
-import { mountElementList } from "../helpers/view";
+import { mountElementList, hydrateElementList } from "../helpers/view";
 import type { SaoObjectType } from "../types/utils";
 import { TextElement } from "./TextElement";
+
+/**
+ * Escape một chuỗi để dùng làm CSS class/id selector. Class hydrate dạng
+ * "{viewId}-{id}" có viewId là hex (uniqid) CÓ THỂ bắt đầu bằng chữ số, làm
+ * ".6a3a..." trở thành selector không hợp lệ → querySelector ném SyntaxError.
+ * Dùng CSS.escape khi có; fallback escape thủ công ký tự đầu là số + ký tự đặc biệt.
+ */
+function cssEscape(value: string): string {
+    const g: any = typeof globalThis !== 'undefined' ? globalThis : {};
+    if (g.CSS && typeof g.CSS.escape === 'function') {
+        return g.CSS.escape(value);
+    }
+    // Fallback tối thiểu: escape chữ số đầu (\3N ) và ký tự không phải [-_a-zA-Z0-9].
+    return value
+        .replace(/^[0-9]/, ch => `\\3${ch} `)
+        .replace(/[^a-zA-Z0-9_-]/g, ch => `\\${ch}`);
+}
 
 export class Html implements HtmlInterface {
     saoType: SaoObjectType = 'Html';
@@ -50,28 +67,60 @@ export class Html implements HtmlInterface {
         this.config = config;
         this.tagName = tagName;
         this.initMode = initMode;
-        const shouldHydrate = config.hydrate && initMode === InitModes.HYDRATE;
 
-        const onlySync = (initMode === InitModes.HYDRATE && config.element instanceof HTMLElement) || element instanceof HTMLElement;
-        if (onlySync) {
-            this.element = element || config.element as HTMLElement;
+        // ── Ưu tiên element trực tiếp (ViewManager rootElement / test) ─────────
+        // config.element hoặc tham số element cho phép caller truyền HTMLElement sẵn có
+        // mà không cần lookup DOM.
+        const directElement = element instanceof HTMLElement
+            ? element
+            : (config.element instanceof HTMLElement ? config.element : null);
+
+        if (directElement) {
+            this.element = directElement;
             this.tagName = this.element.tagName.toLowerCase();
-        } else if (shouldHydrate && config.selector) {
-            const found = document.querySelector(`${tagName}.${id}`) as HTMLElement | null;
-            if (found instanceof HTMLElement) {
+        } else if (initMode === InitModes.HYDRATE) {
+            // ── SSR Hydration: claim server-rendered DOM node bằng class ID ──────
+            //
+            // Blade compiler emit class: $__VIEW_ID__ . '-{id}' (e.g. "v12345-af0882bc-0-1").
+            // Tham chiếu: COMPILER_CONTRACT.md §hydration, docs/FOREACH_RECONCILIATION_DESIGN.md
+            //
+            // Thuật toán (top-down):
+            //   1. Xây dựng hydrateClass = "{viewId}-{id}"
+            //   2. Tìm trong parentElement.element trước (để tránh cross-view collision)
+            //   3. Fallback: document.querySelector nếu không có parentElement
+            //   4. Không tìm thấy → tạo element mới (partial hydration)
+            const viewId = (ctx as any).viewId ?? null;
+            let found: HTMLElement | null = null;
+
+            if (id) {
+                const hydrateClass = viewId ? `${viewId}-${id}` : id;
+                // viewId (server uniqid) là hex CÓ THỂ bắt đầu bằng chữ số → class
+                // "6a3a...-32a9c14a" làm selector ".6a3a..." KHÔNG hợp lệ
+                // (querySelector ném SyntaxError). CSS.escape() escape ký tự đầu.
+                const selector = `${tagName}.${cssEscape(hydrateClass)}`;
+                // Tìm trong parent scope trước (top-down traversal)
+                const searchScope: Element | null = parentElement?.element ?? null;
+                if (searchScope) {
+                    found = searchScope.querySelector(selector) as HTMLElement | null;
+                }
+                // Fallback: toàn bộ document (cho root-level elements)
+                if (!found) {
+                    found = document.querySelector(selector) as HTMLElement | null;
+                }
+            }
+
+            if (found) {
                 this.element = found;
                 this.tagName = found.tagName.toLowerCase();
             } else {
+                // Partial hydration fallback: element không có trong SSR output
                 this.element = document.createElement(tagName);
-                this.element.classList.add(id || '');
-                console.warn(`[Html] Selector "${config.selector}" not found, created new <${tagName}>.`);
+                if (id) this.element.classList.add(id);
             }
         } else {
+            // ── CSR (create mode): tạo element mới ───────────────────────────────
             this.element = document.createElement(this.tagName);
-            this.element.classList.add(id || '');
-            if (shouldHydrate) {
-                console.warn(`[Html] No selector for hydration, created new <${tagName}>.`);
-            }
+            if (id) this.element.classList.add(id);
         }
 
 
@@ -95,40 +144,138 @@ export class Html implements HtmlInterface {
 
 
 
-    private initializeAttributes() {
-        if (this.config.attrs) {
-            for (const [attrName, attrConfig] of Object.entries(this.config.attrs)) {
-                if (attrConfig.type === 'value') {
-                    this.element.setAttribute(attrName, attrConfig.value);
-                } else if (attrConfig.type === 'binding') {
-                    const value = attrConfig.factory ? attrConfig.factory() : '';
-                    if (value !== undefined && value !== null && value !== false) {
-                        this.element.setAttribute(attrName, String(value));
-                    } else {
-                        this.element.removeAttribute(attrName);
-                    }
+    /**
+     * Chuẩn hóa tên attr từ camelCase → kebab-case cho data-* và aria-* attrs.
+     *
+     * Compiler emit camelCase: "dataCount" → client phải set "data-count" trên DOM.
+     * Tham chiếu: COMPILER_CONTRACT.md §3 — camelCase attrs.
+     *
+     * @example normalizeAttrName('dataCount') === 'data-count'
+     * @example normalizeAttrName('ariaLabel') === 'aria-label'
+     * @example normalizeAttrName('id') === 'id'  (không đổi)
+     */
+    private normalizeAttrName(name: string): string {
+        if (/^data[A-Z]/.test(name)) {
+            return 'data-' + name[4].toLowerCase() + name.slice(5).replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+        }
+        if (/^aria[A-Z]/.test(name)) {
+            return 'aria-' + name[4].toLowerCase() + name.slice(5).replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+        }
+        return name;
+    }
 
-                    // Reactive binding for attributes
-                    if (attrConfig.stateKeys?.length) {
-                        const unsubscribe = this.ctx.states.__.subscribe(
-                            attrConfig.stateKeys,
-                            () => {
-                                const newValue = attrConfig.factory ? attrConfig.factory() : '';
-                                if (newValue !== undefined && newValue !== null && newValue !== false) {
-                                    this.element.setAttribute(attrName, String(newValue));
-                                } else {
-                                    this.element.removeAttribute(attrName);
-                                }
-                            }
-                        );
-                        this.bindingUnsubscribes.push(unsubscribe);
-                    }
-                }
+    /**
+     * Thiết lập two-way data binding (v-model-like) theo compiler pattern:
+     *
+     *   attrs: { "bind": { type: 'static', value: true }, "<stateKey>": { type: 'static', value: true } }
+     *
+     *   - "bind": true          → bật two-way binding
+     *   - "<stateKey>": true    → tên state key cần bind (e.g. "newTodo")
+     *
+     * Hành vi:
+     *   1. Khởi tạo: set element.value = state hiện tại
+     *   2. input event → update state
+     *   3. state change → update element.value
+     *
+     * Tham chiếu: COMPILER_CONTRACT.md §5 — @bind directive.
+     */
+    private setupTwoWayBinding(stateKey: string): void {
+        const manager = this.ctx.states.__;
+        const el = this.element as HTMLInputElement;
+        const isSelect = el.tagName === 'SELECT';
+        const isCheckbox = el.type === 'checkbox';
+        const isRadio = el.type === 'radio';
+        const isNumber = el.type === 'number' || el.type === 'range';
+
+        // state → element (dùng cho cả khởi tạo lẫn reactive update)
+        const applyState = (val: any) => {
+            if (isCheckbox) {
+                el.checked = !!val;
+            } else if (isRadio) {
+                // Radio group: checked khi state trùng value của radio này
+                el.checked = val !== null && val !== undefined && String(val) === el.value;
+            } else {
+                el.value = val !== null && val !== undefined ? String(val) : '';
+            }
+        };
+
+        // 1. Khởi tạo từ state hiện tại (nếu có)
+        const initial = manager.getStateByKey(stateKey);
+        if (initial !== null && initial !== undefined) {
+            if (isSelect) {
+                // <option> children chưa được append lúc constructor chạy —
+                // set .value trước khi có options là no-op, nên defer 1 microtask.
+                queueMicrotask(() => applyState(manager.getStateByKey(stateKey)));
+            } else {
+                applyState(initial);
             }
         }
+
+        // 2. element → state
+        const readValue = (): any => {
+            if (isCheckbox) return el.checked;
+            if (isNumber) {
+                // Giữ number cho state; input dở dang ('1e', rỗng) → giữ string thô
+                const n = el.valueAsNumber;
+                return Number.isNaN(n) ? el.value : n;
+            }
+            // radio chỉ fire change khi được chọn → value là giá trị đã chọn
+            return el.value;
+        };
+        const inputHandler = () => {
+            const setter = manager.setters[stateKey];
+            if (typeof setter === 'function') {
+                setter(readValue());
+            } else {
+                // Fallback: updateStateByKey trực tiếp
+                manager.updateStateByKey(stateKey, readValue());
+            }
+        };
+        const eventType = isCheckbox || isRadio || isSelect ? 'change' : 'input';
+        this.element.addEventListener(eventType, inputHandler, { signal: this.abortController.signal });
+
+        // 3. state → element (reactive update)
+        const unsubscribe = manager.subscribe([stateKey], () => {
+            applyState(manager.getStateByKey(stateKey));
+        });
+        this.bindingUnsubscribes.push(unsubscribe);
+    }
+
+    private initializeAttributes() {
+        const attrs = this.config.attrs;
+
+        if (attrs) {
+            // ─── Detect @bind directive (two-way binding) ─────────────
+            // Pattern từ compiler: { "bind": {type:'static', value:true}, "<stateKey>": {type:'static', value:true} }
+            // Tham chiếu: COMPILER_CONTRACT.md §5.
+            let bindStateKey: string | undefined;
+            const bindAttr = attrs['bind'];
+            if (bindAttr?.type === 'static' && bindAttr?.value === true) {
+                bindStateKey = Object.keys(attrs).find(k => {
+                    if (k === 'bind') return false;
+                    const v = attrs[k];
+                    // State key marker: { type: 'static', value: true }
+                    return v.type === 'static' && v.value === true;
+                });
+            }
+
+            // Apply attrs TRƯỚC binding — setupTwoWayBinding cần el.type ('checkbox',
+            // 'radio', 'number'...) đã có mặt. Khi có bind: skip "bind=true" và
+            // "<stateKey>=true" để không set marker lên DOM.
+            for (const [attrName, attrConfig] of Object.entries(attrs)) {
+                if (bindStateKey && (attrName === 'bind' || (attrConfig.type === 'static' && attrConfig.value === true))) continue;
+                this._applyAttr(attrName, attrConfig);
+            }
+
+            if (bindStateKey) {
+                this.setupTwoWayBinding(bindStateKey);
+            }
+        }
+
+        // props độc lập với attrs/bind — element chỉ có props vẫn phải chạy
         if (this.config.props) {
             for (const [propName, propConfig] of Object.entries(this.config.props)) {
-                if (propConfig.type === 'value') {
+                if (propConfig.type === 'static' || propConfig.type === 'value') {
                     (this.element as any)[propName] = propConfig.value;
                 } else if (propConfig.type === 'binding') {
                     const value = propConfig.factory ? propConfig.factory() : '';
@@ -156,6 +303,45 @@ export class Html implements HtmlInterface {
                         this.bindingUnsubscribes.push(unsubscribe);
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Apply một attr vào element, bao gồm:
+     *   - Chuẩn hóa tên (camelCase → kebab-case cho data-* / aria-*)
+     *   - Xử lý reactive binding
+     */
+    private _applyAttr(attrName: string, attrConfig: any): void {
+        // FIX(Phase4): chuẩn hóa tên — dataCount → data-count
+        const normalizedName = this.normalizeAttrName(attrName);
+
+        // FIX(baseline#1): contract chuẩn là 'static' (compiler emit); 'value' giữ làm legacy alias
+        if (attrConfig.type === 'static' || attrConfig.type === 'value') {
+            if (attrConfig.value !== undefined && attrConfig.value !== null && attrConfig.value !== false) {
+                this.element.setAttribute(normalizedName, String(attrConfig.value));
+            }
+        } else if (attrConfig.type === 'binding') {
+            const value = attrConfig.factory ? attrConfig.factory() : '';
+            if (value !== undefined && value !== null && value !== false) {
+                this.element.setAttribute(normalizedName, String(value));
+            } else {
+                this.element.removeAttribute(normalizedName);
+            }
+
+            if (attrConfig.stateKeys?.length) {
+                const unsubscribe = this.ctx.states.__.subscribe(
+                    attrConfig.stateKeys,
+                    () => {
+                        const newValue = attrConfig.factory ? attrConfig.factory() : '';
+                        if (newValue !== undefined && newValue !== null && newValue !== false) {
+                            this.element.setAttribute(normalizedName, String(newValue));
+                        } else {
+                            this.element.removeAttribute(normalizedName);
+                        }
+                    }
+                );
+                this.bindingUnsubscribes.push(unsubscribe);
             }
         }
     }
@@ -222,7 +408,7 @@ export class Html implements HtmlInterface {
         if (!this.config.styles) return;
 
         for (const [prop, styleConfig] of Object.entries(this.config.styles)) {
-            if (styleConfig.type === 'value') {
+            if (styleConfig.type === 'static' || styleConfig.type === 'value') {
                 this.element.style.setProperty(prop, styleConfig.value ?? '');
             } else if (styleConfig.type === 'binding') {
                 // Initial value
@@ -274,12 +460,14 @@ export class Html implements HtmlInterface {
     renderChildren(): SaoElementChildren {
         const children = this.childrenFactory ? this.childrenFactory(this) : [];
         this.children = [];
-        this.children = children.map((child: SaoElement | DOMElement | string | number) => {
-            if (typeof child === 'string' || typeof child === 'number') {
-                return new TextElement({ ctx: this.ctx as ViewControllerInterface, parent: this.parent, stateKeys: [], generateText: () => String(child) });
-            }
-            return child;
-        });
+        this.children = children
+            .filter((child): child is NonNullable<typeof child> => child !== null && child !== undefined)
+            .map((child) => {
+                if (typeof child === 'string' || typeof child === 'number') {
+                    return new TextElement({ ctx: this.ctx as ViewControllerInterface, parent: this.parent, stateKeys: [], generateText: () => String(child) });
+                }
+                return child;
+            });
         return this.children;
     }
 
@@ -289,11 +477,21 @@ export class Html implements HtmlInterface {
         }
         let children: SaoElementChildren = [];
         if (this.childrenFactory) {
-            // Compiled output uses (parentElement) => [...] — pass `this` as parentElement
             children = this.renderChildren();
         }
-        // CLEAR EXISTING CONTENT BEFORE RENDERING NEW CHILDREN
-        this.element.innerHTML = ''; // Clear existing content before rendering children
+
+        if (this.initMode === InitModes.HYDRATE) {
+            // ── Hydrate mode: DOM đã có từ server ────────────────────────
+            // renderChildren() đã tạo JS objects (Html claim DOM, Output claim markers).
+            // hydrateElementList gọi render() đệ quy để children cũng claim DOM,
+            // nhưng KHÔNG appendChild — giữ nguyên server-rendered DOM.
+            if (children && children.length > 0) {
+                hydrateElementList(this, children);
+            }
+            return this.element;
+        }
+
+        this.element.innerHTML = '';
 
         if (children && children.length > 0) {
             mountElementList(this, children);
@@ -333,7 +531,12 @@ export class Html implements HtmlInterface {
         this.element.remove();
     }
 
+    /** Registry guard — element đã destroy không được reuse (xem RUNTIME_CONTRACT.md §2) */
+    public __destroyed__: boolean = false;
+
     destroy() {
+        this.__destroyed__ = true;
+
         // Abort all registered event listeners
         this.abortController.abort();
         this.abortController = new AbortController();
@@ -354,6 +557,8 @@ export class Html implements HtmlInterface {
         if (this.element.children.length > 0) {
             this.element.innerHTML = '';
         }
+        // Gỡ element khỏi DOM — destroy là vĩnh viễn
+        this.element.remove();
     }
 
     get isSaoElement(): boolean {

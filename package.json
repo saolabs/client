@@ -33,7 +33,8 @@
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build",
     "publish-dry-run": "npm publish --dry-run",
-    "test": "echo \"No tests specified yet\""
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "typescript",
@@ -55,7 +56,9 @@
   "homepage": "https://github.com/saolabs/client#readme",
   "devDependencies": {
     "typescript": "^5.0.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "vitest": "^3.2.4",
+    "jsdom": "^25.0.1"
   },
   "engines": {
     "node": ">=16.0.0"

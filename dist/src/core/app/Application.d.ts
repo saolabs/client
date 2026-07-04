@@ -61,7 +61,7 @@ export declare class Application implements ApplicationInterface {
     /** Đã boot chưa */
     private booted;
     private ownProperties;
-    __store: Map<string, {
+    __store: Map<any, {
         isOverridable: boolean;
         value: any;
     }>;
@@ -152,8 +152,8 @@ export declare class Application implements ApplicationInterface {
     destroy(): void;
     getBindings(): Map<ServiceKey, ServiceFactory<any>>;
     getSingletons(): Map<ServiceKey, any>;
-    set<T = any>(name: string, value: T, isOne?: boolean): void;
-    get<T = any>(name: string): T;
+    set<T = any>(name: any, value: T, isOne?: boolean): void;
+    get<T = any>(name: any): T;
     setMethod(name: string, method: Function, isOne?: boolean): void;
 }
 //# sourceMappingURL=Application.d.ts.map

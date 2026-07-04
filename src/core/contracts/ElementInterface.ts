@@ -73,6 +73,8 @@ export interface WrapperInterface extends SaoNodeInterface {
     nodes: Node[];
     domChildren: Node[];
     [key: string]: any;
+    /** Render — chạy childrenFactory, trả về danh sách children đã tạo. */
+    render(): SaoElementChildren;
     appendTo(parent: HtmlInterface): void;
     mountTo(parent: HtmlInterface): void;
     clear(): void;
@@ -85,10 +87,16 @@ export interface WrapperInterface extends SaoNodeInterface {
 
 // ─── Element Config Types ────────────────────────────────────────
 
+/**
+ * Contract chuẩn (RUNTIME_CONTRACT.md §1.1): type = 'static' | 'binding'.
+ * 'value' giữ làm legacy alias của 'static' đến v0.2.
+ */
+export type BindingConfigType = 'static' | 'binding' | 'value';
+
 export type SaoElementConfig = {
     attrs?: {
         [key: string]: {
-            type: 'value' | 'binding';
+            type: BindingConfigType;
             value?: any;
             stateKeys?: string[];
             factory?: () => any;
@@ -96,7 +104,7 @@ export type SaoElementConfig = {
     },
     props?: {
         [key: string]: {
-            type: 'value' | 'binding';
+            type: BindingConfigType;
             value?: any;
             stateKeys?: string[];
             factory?: () => any;
@@ -120,7 +128,7 @@ export type SaoElementConfig = {
     }>,
     styles?: {
         [prop: string]: {
-            type: 'value' | 'binding';
+            type: BindingConfigType;
             value?: string;
             stateKeys?: string[];
             factory?: () => string;
@@ -147,10 +155,12 @@ export type DOMElement = HTMLElement | SVGElement | DocumentFragment | Text | Co
 // ─── Children Types ─────────────────────────────────────────────
 
 /** All possible rendered child node types */
-export type SaoElementChildren = Array<SaoElement | DOMElement>;
+export type SaoElementChildren = Array<SaoElement | SaoNodeInterface | DOMElement>;
 
-/** What a children factory can return (before mounting) */
-export type SaoChildrenFactoryOutput = Array<SaoElement | DOMElement | string | number>;
+/** What a children factory can return (before mounting).
+ *  SaoNodeInterface bao phủ các marker-based element (Output, Component, Block...)
+ *  mà compiled output vẫn trả về trong children factories. */
+export type SaoChildrenFactoryOutput = Array<SaoElement | SaoNodeInterface | DOMElement | string | number | null | undefined>;
 
 /** Factory function that produces children given parent element */
 export type SaoChildrenFactory = (parentElement: HtmlInterface | null) => SaoChildrenFactoryOutput;

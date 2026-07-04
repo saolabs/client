@@ -35,6 +35,12 @@ export class StateManager {
         this.controller = null;
         /** Properties that should NOT become state keys */
         this.ownProperties = ['__', 'on', 'off', 'unsubscribe'];
+        // ─── Pause / Resume (dirty tracking) ────────────────────────
+        // Thiết kế: ROUTE_RENDER_FLOW.md §7, §8.2-8.3.
+        // Khi paused: state VẪN nhận giá trị mới, nhưng không notify listener —
+        // key đổi được ghi vào dirtyKeys. resume() flush đúng các key dirty.
+        this._isPaused = false;
+        this.dirtyKeys = new Set();
         this.stateInstance = stateInstance;
         this.controller = controller ?? null;
     }
@@ -109,7 +115,16 @@ export class StateManager {
         return [value, setValue, stateKey];
     }
     // ─── State Access ───────────────────────────────────────────
-    /** Register shorthand — just returns the setter */
+    /**
+     * Register shorthand — pre-declare a state slot, returns setter.
+     *
+     * Compiler pattern:
+     *   const set$count = __STATE__.__.register('count');
+     *   // initial value set later in commitConstructorData:
+     *   update$count(0);  →  updateStateByKey('count', 0)
+     *
+     * Value is optional (defaults to undefined until commitConstructorData runs).
+     */
     register(key, value) {
         return this.useState(value, key)[1];
     }
@@ -265,6 +280,44 @@ export class StateManager {
             this.listeners.delete(key);
         }
     }
+    get isPaused() {
+        return this._isPaused;
+    }
+    /** Chuyển sang dirty-mode. Flush nốt pending changes trước để DOM là snapshot nhất quán. */
+    pause() {
+        if (this._isPaused || this._isDestroyed)
+            return;
+        this.flushNow();
+        this._isPaused = true;
+    }
+    /**
+     * Thoát dirty-mode. Notify listeners cho đúng các key đã đổi trong lúc paused.
+     * Trả về danh sách dirty keys (rỗng = không có gì thay đổi, không render).
+     */
+    resume() {
+        if (!this._isPaused || this._isDestroyed)
+            return [];
+        this._isPaused = false;
+        const dirty = Array.from(this.dirtyKeys);
+        this.dirtyKeys.clear();
+        if (dirty.length > 0) {
+            for (const key of dirty)
+                this.pendingChanges.add(key);
+            this.flushNow();
+        }
+        return dirty;
+    }
+    /** Flush đồng bộ pending changes (huỷ RAF đang chờ nếu có). */
+    flushNow() {
+        if (this.flushRAF !== null) {
+            cancelAnimationFrame(this.flushRAF);
+            this.flushRAF = null;
+        }
+        if (this.pendingChanges.size > 0) {
+            this.executeFlush();
+        }
+        this.hasPendingFlush = false;
+    }
     // ─── Batch Flush System ─────────────────────────────────────
     commitStateChange(key, _oldValue) {
         if (this._isDestroyed)
@@ -272,6 +325,11 @@ export class StateManager {
         const newValue = this.states[key]?.value;
         if (_oldValue === newValue)
             return;
+        // Paused → ghi sổ, không notify (giá trị đã được set vào states)
+        if (this._isPaused) {
+            this.dirtyKeys.add(key);
+            return;
+        }
         this.pendingChanges.add(key);
         if (!this.hasPendingFlush) {
             this.hasPendingFlush = true;

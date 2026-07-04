@@ -33,8 +33,10 @@ export declare class TextElement implements TextInterface {
     setParentElement(parent: HtmlInterface | null): void;
     /** Update text content in-place */
     update(newText: string): void;
-    render(): void;
+    render(): HTMLElement | Text | Comment;
     remove(): void;
+    /** Registry guard — element đã destroy không được reuse */
+    __destroyed__: boolean;
     destroy(): void;
     get text(): string;
     set text(newText: string);

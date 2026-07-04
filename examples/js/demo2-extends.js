@@ -1,4 +1,4 @@
-import { View, ViewController, app, Application } from 'saola';
+import { View, ViewController, app, Application } from '@saolabs/client';
 
 
 const __VIEW_PATH__ = 'examples.demo2-extends';
@@ -65,6 +65,7 @@ class Demo2ExtendsView extends View {
 
         const __UPDATE_DATA_TRAIT__ = {};
         let {demoList = []} = __data__;
+        __STATE__.__.register('demoList', demoList);
         const set$status = __STATE__.__.register('status');
         let status = null;
         const setStatus = (state) => {
@@ -108,9 +109,8 @@ class Demo2ExtendsView extends View {
             }
         };
         let i = 0;
-        __UPDATE_DATA_TRAIT__.demoList = value => demoList = value;
-        __UPDATE_DATA_TRAIT__.i = value => i = value;
-        const __VARIABLE_LIST__ = ["demoList", "i"];
+        __UPDATE_DATA_TRAIT__.demoList = value => { demoList = value; updateStateByKey('demoList', value); };
+        const __VARIABLE_LIST__ = ["demoList"];
 
 
         this.__ctrl__.setUserDefinedConfig({
@@ -145,10 +145,8 @@ class Demo2ExtendsView extends View {
                         }
                     }
                 }
-                // Then update states from data
-                update$status(false);
-                update$user({"name": "Jone", "email": "jon@test.com"});
-                update$posts([{"title": "...", "content": "..."}, {"title": "...", "content": "..."}, {"title": "...", "content": "..."}, {"title": "...", "content": "..."}]);
+                // Re-derive CHỈ state phụ thuộc data — state literal của instance KHÔNG reset
+
                 // Finally lock state updates
                 lockUpdateRealState();
             },
@@ -166,7 +164,7 @@ class Demo2ExtendsView extends View {
             let parentReactive = null;
             this.block('block-content', 'content', (parentElement) => [
             this.html(`e085b222`, "div", parentElement,
-                { classes: [{ type: 'static', value: "demo" }, { type: 'binding', value: "active", factory: () => status, stateKeys: ["status"] }], attrs: { "dataCount": { type: 'binding', value: App.Helper.count(demoList), factory: () => App.Helper.count(demoList), stateKeys: [] }, "dataUserName": { type: 'binding', value: user.name, factory: () => user.name, stateKeys: ["user"] } } },
+                { classes: [{ type: 'static', value: "demo" }, { type: 'binding', value: "active", factory: () => status, stateKeys: ["status"] }], attrs: { "dataCount": { type: 'binding', value: App.Helper.count(demoList), factory: () => App.Helper.count(demoList), stateKeys: ["demoList"] }, "dataUserName": { type: 'binding', value: user.name, factory: () => user.name, stateKeys: ["user"] } } },
                 (parentElement) => [
                 this.html(`06fe9377`, "h1", parentElement, {}, (parentElement) => [
                     this.text('Hello, '),

@@ -96,61 +96,233 @@ export class BlockManagerService implements BlockManagerInterface {
      * viewId:blockName), and inserts block content between outlet markers.
      */
     mountAll(): void {
-        for (const [name, block] of this.activeBlocks) {
-            // Try to find an outlet that matches this block name
-            for (const [outletKey, outlet] of this.blockOutlets) {
-                if (outletKey.endsWith(`:${name}`) || outlet.name === name) {
-                    if (block.contentRenderFactory) {
-                        this.mountBlockIntoOutlet(block, outlet);
-                    }
-                    break;
-                }
+        // Mount block content vào outlet cùng tên; outlet không có block active → clear về rỗng
+        for (const [, outlet] of this.blockOutlets) {
+            const block = this.activeBlocks.get(outlet.name);
+            if (block && block.contentRenderFactory) {
+                this.mountBlockIntoOutlet(block, outlet);
+            } else {
+                this.clearOutlet(outlet.name);
             }
         }
     }
 
     /**
      * Mount a single block's content into an outlet.
-     * Content is rendered and inserted between the outlet's open/close markers.
+     * Clear nội dung cũ trước, render content mới GIỮA outlet markers
+     * (cùng insertion model với Reactive — RUNTIME_CONTRACT.md §2).
      */
     private mountBlockIntoOutlet(block: BlockInterface, outlet: BlockOutletInterface): void {
-        if (!outlet.parentElement?.element) return;
+        if (!outlet.openTag.parentNode) return; // outlet chưa nằm trong DOM
 
-        const parentEl = outlet.parentElement.element;
+        // Clear nội dung cũ (page trước) trước khi mount page mới
+        this.clearOutlet(outlet.name);
+
         const children: any[] = [];
+        const insertBeforeClose = (node: Node) => {
+            outlet.closeTag.parentNode?.insertBefore(node, outlet.closeTag);
+        };
 
-        // Render block content using the factory
-        const content = block.contentRenderFactory!(block.ctx as any);
+        // Render block content using the factory — elements thuộc về PAGE ctrl
+        const content = block.contentRenderFactory!(outlet.parentElement as any);
 
         if (!Array.isArray(content)) return;
 
-        // Insert each child between outlet markers
         for (const child of content) {
+            if (child === null || child === undefined) continue;
             if (typeof child === 'string' || typeof child === 'number') {
-                const textNode = document.createTextNode(String(child));
-                parentEl.insertBefore(textNode, outlet.closeTag);
-            } else if (child && typeof child === 'object') {
-                if ('element' in child) {
-                    // HtmlInterface, TextInterface
-                    parentEl.insertBefore(child.element, outlet.closeTag);
+                insertBeforeClose(document.createTextNode(String(child)));
+            } else if (child instanceof Node) {
+                insertBeforeClose(child);
+            } else if (typeof child === 'object') {
+                if ('element' in child && (child as any).element) {
+                    insertBeforeClose((child as any).element);
                     children.push(child);
                     child.render();
                 } else if ('openTag' in child) {
-                    // Reactive, Fragment, Output — set parent, render
+                    // Marker-based: đặt markers đúng vị trí trước, render sau (idempotent)
                     if ('parent' in child) {
                         (child as any).parent = outlet.parentElement;
                     }
                     if ('parentElement' in child) {
                         (child as any).parentElement = outlet.parentElement;
                     }
+                    insertBeforeClose((child as any).openTag);
+                    insertBeforeClose((child as any).closeTag);
                     children.push(child);
                     child.render();
                 }
             }
         }
 
-        // Track mounted children for cleanup
+        // Track mounted children for lifecycle (start/stop/destroy)
         this.mountedChildren.set(outlet.name, children);
+    }
+
+    /**
+     * Hydrate version của mountAll — dùng khi SSR.
+     * KHÁC mountAll: KHÔNG clearOutlet (giữ DOM server), KHÔNG insertBefore.
+     * Chạy block factory ở HYDRATE mode → Html/Output/Reactive con CLAIM
+     * DOM server đã render sẵn giữa cặp marker của outlet.
+     *
+     * Tiền đề: page ctrl.initMode === HYDRATE khi gọi (để this.html() trong
+     * factory tạo element claim DOM thay vì tạo mới).
+     */
+    mountAllHydrate(): void {
+        for (const [, outlet] of this.blockOutlets) {
+            const block = this.activeBlocks.get(outlet.name);
+            if (block && block.contentRenderFactory) {
+                this.hydrateBlockIntoOutlet(block, outlet);
+            }
+            // outlet không có block active → để nguyên DOM server (thường rỗng)
+        }
+    }
+
+    /**
+     * Claim block content vào outlet (hydrate). Chạy factory, gọi render() đệ quy
+     * trên children để claim DOM, KHÔNG chèn node mới. Track children cho lifecycle.
+     */
+    private hydrateBlockIntoOutlet(block: BlockInterface, outlet: BlockOutletInterface): void {
+        const children: any[] = [];
+        const content = block.contentRenderFactory!(outlet.parentElement as any);
+        if (!Array.isArray(content)) return;
+
+        for (const child of content) {
+            if (child === null || child === undefined) continue;
+            if (typeof child === 'string' || typeof child === 'number') continue; // text: giữ server
+            if (child instanceof Node) continue;
+            if (typeof child === 'object') {
+                if ('element' in child && (child as any).element) {
+                    children.push(child);
+                    (child as any).render(); // HYDRATE: Html claim DOM, không chèn
+                } else if ('openTag' in child) {
+                    if ('parent' in child) (child as any).parent = outlet.parentElement;
+                    if ('parentElement' in child) (child as any).parentElement = outlet.parentElement;
+                    children.push(child);
+                    (child as any).render(); // HYDRATE: Output/Reactive claim markers
+                }
+            }
+        }
+
+        this.mountedChildren.set(outlet.name, children);
+    }
+
+    /** Tìm outlet theo tên (outlet key = `${layoutViewId}-ob-${name}`) */
+    private findOutletByName(name: string): BlockOutletInterface | null {
+        for (const [, outlet] of this.blockOutlets) {
+            if (outlet.name === name) return outlet;
+        }
+        return null;
+    }
+
+    /**
+     * Detach block content của một page (rời trang, vào PageCache):
+     * gỡ DOM giữa markers của từng outlet vào DocumentFragment, lấy children
+     * đang track ra khỏi manager (KHÔNG destroy — instance sống trong cache).
+     *
+     * Trả Map<outletName, {fragment, children}> để restore sau này.
+     */
+    detachPageContent(viewId: string): Map<string, { fragment: DocumentFragment; children: any[] }> {
+        const result = new Map<string, { fragment: DocumentFragment; children: any[] }>();
+        for (const [name, block] of Array.from(this.activeBlocks)) {
+            if (block.viewId !== viewId) continue;
+
+            const fragment = document.createDocumentFragment();
+            const outlet = this.findOutletByName(name);
+            if (outlet && outlet.openTag.parentNode) {
+                let current = outlet.openTag.nextSibling;
+                while (current && current !== outlet.closeTag) {
+                    const next = current.nextSibling;
+                    fragment.appendChild(current); // appendChild tự remove khỏi DOM
+                    current = next;
+                }
+            }
+
+            const children = this.mountedChildren.get(name) ?? [];
+            this.mountedChildren.delete(name);
+            this.activeBlocks.delete(name); // page rời đi — không còn active ở outlet này
+            result.set(name, { fragment, children });
+        }
+        return result;
+    }
+
+    /**
+     * Restore block content của một page từ PageCache vào outlets hiện tại.
+     * Tiền đề: layout đang mount trùng với layout lúc detach (ViewManager guard).
+     */
+    restorePageContent(viewId: string, contents: Map<string, { fragment: DocumentFragment; children: any[] }>): void {
+        for (const [name, { fragment, children }] of contents) {
+            const outlet = this.findOutletByName(name);
+            if (outlet && outlet.closeTag.parentNode) {
+                outlet.closeTag.parentNode.insertBefore(fragment, outlet.closeTag);
+            }
+            this.mountedChildren.set(name, children);
+            // Re-activate block của page này (blocks map còn giữ — pause không xoá)
+            const block = this.blocks.get(name + viewId);
+            if (block) {
+                this.activeBlocks.set(name, block);
+            }
+        }
+    }
+
+    /** Start toàn bộ block content đang mounted (gọi sau mountAll) */
+    startAll(): void {
+        for (const [, children] of this.mountedChildren) {
+            for (const child of children) {
+                if (child && typeof child.start === 'function') child.start();
+            }
+        }
+    }
+
+    /** Stop toàn bộ block content (trước khi swap page) */
+    stopAll(): void {
+        for (const [, children] of this.mountedChildren) {
+            for (const child of children) {
+                if (child && typeof child.stop === 'function') child.stop();
+            }
+        }
+    }
+
+    /**
+     * Gỡ mọi dấu vết của một view (page bị destroy):
+     * clear outlet đang chứa content của nó + xoá block đăng ký.
+     */
+    unmountView(viewId: string): void {
+        for (const [name, block] of this.activeBlocks) {
+            if (block.viewId === viewId) {
+                this.clearOutlet(name);
+                this.activeBlocks.delete(name);
+            }
+        }
+        for (const [key, block] of this.blocks) {
+            if (block.viewId === viewId) {
+                this.blocks.delete(key);
+            }
+        }
+    }
+
+    /**
+     * Gỡ outlets của một layout khỏi registry mà KHÔNG destroy — layout pause
+     * vào PageCache. Nếu để lại, mountAll/findOutletByName có thể đụng outlet
+     * (trùng tên) của layout đang detached. Re-register khi resume qua
+     * addOutlet (ViewManager.reregisterLayoutOutlets).
+     */
+    detachOutletsOfView(viewId: string): void {
+        for (const [key, outlet] of this.blockOutlets) {
+            if ((outlet as any).ctx?.viewId === viewId) {
+                this.blockOutlets.delete(key);
+            }
+        }
+    }
+
+    /** Gỡ outlets của một layout bị destroy */
+    removeOutletsOfView(viewId: string): void {
+        for (const [key, outlet] of this.blockOutlets) {
+            if ((outlet as any).ctx?.viewId === viewId) {
+                this.mountedChildren.delete(outlet.name);
+                this.blockOutlets.delete(key);
+            }
+        }
     }
 
     /**
