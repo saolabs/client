@@ -132,6 +132,11 @@ describe('readBootConfig', () => {
     it('map APP_CONFIGS → { view.container, router.routes }', () => {
         (window as any).APP_CONFIGS = {
             container: '#app-root',
+            view: {
+                ssrData: {
+                    'web.home': { instances: { 'v-home': { viewId: 'v-home' } } },
+                },
+            },
             router: {
                 mode: 'history',
                 allRoutes: [
@@ -143,6 +148,7 @@ describe('readBootConfig', () => {
         const cfg = readBootConfig();
         expect(cfg).not.toBeNull();
         expect(cfg!.view.container).toBe('#app-root');
+        expect(cfg!.view.ssrData['web.home'].instances['v-home'].viewId).toBe('v-home');
         expect(cfg!.router.mode).toBe('history');
         expect(cfg!.router.routes).toHaveLength(2);
         expect(cfg!.router.routes[0].component).toBe('web.home');

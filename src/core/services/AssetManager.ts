@@ -5,17 +5,16 @@
  * Bối cảnh (Component = View — page/layout/super/nested đều là View):
  *   Mỗi `.sao` có thể khai báo `<style>` và `<script>` (không phải script
  *   `export default` — cái đó là method của component, do compiler gom vào
- *   userDefined). Các asset này phải có mặt trong real DOM khi có ÍT NHẤT một
- *   instance của component đang sống, và bị gỡ khi KHÔNG còn instance nào.
+ *   userDefined). Style/link có mặt khi có ÍT NHẤT một instance đang sống;
+ *   script đã execute được giữ tới teardown để không chạy lại ngoài ý muốn.
  *
  * Quy tắc (theo thiết kế):
- *   1. Ref-count theo (component path, asset). acquire() khi một instance vào
- *      real DOM (mount/resume); release() khi rời real DOM (pause/unmount/destroy).
+ *   1. Global style/link/script dùng identity của chính asset để các View khác
+ *      path vẫn dùng chung. Scoped style thêm component path vào identity.
  *   2. Insert đúng MỘT lần — khi ref 0 → 1. Các instance sau không insert lại.
- *   3. Remove khi ref 1 → 0 — instance khai báo đầu tiên bị gỡ nhưng nơi khác
- *      còn instance thì asset KHÔNG bị remove.
- *   4. View B bị pause (rời real DOM) → release → nếu về 0 thì remove; back lại
- *      view B → acquire → insert lại.
+ *   3. Style/link remove khi ref 1 → 0; nếu nơi khác còn ref thì phải giữ.
+ *   4. Style/link remove khi ref về 0. Script đã execute thì giữ tới teardown
+ *      document, vì remove tag không hoàn tác side effect và reinsert sẽ chạy lại.
  *
  * Style:
  *   - `scoped` → CSS chỉ áp dụng cho subtree của component (prefix selector bằng
@@ -61,8 +60,10 @@ interface AssetRecord {
 }
 
 export class AssetManagerService {
-    /** key = assetKey(path, kind, index) → record (ref-count + DOM node). */
+    /** key = semantic asset identity → record (ref-count + DOM node). */
     private records: Map<string, AssetRecord> = new Map();
+    /** Legacy/debug lookup `(path, kind, index)` → semantic asset identity. */
+    private leaseKeys: Map<string, string> = new Map();
     /** path → scopeId ổn định (cache để mọi instance dùng chung). */
     private scopeIds: Map<string, string> = new Map();
 
@@ -81,7 +82,9 @@ export class AssetManagerService {
         if (styles && styles.length) {
             const scopeId = this.scopeIdFor(path, styles);
             styles.forEach((style, idx) => {
-                this.acquireOne(this.key(path, 'sty', idx), () => this.createStyleNode(path, style, scopeId));
+                const key = this.styleKey(path, style);
+                this.leaseKeys.set(this.leaseKey(path, 'sty', idx), key);
+                this.acquireOne(key, () => this.createStyleNode(path, style, scopeId));
             });
             // Tag scope cho subtree của instance này (mỗi instance tự tag — node <style> dùng chung).
             if (scopeId && subtreeRoots && subtreeRoots.length) {
@@ -90,20 +93,22 @@ export class AssetManagerService {
         }
         if (scripts && scripts.length) {
             scripts.forEach((script, idx) => {
-                this.acquireOne(this.key(path, 'sc', idx), () => this.createScriptNode(script));
+                const key = this.scriptKey(script);
+                this.leaseKeys.set(this.leaseKey(path, 'sc', idx), key);
+                this.acquireOne(key, () => this.createScriptNode(script));
             });
         }
     }
 
     /**
-     * Một instance của `path` rời real DOM → giảm ref; remove khi 1→0.
+     * Một instance của `path` rời real DOM → giảm ref; style/link remove khi 1→0.
      */
     release(path: string, styles?: StyleSpec[] | null, scripts?: ScriptSpec[] | null): void {
         if (styles && styles.length) {
-            styles.forEach((_style, idx) => this.releaseOne(this.key(path, 'sty', idx)));
+            styles.forEach((style) => this.releaseOne(this.styleKey(path, style), true));
         }
         if (scripts && scripts.length) {
-            scripts.forEach((_script, idx) => this.releaseOne(this.key(path, 'sc', idx)));
+            scripts.forEach((script) => this.releaseOne(this.scriptKey(script), false));
         }
     }
 
@@ -116,7 +121,8 @@ export class AssetManagerService {
 
     /** Ref-count hiện tại của một asset (test/debug). */
     refCount(path: string, kind: 'sty' | 'sc', index: number): number {
-        return this.records.get(this.key(path, kind, index))?.refs ?? 0;
+        const key = this.leaseKeys.get(this.leaseKey(path, kind, index));
+        return key ? this.records.get(key)?.refs ?? 0 : 0;
     }
 
     /** Dọn sạch — gỡ mọi node, reset (teardown app/test). */
@@ -125,6 +131,7 @@ export class AssetManagerService {
             rec.node?.parentNode?.removeChild(rec.node);
         }
         this.records.clear();
+        this.leaseKeys.clear();
         this.scopeIds.clear();
     }
 
@@ -143,11 +150,11 @@ export class AssetManagerService {
         }
     }
 
-    private releaseOne(key: string): void {
+    private releaseOne(key: string, removeWhenUnused: boolean): void {
         const rec = this.records.get(key);
         if (!rec) return;
-        rec.refs--;
-        if (rec.refs <= 0) {
+        rec.refs = Math.max(0, rec.refs - 1);
+        if (rec.refs === 0 && removeWhenUnused) {
             // 1 → 0: không còn instance nào → remove.
             rec.node?.parentNode?.removeChild(rec.node);
             rec.node = null;
@@ -155,8 +162,22 @@ export class AssetManagerService {
         }
     }
 
-    private key(path: string, kind: 'sty' | 'sc', index: number): string {
+    private leaseKey(path: string, kind: 'sty' | 'sc', index: number): string {
         return `${path}::${kind}::${index}`;
+    }
+
+    /**
+     * Global CSS/link dedup xuyên View. Scoped CSS phải giữ path trong key vì
+     * cùng source nhưng mỗi View được rewrite bằng scopeId khác nhau.
+     */
+    private styleKey(path: string, style: StyleSpec): string {
+        const scope = style.type === 'code' && style.scoped ? `scoped:${path}` : 'global';
+        return `sty::${scope}::${this.stableSerialize(style)}`;
+    }
+
+    /** Script là document-global side effect nên dedup xuyên View. */
+    private scriptKey(script: ScriptSpec): string {
+        return `sc::global::${this.stableSerialize(script)}`;
     }
 
     // ─── Style ──────────────────────────────────────────────────
@@ -166,6 +187,12 @@ export class AssetManagerService {
         if (!head) return null;
 
         if (style.type === 'href') {
+            const existing = this.findExistingStylesheet(style);
+            if (existing) {
+                // Adopt link do Blade SSR phát ra thay vì chèn bản thứ hai khi hydrate.
+                existing.setAttribute(OWNER_ATTR, path);
+                return existing;
+            }
             const link = document.createElement('link');
             link.setAttribute('rel', 'stylesheet');
             if (style.href) link.setAttribute('href', style.href);
@@ -183,6 +210,34 @@ export class AssetManagerService {
         el.setAttribute(OWNER_ATTR, path);
         head.appendChild(el);
         return el;
+    }
+
+    /** Tìm stylesheet SSR cùng identity để hydration không tạo node trùng. */
+    private findExistingStylesheet(style: StyleSpec): HTMLLinkElement | null {
+        if (typeof document === 'undefined' || !style.href) return null;
+        const expectedHref = new URL(style.href, document.baseURI).href;
+        const links = document.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href]');
+        for (const link of Array.from(links)) {
+            if (link.href !== expectedHref) continue;
+            if (!this.matchesExtraAttrs(link, style)) continue;
+            return link;
+        }
+        return null;
+    }
+
+    private matchesExtraAttrs(el: HTMLElement, spec: StyleSpec): boolean {
+        if (spec.id && el.id !== spec.id) return false;
+        if (spec.className && el.getAttribute('class') !== spec.className) return false;
+        for (const [name, value] of Object.entries(spec.attributes ?? {})) {
+            if (name.toLowerCase() === 'href' || name.toLowerCase() === 'rel') continue;
+            if (value === true && !el.hasAttribute(name)) return false;
+            if (value === false || value == null) {
+                if (el.hasAttribute(name)) return false;
+            } else if (value !== true && el.getAttribute(name) !== String(value)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** scopeId ổn định theo path (mọi instance + cả node <style> dùng chung). */
@@ -256,6 +311,16 @@ export class AssetManagerService {
                 else if (v !== false && v != null) el.setAttribute(k, String(v));
             }
         }
+    }
+
+    /** JSON ổn định theo key để object attributes khác thứ tự vẫn cùng identity. */
+    private stableSerialize(value: unknown): string {
+        if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'undefined';
+        if (Array.isArray(value)) return `[${value.map(item => this.stableSerialize(item)).join(',')}]`;
+        const object = value as Record<string, unknown>;
+        return `{${Object.keys(object).sort().map((key) =>
+            `${JSON.stringify(key)}:${this.stableSerialize(object[key])}`
+        ).join(',')}}`;
     }
 
     /** Hash ngắn ổn định từ chuỗi (djb2) → dùng làm scopeId. */

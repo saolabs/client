@@ -299,6 +299,16 @@ describe('ViewManager.hydrateView', () => {
         requestAnimationFrame(() => requestAnimationFrame(() => r()))
     );
 
+    const semanticSnapshot = (scope: HTMLElement) =>
+        Array.from(scope.querySelectorAll('#hydrated-page, #hydrated-page *')).map((element) => ({
+            tag: element.tagName.toLowerCase(),
+            id: element.id || null,
+            // Blade template indentation may introduce inter-element whitespace;
+            // semantic comparison intentionally ignores formatting-only spaces.
+            text: (element.textContent ?? '').replace(/\s+/g, ''),
+            children: element.children.length,
+        }));
+
     it('hydrateView thành công — trả về kết quả không null', async () => {
         const result = await vm.hydrateView(
             'web.hydrate-test',
@@ -342,6 +352,23 @@ describe('ViewManager.hydrateView', () => {
         // Không có element mới bị duplicate
         const allH1 = container.querySelectorAll('h1');
         expect(allH1.length).toBe(1);
+    });
+
+    it('Blade fixture hydrate và CSR từ cùng view factory có DOM semantic tương đương', async () => {
+        await vm.hydrateView('web.hydrate-test', { __SSR_VIEW_ID__: SSR_VIEW_ID });
+        const hydratedSnapshot = semanticSnapshot(container);
+
+        const csrContainer = document.createElement('div');
+        document.body.appendChild(csrContainer);
+        const csrVm = new ViewManager(app() as any);
+        csrVm.setApp(app() as any);
+        csrVm.init({
+            container: csrContainer,
+            registry: { 'web.hydrate-test': makeHydrateFactory() },
+        });
+        await csrVm.mountView('web.hydrate-test', {});
+
+        expect(semanticSnapshot(csrContainer)).toEqual(hydratedSnapshot);
     });
 
     it('Output claim SSR markers — text node giữa markers được giữ nguyên', async () => {

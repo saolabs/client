@@ -5,17 +5,16 @@
  * Bối cảnh (Component = View — page/layout/super/nested đều là View):
  *   Mỗi `.sao` có thể khai báo `<style>` và `<script>` (không phải script
  *   `export default` — cái đó là method của component, do compiler gom vào
- *   userDefined). Các asset này phải có mặt trong real DOM khi có ÍT NHẤT một
- *   instance của component đang sống, và bị gỡ khi KHÔNG còn instance nào.
+ *   userDefined). Style/link có mặt khi có ÍT NHẤT một instance đang sống;
+ *   script đã execute được giữ tới teardown để không chạy lại ngoài ý muốn.
  *
  * Quy tắc (theo thiết kế):
- *   1. Ref-count theo (component path, asset). acquire() khi một instance vào
- *      real DOM (mount/resume); release() khi rời real DOM (pause/unmount/destroy).
+ *   1. Global style/link/script dùng identity của chính asset để các View khác
+ *      path vẫn dùng chung. Scoped style thêm component path vào identity.
  *   2. Insert đúng MỘT lần — khi ref 0 → 1. Các instance sau không insert lại.
- *   3. Remove khi ref 1 → 0 — instance khai báo đầu tiên bị gỡ nhưng nơi khác
- *      còn instance thì asset KHÔNG bị remove.
- *   4. View B bị pause (rời real DOM) → release → nếu về 0 thì remove; back lại
- *      view B → acquire → insert lại.
+ *   3. Style/link remove khi ref 1 → 0; nếu nơi khác còn ref thì phải giữ.
+ *   4. Style/link remove khi ref về 0. Script đã execute thì giữ tới teardown
+ *      document, vì remove tag không hoàn tác side effect và reinsert sẽ chạy lại.
  *
  * Style:
  *   - `scoped` → CSS chỉ áp dụng cho subtree của component (prefix selector bằng
@@ -50,8 +49,10 @@ export interface ScriptSpec {
 /** Attribute scope cho scoped style — value = scopeId của component path. */
 export declare const SCOPE_ATTR = "data-sao-scope";
 export declare class AssetManagerService {
-    /** key = assetKey(path, kind, index) → record (ref-count + DOM node). */
+    /** key = semantic asset identity → record (ref-count + DOM node). */
     private records;
+    /** Legacy/debug lookup `(path, kind, index)` → semantic asset identity. */
+    private leaseKeys;
     /** path → scopeId ổn định (cache để mọi instance dùng chung). */
     private scopeIds;
     private get headEl();
@@ -61,7 +62,7 @@ export declare class AssetManagerService {
      */
     acquire(path: string, styles?: StyleSpec[] | null, scripts?: ScriptSpec[] | null, subtreeRoots?: Node[] | null): void;
     /**
-     * Một instance của `path` rời real DOM → giảm ref; remove khi 1→0.
+     * Một instance của `path` rời real DOM → giảm ref; style/link remove khi 1→0.
      */
     release(path: string, styles?: StyleSpec[] | null, scripts?: ScriptSpec[] | null): void;
     /** Tổng số node asset đang trong DOM (test/debug). */
@@ -72,8 +73,18 @@ export declare class AssetManagerService {
     clear(): void;
     private acquireOne;
     private releaseOne;
-    private key;
+    private leaseKey;
+    /**
+     * Global CSS/link dedup xuyên View. Scoped CSS phải giữ path trong key vì
+     * cùng source nhưng mỗi View được rewrite bằng scopeId khác nhau.
+     */
+    private styleKey;
+    /** Script là document-global side effect nên dedup xuyên View. */
+    private scriptKey;
     private createStyleNode;
+    /** Tìm stylesheet SSR cùng identity để hydration không tạo node trùng. */
+    private findExistingStylesheet;
+    private matchesExtraAttrs;
     /** scopeId ổn định theo path (mọi instance + cả node <style> dùng chung). */
     private scopeIdFor;
     /**
@@ -86,6 +97,8 @@ export declare class AssetManagerService {
     private tagScope;
     private createScriptNode;
     private applyExtraAttrs;
+    /** JSON ổn định theo key để object attributes khác thứ tự vẫn cùng identity. */
+    private stableSerialize;
     /** Hash ngắn ổn định từ chuỗi (djb2) → dùng làm scopeId. */
     private hash;
 }

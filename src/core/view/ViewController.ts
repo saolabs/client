@@ -123,6 +123,8 @@ export class ViewController implements ViewControllerInterface {
     private hasScheduledUpdate = false;
     /** Centralized AbortController for all event listeners */
     private eventAbortController: AbortController = new AbortController();
+    /** Exact listener references for cleanup when an individual Html node dies. */
+    public elementEventHandlers: Map<HTMLElement, Map<string, EventListener[]>> = new Map();
 
     // ─── Loop ───────────────────────────────────────────────────
     /** Current loop context stack (@foreach, @for, @while) */
@@ -156,6 +158,8 @@ export class ViewController implements ViewControllerInterface {
     private _isDataCommitted = false;
     /** Whether the view has been mounted */
     private _isMounted = false;
+    /** Whether the reactive element tree has been started. */
+    private _isStarted = false;
     /** Whether the view has been fully destroyed */
     private _isDestroyed = false;
     /** Whether this instance's styles/scripts are currently counted in AssetManager
@@ -278,6 +282,11 @@ export class ViewController implements ViewControllerInterface {
             return output;
         }
         this.prerenderOutput = output;
+        // Skeleton là tree đang live cho tới khi async render thay thế nó.
+        // Controller phải start/pause/destroy được tree này như render tree thường.
+        if (output && typeof (output as any).start === 'function' && (output as any).saoType !== 'View') {
+            this._rootTree = output;
+        }
         this.callingMethod = oldCallingMethod;
         return output;
     }
@@ -316,7 +325,17 @@ export class ViewController implements ViewControllerInterface {
     private callHook(name: string): void {
         const fn = (this.view as any)?.[name];
         if (typeof fn === 'function') {
-            try { fn.call(this.view); }
+            try {
+                const result = fn.call(this.view);
+                // Lifecycle transitions are deliberately synchronous. If a user hook
+                // is async, do not block navigation, but never leave a rejected promise
+                // unhandled either.
+                if (result && typeof result.then === 'function') {
+                    Promise.resolve(result).catch((e) => {
+                        console.error(`[ViewController] async hook "${name}" error in "${this.path}":`, e);
+                    });
+                }
+            }
             catch (e) { console.error(`[ViewController] hook "${name}" error in "${this.path}":`, e); }
         }
     }
@@ -349,6 +368,7 @@ export class ViewController implements ViewControllerInterface {
 
     /** Unmount — gỡ instance khỏi real DOM (fire hook + release asset). */
     unmount(): void {
+        if (this._isDestroyed || !this._isMounted) return;
         this.callHook('unmounting');
         this.releaseAssets();
         this._isMounted = false;
@@ -399,12 +419,13 @@ export class ViewController implements ViewControllerInterface {
      * This ensures initial state values are set before subscriptions fire.
      */
     start(): void {
-        if (this._isDestroyed) return;
+        if (this._isDestroyed || this._isStarted) return;
         // Page extends layout không có _rootTree (render trả về superView) —
         // tree thật của nó là block content, được BlockManager.startAll() kích hoạt.
         if (!this._rootTree && this.blocks.size === 0) return;
 
         this.callHook('starting');
+        this._isStarted = true;
 
         // Recursively start all children (Output, TextElement, Html, Reactive, Fragment)
         if (this._rootTree && 'start' in this._rootTree && typeof this._rootTree.start === 'function') {
@@ -412,6 +433,7 @@ export class ViewController implements ViewControllerInterface {
         }
 
         this._lifecycleState = 'active';
+        this.isActive = true;
 
         this.callHook('started');
         this.callHook('onMounted'); // legacy alias
@@ -425,6 +447,8 @@ export class ViewController implements ViewControllerInterface {
     private _lifecycleState: 'created' | 'active' | 'paused' | 'destroyed' = 'created';
     /** Data nhận được trong lúc paused (async fetch về muộn) — apply khi resume */
     private _bufferedData: Record<string, any> | null = null;
+    /** Only children paused by this controller may be resumed by it. */
+    private _pausedChildren: ViewControllerInterface[] = [];
 
     get lifecycleState(): string {
         return this._lifecycleState;
@@ -449,6 +473,13 @@ export class ViewController implements ViewControllerInterface {
         // 1. Flush nốt mọi update đang chờ → DOM là snapshot nhất quán
         this.states.__.flushNow();
         this.flushReactiveUpdatesNow();
+
+        // Parent pauses before descendants; descendants finish before parent.
+        // Snapshot prevents resuming children that were already inactive on entry.
+        this._pausedChildren = this.children.filter((child) => child.lifecycleState === 'active');
+        for (let i = this._pausedChildren.length - 1; i >= 0; i--) {
+            this._pausedChildren[i].pause();
+        }
 
         // 2. Dirty-mode
         this.states.__.pause();
@@ -495,6 +526,13 @@ export class ViewController implements ViewControllerInterface {
             this.updateData(buffered);
         }
 
+        // Resume outside-in: parent state is live before child subscriptions flush.
+        const pausedChildren = this._pausedChildren;
+        this._pausedChildren = [];
+        for (const child of pausedChildren) {
+            if (child.lifecycleState === 'paused') child.resume();
+        }
+
         // 4. Hook
         this.callHook('resumed');
         this.callHook('onResume'); // legacy alias
@@ -513,14 +551,17 @@ export class ViewController implements ViewControllerInterface {
      * DOM stays intact but reactive updates are paused.
      */
     stop(): void {
-        if (this._isDestroyed || !this._rootTree) return;
+        if (!this._isStarted) return;
 
         this.callHook('stopping');
+        this._isStarted = false;
 
         // Recursively stop all children
-        if ('stop' in this._rootTree && typeof this._rootTree.stop === 'function') {
+        if (this._rootTree && 'stop' in this._rootTree && typeof this._rootTree.stop === 'function') {
             this._rootTree.stop();
         }
+
+        this.isActive = false;
 
         this.callHook('stopped');
         this.callHook('onDeactivated'); // legacy alias
@@ -532,14 +573,15 @@ export class ViewController implements ViewControllerInterface {
 
         this.callHook('destroying');
 
+        // stop() must run while the instance is still valid so user cleanup hooks
+        // and the element tree are not skipped.
+        this.stop();
+
         // Gỡ style/script nếu instance còn đang giữ ref (chưa qua pause)
         this.releaseAssets();
 
         this._isDestroyed = true;
         this._lifecycleState = 'destroyed';
-
-        // Stop reactive subscriptions first
-        this.stop();
 
         // Cancel pending updates
         this.pendingReactiveUpdates.clear();
@@ -547,9 +589,11 @@ export class ViewController implements ViewControllerInterface {
 
         // Abort all event listeners
         this.eventAbortController.abort();
+        this.elementEventHandlers.clear();
 
         // Sắp gỡ DOM khỏi real DOM
-        this.callHook('unmounting');
+        const wasMounted = this._isMounted;
+        if (wasMounted) this.callHook('unmounting');
 
         // Destroy root tree
         if (this._rootTree && 'destroy' in this._rootTree && typeof this._rootTree.destroy === 'function') {
@@ -558,7 +602,15 @@ export class ViewController implements ViewControllerInterface {
         this._rootTree = null;
         this._isMounted = false;
 
-        this.callHook('unmounted');
+        // A child controller can exist outside _rootTree (for layout/block paths).
+        // Destroy remaining children in reverse ownership order; destroy is idempotent.
+        for (let i = this.children.length - 1; i >= 0; i--) {
+            this.children[i].destroy();
+        }
+        this.children = [];
+        this._pausedChildren = [];
+
+        if (wasMounted) this.callHook('unmounted');
 
         // Destroy state
         this.states.__.destroy();
@@ -577,6 +629,10 @@ export class ViewController implements ViewControllerInterface {
         this.elements.clear();
         this.sections.clear();
         this.blocks.clear();
+
+        const parent = this.parent;
+        this.parent = null;
+        parent?.removeChild(this);
 
         // Nullify references
         this.rootElement = null;
@@ -726,6 +782,10 @@ export class ViewController implements ViewControllerInterface {
      *   - Object with string handler (method name on view): { handler: 'handleClick' }
      */
     addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler): void {
+        // Compiled Html supplies the complete handler list for one event. Replacing
+        // the previous set makes render/hydrate initialization idempotent.
+        this.removeEventListener(element, event);
+        const registered: EventListener[] = [];
         for (const h of handlers) {
             let fn: EventListener;
 
@@ -769,7 +829,27 @@ export class ViewController implements ViewControllerInterface {
             }
 
             element.addEventListener(event, fn, { signal: this.eventAbortController.signal });
+            registered.push(fn);
         }
+
+        if (registered.length > 0) {
+            let events = this.elementEventHandlers.get(element);
+            if (!events) {
+                events = new Map();
+                this.elementEventHandlers.set(element, events);
+            }
+            events.set(event, registered);
+        }
+    }
+
+    removeEventListener(element: HTMLElement, event: string): void {
+        const events = this.elementEventHandlers.get(element);
+        const listeners = events?.get(event) ?? [];
+        for (const listener of listeners) {
+            element.removeEventListener(event, listener);
+        }
+        events?.delete(event);
+        if (events?.size === 0) this.elementEventHandlers.delete(element);
     }
 
     // ─── Reactive Scheduling ────────────────────────────────────
@@ -1042,6 +1122,32 @@ export class ViewController implements ViewControllerInterface {
         return null;
     }
 
+    /** Deterministic fallback counter for the (contract-violating) missing-id path. */
+    private _missingIncludeIdCounter = 0;
+
+    /**
+     * Resolve the hydrate id for an @include component.
+     *
+     * The compiler ALWAYS emits a deterministic id (md5[:8] of the position-based
+     * base id) so the client marker `s:c:{viewId}-{id}` matches the server-rendered
+     * one. A missing id therefore means a compiler/runtime contract violation — and
+     * in HYDRATE mode it guarantees a marker mismatch (claimSSRMarkers finds nothing
+     * → silent CSR re-render / duplicated DOM).
+     *
+     * Never invent a RANDOM id here: a random id also makes every `elements.get(id)`
+     * lookup miss, so the component is recreated on each render (cache broken). We
+     * surface the violation loudly and fall back to a render-stable deterministic id
+     * so behaviour stays idempotent even in the broken case.
+     */
+    private resolveIncludeId(id: string | null, kind: string, path: string): string {
+        if (id) return id;
+        console.error(
+            `[Saola] ${kind}(): missing hydrate id for view "${path}". The compiler must ` +
+            `pass a deterministic id — marker sync with the server is broken for this component.`
+        );
+        return `cpn-missing-${this._missingIncludeIdCounter++}`;
+    }
+
     include(
         id: string | null = null,
         path: string = '',
@@ -1049,9 +1155,7 @@ export class ViewController implements ViewControllerInterface {
         stateKeys: string[],
         dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>
     ): Component {
-        if (!id) {
-            id = `cpn-${generateUUID(5)}`;
-        }
+        id = this.resolveIncludeId(id, 'include', path);
         const existing = this.elements.get(id);
         if (existing instanceof Component) {
             existing.setDataFactory(dataFactory);
@@ -1062,7 +1166,7 @@ export class ViewController implements ViewControllerInterface {
         }
         let component = new Component({
             ctx: this,
-            id: id ?? generateUUID(10),
+            id,
             stateKeys,
             parent: parentElement,
             dataFactory,
@@ -1076,9 +1180,7 @@ export class ViewController implements ViewControllerInterface {
     }
 
     includeIf(id: string | null = null, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component {
-        if (!id) {
-            id = `c-${generateUUID(5)}`;
-        }
+        id = this.resolveIncludeId(id, 'includeIf', path);
         const existing = this.elements.get(id);
         if (existing instanceof Component) {
             existing.setDataFactory(dataFactory);
@@ -1089,7 +1191,7 @@ export class ViewController implements ViewControllerInterface {
         }
         let component = new Component({
             ctx: this,
-            id: id ?? generateUUID(10),
+            id,
             stateKeys,
             parent: parentElement,
             dataFactory,
@@ -1102,9 +1204,7 @@ export class ViewController implements ViewControllerInterface {
     }
 
     includeWhen(id: string | null, condition: { stateKeys: string[], checker: () => any }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component {
-        if (!id) {
-            id = `cpn-${generateUUID(5)}`;
-        }
+        id = this.resolveIncludeId(id, 'includeWhen', path);
         const existing = this.elements.get(id);
         if (existing instanceof Component) {
             existing.setDataFactory(dataFactory);
@@ -1116,7 +1216,7 @@ export class ViewController implements ViewControllerInterface {
         }
         let component = new Component({
             ctx: this,
-            id: id ?? generateUUID(10),
+            id,
             stateKeys,
             parent: parentElement,
             dataFactory,
@@ -1469,11 +1569,16 @@ export class ViewController implements ViewControllerInterface {
     setIsSuperView(isSuper: boolean): void {
         this.isSuperView = isSuper;
     }
-    setParent(parent: ViewControllerInterface): void {
+    setParent(parent: ViewControllerInterface | null): void {
         this.parent = parent;
     }
     addChild(child: ViewControllerInterface): void {
-        this.children.push(child);
+        if (!this.children.includes(child)) this.children.push(child);
+    }
+    removeChild(child: ViewControllerInterface): void {
+        const index = this.children.indexOf(child);
+        if (index >= 0) this.children.splice(index, 1);
+        if (child.parent === this) child.setParent(null);
     }
 
 

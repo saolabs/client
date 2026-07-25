@@ -13,6 +13,8 @@ export interface ActiveRouteInterface {
     $query: Record<string, any>;
     $params: Record<string, any>;
     $urlPath: string;
+    /** Request URI = path + query (không gồm hash) — cache key phía ViewManager */
+    $uri?: string;
     $fragment: string;
     new (route: RouteInterface, urlPath: string, fragment: string): ActiveRouteInterface;
     setQuery(query: Record<string, any>): void;

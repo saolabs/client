@@ -89,6 +89,8 @@ export declare class ViewController implements ViewControllerInterface {
     private hasScheduledUpdate;
     /** Centralized AbortController for all event listeners */
     private eventAbortController;
+    /** Exact listener references for cleanup when an individual Html node dies. */
+    elementEventHandlers: Map<HTMLElement, Map<string, EventListener[]>>;
     /** Current loop context stack (@foreach, @for, @while) */
     loopContext: LoopContext | null;
     /**
@@ -105,13 +107,17 @@ export declare class ViewController implements ViewControllerInterface {
     elements: Map<string, ElementChild>;
     preloadElement: WrapperInterface | null;
     mainElement: WrapperInterface | null;
-    private wrapperInstance;
+    /** Wrapper instance RIÊNG cho render/prerender — dùng chung sẽ làm
+     *  preloadElement === mainElement → swap skeleton→main destroy nhầm chính nó */
+    private wrapperInstances;
     /** Whether this view is currently active (mounted in DOM) */
     isActive: boolean;
     /** Whether initial data has been committed */
     private _isDataCommitted;
     /** Whether the view has been mounted */
     private _isMounted;
+    /** Whether the reactive element tree has been started. */
+    private _isStarted;
     /** Whether the view has been fully destroyed */
     private _isDestroyed;
     /** Whether this instance's styles/scripts are currently counted in AssetManager
@@ -180,6 +186,8 @@ export declare class ViewController implements ViewControllerInterface {
     private _lifecycleState;
     /** Data nhận được trong lúc paused (async fetch về muộn) — apply khi resume */
     private _bufferedData;
+    /** Only children paused by this controller may be resumed by it. */
+    private _pausedChildren;
     get lifecycleState(): string;
     /**
      * Pause — tạm dừng để vào PageCache:
@@ -222,13 +230,25 @@ export declare class ViewController implements ViewControllerInterface {
      */
     commitData(): void;
     /**
-     * Update data from external source (navigate same view, different params).
-     * Flow: unlock → updateVariableData(newData) → re-set states → lock.
+     * Update data from external source (navigate same view, props từ parent...).
+     *
+     * Contract data vs state (mô hình React — data:props từ ngoài, state:của instance):
+     *   - TRƯỚC commitData (constructor phase): chỉ merge vào this.data. Factory
+     *     đã destructure __data__ lúc khởi tạo; state sẽ do commitData() init MỘT
+     *     lần. KHÔNG chạy updateVariableData ở đây — nếu chạy, sequence
+     *     unlock→lock của nó làm commitConstructorData về sau thành no-op
+     *     (update$xxx bị lock chặn) → state init phụ thuộc data rỗng hay không.
+     *   - SAU commitData: đường props-update chuẩn — unlock → updateVariableData
+     *     (trait cập nhật biến data + notify các key dẫn xuất từ data) → lock.
+     *     Instance state (init bằng literal) KHÔNG được reset ở đây — đó là
+     *     trách nhiệm của compiled updateVariableData (COMPILER_CONTRACT).
      * Khi paused: buffer lại, apply lúc resume (ROUTE_RENDER_FLOW §8.2).
      */
     updateData(newData: Record<string, any>): void;
+    /** Áp data vào biến data (trait) từng key — không đụng state, không đụng lock */
+    private applyDataTrait;
     /**
-     * Update single data item.
+     * Update single data item — cùng contract với updateData (xem trên).
      */
     updateDataItem(key: string, value: any): void;
     /**
@@ -241,6 +261,7 @@ export declare class ViewController implements ViewControllerInterface {
      *   - Object with string handler (method name on view): { handler: 'handleClick' }
      */
     addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler): void;
+    removeEventListener(element: HTMLElement, event: string): void;
     /**
      * Schedule a reactive region for re-render.
      * Multiple calls in the same frame are batched into a single RAF.
@@ -292,6 +313,23 @@ export declare class ViewController implements ViewControllerInterface {
      * Xem docs/RUNTIME_CONTRACT.md §2.
      */
     private aliveFromRegistry;
+    /** Deterministic fallback counter for the (contract-violating) missing-id path. */
+    private _missingIncludeIdCounter;
+    /**
+     * Resolve the hydrate id for an @include component.
+     *
+     * The compiler ALWAYS emits a deterministic id (md5[:8] of the position-based
+     * base id) so the client marker `s:c:{viewId}-{id}` matches the server-rendered
+     * one. A missing id therefore means a compiler/runtime contract violation — and
+     * in HYDRATE mode it guarantees a marker mismatch (claimSSRMarkers finds nothing
+     * → silent CSR re-render / duplicated DOM).
+     *
+     * Never invent a RANDOM id here: a random id also makes every `elements.get(id)`
+     * lookup miss, so the component is recreated on each render (cache broken). We
+     * surface the violation loudly and fall back to a render-stable deterministic id
+     * so behaviour stays idempotent even in the broken case.
+     */
+    private resolveIncludeId;
     include(id: string | null | undefined, path: string | undefined, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component;
     includeIf(id: string | null | undefined, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component;
     includeWhen(id: string | null, condition: {
@@ -307,22 +345,37 @@ export declare class ViewController implements ViewControllerInterface {
      * @foreach directive — iterate over array or object.
      * Returns array of children (not HTML string like the old system).
      *
-     * # Cache-aware re-render (Phase 5)
-     * Khi `_currentForeachCache` được set (bởi Reactive.renderForeach()), __foreach
-     * kiểm tra cache trước mỗi item:
-     *   - Cache hit (item ref giống) → trả về elements cũ (reuse, không recreate DOM)
-     *   - Cache miss (item mới)     → gọi callback → tạo elements mới → lưu vào cache
+     * # Cache-aware re-render (Phase 5 + 5b)
+     * Khi `_currentForeachCache` được set (bởi Reactive), __foreach claim slot
+     * cho từng item:
+     *   - Hit (key khớp + item ref giống) → reuse elements cũ (không recreate DOM)
+     *   - Miss → gọi callback → tạo elements mới → store vào cache
      *
-     * Identity keying: cache key là object reference của item, không phải index.
-     * → Reorder list giữ nguyên elements cho từng item (chỉ thay đổi vị trí DOM).
-     * → Immutable-data patterns (mỗi update tạo object mới) được handle tự động.
+     * Cache key:
+     *   - `keyFn` (compiler emit từ @key(expr)) → field keying (`item.id`)
+     *   - không có → object reference của item (identity keying)
+     * Duplicate keys/primitive items phân biệt bằng occurrence (ForeachSlotCache).
+     * Ref đổi nhưng key trùng → recreate (closure đóng gói item cũ) — slot cũ
+     * được Reactive.prunePass destroy.
      *
-     * @example Compiled output:
+     * @example Compiled output (@key(item.id)):
      * ctrl.__foreach(items, (item, key, index, loop) => [
-     *     this.html('id', 'div', p, {}, () => [this.text(item.name)])
-     * ])
+     *     this.html(`id-${item.id}`, 'div', p, {}, () => [this.text(item.name)])
+     * ], (item) => item.id)
      */
-    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContext) => any): any[];
+    /**
+     * @children — render slot content từ parent include (compiler emit:
+     * `...this.__children(__ONE_CHILDREN_CONTENT__, parentElement)`).
+     *
+     * content có 2 dạng (xem COMPILER _gen_children_slot):
+     *   - function `(parentElement) => elements` — element factory từ
+     *     @importInclude/custom tag phía parent. Factory đóng gói `this` của
+     *     PARENT ctrl → elements thuộc parent scope (state/registry parent),
+     *     giống React children.
+     *   - string — SSR data hoặc default '' → render text tĩnh (rỗng → []).
+     */
+    __children(content: any, parentElement: HtmlInterface | null): any[];
+    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContext) => any, keyFn?: (item: T, index: number) => any): any[];
     __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContext) => any, emptyCallback?: () => any): any[];
     __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContext) => any): any[];
     /**
@@ -405,8 +458,9 @@ export declare class ViewController implements ViewControllerInterface {
     setOriginView(origin: ViewControllerInterface): void;
     setSuperView(superView: ViewControllerInterface): void;
     setIsSuperView(isSuper: boolean): void;
-    setParent(parent: ViewControllerInterface): void;
+    setParent(parent: ViewControllerInterface | null): void;
     addChild(child: ViewControllerInterface): void;
+    removeChild(child: ViewControllerInterface): void;
     /**
      * For nested views: set the chain of super views up to the root, so each view has a reference to its layout parents.
      * Called by ViewManager after creating the view and its super view(s).

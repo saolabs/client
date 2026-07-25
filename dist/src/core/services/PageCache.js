@@ -3,8 +3,8 @@ export class PageCacheService {
         /** Map giữ insertion order → dùng làm LRU */
         this.entries = new Map();
         this.maxEntries = 10;
-        /** 15 phút */
-        this.defaultTTL = 15 * 60 * 1000;
+        /** 10 phút — trong khoảng thiết kế 5–15 phút; override per-view qua cache:{ttl} */
+        this.defaultTTL = 10 * 60 * 1000;
         /** Hook khi entry bị destroy (evict/expire/invalidate) — ViewManager dọn store tại đây */
         this.onEvict = null;
         /** Injectable cho test */
@@ -26,12 +26,37 @@ export class PageCacheService {
         this.entries.set(urlPath, {
             urlPath,
             views: options.views,
-            fragment: options.fragment,
+            fragment: options.fragment ?? document.createDocumentFragment(),
+            layoutPath: options.layoutPath ?? null,
+            outletContents: options.outletContents ?? null,
             scroll: options.scroll ?? { x: 0, y: 0 },
             savedAt: this.now(),
             ttl,
         });
         // LRU evict
+        while (this.entries.size > this.maxEntries) {
+            const oldestKey = this.entries.keys().next().value;
+            const oldest = this.entries.get(oldestKey);
+            this.entries.delete(oldestKey);
+            this.destroyEntry(oldest);
+        }
+    }
+    /**
+     * Trả một entry ĐÃ take() về lại cache — dùng khi restore thất bại nhưng
+     * entry còn giá trị (vd layout của page chưa mount lại; lần điều hướng sau
+     * có thể restore được). GIỮ savedAt gốc — TTL KHÔNG được reset.
+     */
+    putBack(entry) {
+        if (this.isExpired(entry)) {
+            this.destroyEntry(entry);
+            return;
+        }
+        const existing = this.entries.get(entry.urlPath);
+        if (existing && existing !== entry) {
+            this.entries.delete(entry.urlPath);
+            this.destroyEntry(existing);
+        }
+        this.entries.set(entry.urlPath, entry);
         while (this.entries.size > this.maxEntries) {
             const oldestKey = this.entries.keys().next().value;
             const oldest = this.entries.get(oldestKey);
@@ -93,13 +118,34 @@ export class PageCacheService {
         return this.now() - entry.savedAt > entry.ttl;
     }
     destroyEntry(entry) {
-        this.destroyViews(entry.views);
+        this.destroyTakenEntry(entry);
         try {
             this.onEvict?.(entry);
         }
         catch (e) {
             console.error('[PageCache] onEvict error:', e);
         }
+    }
+    /**
+     * Destroy một entry ĐÃ take() ra khỏi cache nhưng không restore được
+     * (vd layout hiện tại không khớp layoutPath). Public cho ViewManager.
+     */
+    destroyTakenEntry(entry) {
+        // Block content đã detach — ViewController.destroy() không đi qua chúng
+        // (không nằm trong _rootTree) nên phải destroy tường minh trước.
+        if (entry.outletContents) {
+            for (const [, content] of entry.outletContents) {
+                for (const child of content.children) {
+                    try {
+                        child?.destroy?.();
+                    }
+                    catch (e) {
+                        console.error('[PageCache] destroy block child error:', e);
+                    }
+                }
+            }
+        }
+        this.destroyViews(entry.views);
     }
     destroyViews(views) {
         for (const view of views) {

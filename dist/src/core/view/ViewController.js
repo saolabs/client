@@ -85,6 +85,8 @@ export class ViewController {
         this.hasScheduledUpdate = false;
         /** Centralized AbortController for all event listeners */
         this.eventAbortController = new AbortController();
+        /** Exact listener references for cleanup when an individual Html node dies. */
+        this.elementEventHandlers = new Map();
         // ─── Loop ───────────────────────────────────────────────────
         /** Current loop context stack (@foreach, @for, @while) */
         this.loopContext = null;
@@ -103,7 +105,9 @@ export class ViewController {
         this.elements = new Map();
         this.preloadElement = null; // For pre-rendering elements before the main render
         this.mainElement = null; // The main rendered element tree
-        this.wrapperInstance = null; // For caching the wrapper instance used in render/prerender
+        /** Wrapper instance RIÊNG cho render/prerender — dùng chung sẽ làm
+         *  preloadElement === mainElement → swap skeleton→main destroy nhầm chính nó */
+        this.wrapperInstances = { render: null, prerender: null };
         // ─── Lifecycle Flags ────────────────────────────────────────
         /** Whether this view is currently active (mounted in DOM) */
         this.isActive = false;
@@ -111,6 +115,8 @@ export class ViewController {
         this._isDataCommitted = false;
         /** Whether the view has been mounted */
         this._isMounted = false;
+        /** Whether the reactive element tree has been started. */
+        this._isStarted = false;
         /** Whether the view has been fully destroyed */
         this._isDestroyed = false;
         /** Whether this instance's styles/scripts are currently counted in AssetManager
@@ -128,6 +134,10 @@ export class ViewController {
         this._lifecycleState = 'created';
         /** Data nhận được trong lúc paused (async fetch về muộn) — apply khi resume */
         this._bufferedData = null;
+        /** Only children paused by this controller may be resumed by it. */
+        this._pausedChildren = [];
+        /** Deterministic fallback counter for the (contract-violating) missing-id path. */
+        this._missingIncludeIdCounter = 0;
         this.__App = app();
         this.view = view;
         this.path = path;
@@ -221,6 +231,11 @@ export class ViewController {
             return output;
         }
         this.prerenderOutput = output;
+        // Skeleton là tree đang live cho tới khi async render thay thế nó.
+        // Controller phải start/pause/destroy được tree này như render tree thường.
+        if (output && typeof output.start === 'function' && output.saoType !== 'View') {
+            this._rootTree = output;
+        }
         this.callingMethod = oldCallingMethod;
         return output;
     }
@@ -256,7 +271,15 @@ export class ViewController {
         const fn = this.view?.[name];
         if (typeof fn === 'function') {
             try {
-                fn.call(this.view);
+                const result = fn.call(this.view);
+                // Lifecycle transitions are deliberately synchronous. If a user hook
+                // is async, do not block navigation, but never leave a rejected promise
+                // unhandled either.
+                if (result && typeof result.then === 'function') {
+                    Promise.resolve(result).catch((e) => {
+                        console.error(`[ViewController] async hook "${name}" error in "${this.path}":`, e);
+                    });
+                }
             }
             catch (e) {
                 console.error(`[ViewController] hook "${name}" error in "${this.path}":`, e);
@@ -291,6 +314,8 @@ export class ViewController {
     }
     /** Unmount — gỡ instance khỏi real DOM (fire hook + release asset). */
     unmount() {
+        if (this._isDestroyed || !this._isMounted)
+            return;
         this.callHook('unmounting');
         this.releaseAssets();
         this._isMounted = false;
@@ -341,18 +366,20 @@ export class ViewController {
      * This ensures initial state values are set before subscriptions fire.
      */
     start() {
-        if (this._isDestroyed)
+        if (this._isDestroyed || this._isStarted)
             return;
         // Page extends layout không có _rootTree (render trả về superView) —
         // tree thật của nó là block content, được BlockManager.startAll() kích hoạt.
         if (!this._rootTree && this.blocks.size === 0)
             return;
         this.callHook('starting');
+        this._isStarted = true;
         // Recursively start all children (Output, TextElement, Html, Reactive, Fragment)
         if (this._rootTree && 'start' in this._rootTree && typeof this._rootTree.start === 'function') {
             this._rootTree.start();
         }
         this._lifecycleState = 'active';
+        this.isActive = true;
         this.callHook('started');
         this.callHook('onMounted'); // legacy alias
     }
@@ -377,6 +404,12 @@ export class ViewController {
         // 1. Flush nốt mọi update đang chờ → DOM là snapshot nhất quán
         this.states.__.flushNow();
         this.flushReactiveUpdatesNow();
+        // Parent pauses before descendants; descendants finish before parent.
+        // Snapshot prevents resuming children that were already inactive on entry.
+        this._pausedChildren = this.children.filter((child) => child.lifecycleState === 'active');
+        for (let i = this._pausedChildren.length - 1; i >= 0; i--) {
+            this._pausedChildren[i].pause();
+        }
         // 2. Dirty-mode
         this.states.__.pause();
         this._lifecycleState = 'paused';
@@ -411,6 +444,13 @@ export class ViewController {
         if (buffered) {
             this.updateData(buffered);
         }
+        // Resume outside-in: parent state is live before child subscriptions flush.
+        const pausedChildren = this._pausedChildren;
+        this._pausedChildren = [];
+        for (const child of pausedChildren) {
+            if (child.lifecycleState === 'paused')
+                child.resume();
+        }
         // 4. Hook
         this.callHook('resumed');
         this.callHook('onResume'); // legacy alias
@@ -427,13 +467,15 @@ export class ViewController {
      * DOM stays intact but reactive updates are paused.
      */
     stop() {
-        if (this._isDestroyed || !this._rootTree)
+        if (!this._isStarted)
             return;
         this.callHook('stopping');
+        this._isStarted = false;
         // Recursively stop all children
-        if ('stop' in this._rootTree && typeof this._rootTree.stop === 'function') {
+        if (this._rootTree && 'stop' in this._rootTree && typeof this._rootTree.stop === 'function') {
             this._rootTree.stop();
         }
+        this.isActive = false;
         this.callHook('stopped');
         this.callHook('onDeactivated'); // legacy alias
     }
@@ -442,26 +484,38 @@ export class ViewController {
         if (this._isDestroyed)
             return;
         this.callHook('destroying');
+        // stop() must run while the instance is still valid so user cleanup hooks
+        // and the element tree are not skipped.
+        this.stop();
         // Gỡ style/script nếu instance còn đang giữ ref (chưa qua pause)
         this.releaseAssets();
         this._isDestroyed = true;
         this._lifecycleState = 'destroyed';
-        // Stop reactive subscriptions first
-        this.stop();
         // Cancel pending updates
         this.pendingReactiveUpdates.clear();
         this.hasScheduledUpdate = false;
         // Abort all event listeners
         this.eventAbortController.abort();
+        this.elementEventHandlers.clear();
         // Sắp gỡ DOM khỏi real DOM
-        this.callHook('unmounting');
+        const wasMounted = this._isMounted;
+        if (wasMounted)
+            this.callHook('unmounting');
         // Destroy root tree
         if (this._rootTree && 'destroy' in this._rootTree && typeof this._rootTree.destroy === 'function') {
             this._rootTree.destroy();
         }
         this._rootTree = null;
         this._isMounted = false;
-        this.callHook('unmounted');
+        // A child controller can exist outside _rootTree (for layout/block paths).
+        // Destroy remaining children in reverse ownership order; destroy is idempotent.
+        for (let i = this.children.length - 1; i >= 0; i--) {
+            this.children[i].destroy();
+        }
+        this.children = [];
+        this._pausedChildren = [];
+        if (wasMounted)
+            this.callHook('unmounted');
         // Destroy state
         this.states.__.destroy();
         // Cleanup loop context stack
@@ -475,6 +529,9 @@ export class ViewController {
         this.elements.clear();
         this.sections.clear();
         this.blocks.clear();
+        const parent = this.parent;
+        this.parent = null;
+        parent?.removeChild(this);
         // Nullify references
         this.rootElement = null;
         this.renderFactory = null;
@@ -521,11 +578,25 @@ export class ViewController {
                 console.error(`[ViewController] commitData error in "${this.path}":`, e);
             }
         }
+        // Lock ENFORCE ở runtime — không phụ thuộc compiler emit lockUpdateRealState()
+        // cuối commitConstructorData (view không có state → compiled fn rỗng, không lock).
+        // Từ đây update$xxx chỉ chạy được trong cửa sổ unlock của updateData.
+        this.states.__.lockUpdateRealState();
         this._isDataCommitted = true;
     }
     /**
-     * Update data from external source (navigate same view, different params).
-     * Flow: unlock → updateVariableData(newData) → re-set states → lock.
+     * Update data from external source (navigate same view, props từ parent...).
+     *
+     * Contract data vs state (mô hình React — data:props từ ngoài, state:của instance):
+     *   - TRƯỚC commitData (constructor phase): chỉ merge vào this.data. Factory
+     *     đã destructure __data__ lúc khởi tạo; state sẽ do commitData() init MỘT
+     *     lần. KHÔNG chạy updateVariableData ở đây — nếu chạy, sequence
+     *     unlock→lock của nó làm commitConstructorData về sau thành no-op
+     *     (update$xxx bị lock chặn) → state init phụ thuộc data rỗng hay không.
+     *   - SAU commitData: đường props-update chuẩn — unlock → updateVariableData
+     *     (trait cập nhật biến data + notify các key dẫn xuất từ data) → lock.
+     *     Instance state (init bằng literal) KHÔNG được reset ở đây — đó là
+     *     trách nhiệm của compiled updateVariableData (COMPILER_CONTRACT).
      * Khi paused: buffer lại, apply lúc resume (ROUTE_RENDER_FLOW §8.2).
      */
     updateData(newData) {
@@ -536,6 +607,15 @@ export class ViewController {
             return;
         }
         this.data = { ...this.data, ...newData };
+        if (!this._isDataCommitted) {
+            // Constructor phase (data mount / async data về TRƯỚC commit):
+            // áp data vào biến data qua TRAIT-ONLY (updateVariableItemData từng key)
+            // — closure vars nhận giá trị mới để commitData init state từ đó.
+            // KHÔNG chạy updateVariableData (tránh re-init state) và KHÔNG
+            // đụng lock (commitData cần cửa unlock của constructor phase).
+            this.applyDataTrait(newData);
+            return;
+        }
         const fn = this.runtimeConfig?.updateVariableData;
         if (typeof fn === 'function') {
             this.states.__.unlockUpdateRealState();
@@ -550,11 +630,30 @@ export class ViewController {
             }
         }
     }
+    /** Áp data vào biến data (trait) từng key — không đụng state, không đụng lock */
+    applyDataTrait(newData) {
+        const itemFn = this.runtimeConfig?.updateVariableItemData;
+        if (typeof itemFn !== 'function')
+            return;
+        for (const key of Object.keys(newData)) {
+            try {
+                itemFn.call(this.makeConfigThis(), key, newData[key]);
+            }
+            catch (e) {
+                console.error(`[ViewController] applyDataTrait error in "${this.path}" (key: ${key}):`, e);
+            }
+        }
+    }
     /**
-     * Update single data item.
+     * Update single data item — cùng contract với updateData (xem trên).
      */
     updateDataItem(key, value) {
         this.data[key] = value;
+        if (!this._isDataCommitted) {
+            // Constructor phase: trait-only, không đụng lock (như updateData)
+            this.applyDataTrait({ [key]: value });
+            return;
+        }
         const fn = this.runtimeConfig?.updateVariableItemData;
         if (typeof fn === 'function') {
             this.states.__.unlockUpdateRealState();
@@ -580,6 +679,10 @@ export class ViewController {
      *   - Object with string handler (method name on view): { handler: 'handleClick' }
      */
     addEventListener(element, event, handlers) {
+        // Compiled Html supplies the complete handler list for one event. Replacing
+        // the previous set makes render/hydrate initialization idempotent.
+        this.removeEventListener(element, event);
+        const registered = [];
         for (const h of handlers) {
             let fn;
             if (typeof h === 'function') {
@@ -628,7 +731,26 @@ export class ViewController {
                 continue;
             }
             element.addEventListener(event, fn, { signal: this.eventAbortController.signal });
+            registered.push(fn);
         }
+        if (registered.length > 0) {
+            let events = this.elementEventHandlers.get(element);
+            if (!events) {
+                events = new Map();
+                this.elementEventHandlers.set(element, events);
+            }
+            events.set(event, registered);
+        }
+    }
+    removeEventListener(element, event) {
+        const events = this.elementEventHandlers.get(element);
+        const listeners = events?.get(event) ?? [];
+        for (const listener of listeners) {
+            element.removeEventListener(event, listener);
+        }
+        events?.delete(event);
+        if (events?.size === 0)
+            this.elementEventHandlers.delete(element);
     }
     // ─── Reactive Scheduling ────────────────────────────────────
     /**
@@ -750,12 +872,12 @@ export class ViewController {
         return this.App.View?.yieldContent?.(name, defaultValue) ?? defaultValue;
     }
     wrapper(factory) {
-        const callingMethod = this.callingMethod;
-        let key = callingMethod === 'prerender' ? 'preloadElement' : 'mainElement';
-        let wrapper = this.wrapperInstance;
-        if (!wrapper) {
+        const which = this.callingMethod === 'prerender' ? 'prerender' : 'render';
+        const key = which === 'prerender' ? 'preloadElement' : 'mainElement';
+        let wrapper = this.wrapperInstances[which];
+        if (!wrapper || wrapper.__destroyed__) {
             wrapper = new Wrapper({ ctx: this, initMode: this.initMode, parentElement: this.parentElement, childrenFactory: factory });
-            this.wrapperInstance = wrapper;
+            this.wrapperInstances[which] = wrapper;
         }
         else {
             wrapper.setChildrenFactory(factory);
@@ -870,10 +992,29 @@ export class ViewController {
         }
         return null;
     }
+    /**
+     * Resolve the hydrate id for an @include component.
+     *
+     * The compiler ALWAYS emits a deterministic id (md5[:8] of the position-based
+     * base id) so the client marker `s:c:{viewId}-{id}` matches the server-rendered
+     * one. A missing id therefore means a compiler/runtime contract violation — and
+     * in HYDRATE mode it guarantees a marker mismatch (claimSSRMarkers finds nothing
+     * → silent CSR re-render / duplicated DOM).
+     *
+     * Never invent a RANDOM id here: a random id also makes every `elements.get(id)`
+     * lookup miss, so the component is recreated on each render (cache broken). We
+     * surface the violation loudly and fall back to a render-stable deterministic id
+     * so behaviour stays idempotent even in the broken case.
+     */
+    resolveIncludeId(id, kind, path) {
+        if (id)
+            return id;
+        console.error(`[Saola] ${kind}(): missing hydrate id for view "${path}". The compiler must ` +
+            `pass a deterministic id — marker sync with the server is broken for this component.`);
+        return `cpn-missing-${this._missingIncludeIdCounter++}`;
+    }
     include(id = null, path = '', parentElement, stateKeys, dataFactory) {
-        if (!id) {
-            id = `cpn-${generateUUID(5)}`;
-        }
+        id = this.resolveIncludeId(id, 'include', path);
         const existing = this.elements.get(id);
         if (existing instanceof Component) {
             existing.setDataFactory(dataFactory);
@@ -884,20 +1025,19 @@ export class ViewController {
         }
         let component = new Component({
             ctx: this,
-            id: id ?? generateUUID(10),
+            id,
             stateKeys,
             parent: parentElement,
             dataFactory,
             path,
             type: 'default',
+            initMode: this.initMode,
         });
         this.elements.set(id, component);
         return component;
     }
     includeIf(id = null, path, parentElement, stateKeys, dataFactory) {
-        if (!id) {
-            id = `c-${generateUUID(5)}`;
-        }
+        id = this.resolveIncludeId(id, 'includeIf', path);
         const existing = this.elements.get(id);
         if (existing instanceof Component) {
             existing.setDataFactory(dataFactory);
@@ -908,20 +1048,19 @@ export class ViewController {
         }
         let component = new Component({
             ctx: this,
-            id: id ?? generateUUID(10),
+            id,
             stateKeys,
             parent: parentElement,
             dataFactory,
             path,
             type: 'if',
+            initMode: this.initMode,
         });
         this.elements.set(id, component);
         return component;
     }
     includeWhen(id, condition, path, parentElement, stateKeys, dataFactory) {
-        if (!id) {
-            id = `cpn-${generateUUID(5)}`;
-        }
+        id = this.resolveIncludeId(id, 'includeWhen', path);
         const existing = this.elements.get(id);
         if (existing instanceof Component) {
             existing.setDataFactory(dataFactory);
@@ -933,13 +1072,14 @@ export class ViewController {
         }
         let component = new Component({
             ctx: this,
-            id: id ?? generateUUID(10),
+            id,
             stateKeys,
             parent: parentElement,
             dataFactory,
             path,
             type: 'when',
             condition,
+            initMode: this.initMode,
         });
         this.elements.set(id, component);
         return component;
@@ -980,22 +1120,47 @@ export class ViewController {
      * @foreach directive — iterate over array or object.
      * Returns array of children (not HTML string like the old system).
      *
-     * # Cache-aware re-render (Phase 5)
-     * Khi `_currentForeachCache` được set (bởi Reactive.renderForeach()), __foreach
-     * kiểm tra cache trước mỗi item:
-     *   - Cache hit (item ref giống) → trả về elements cũ (reuse, không recreate DOM)
-     *   - Cache miss (item mới)     → gọi callback → tạo elements mới → lưu vào cache
+     * # Cache-aware re-render (Phase 5 + 5b)
+     * Khi `_currentForeachCache` được set (bởi Reactive), __foreach claim slot
+     * cho từng item:
+     *   - Hit (key khớp + item ref giống) → reuse elements cũ (không recreate DOM)
+     *   - Miss → gọi callback → tạo elements mới → store vào cache
      *
-     * Identity keying: cache key là object reference của item, không phải index.
-     * → Reorder list giữ nguyên elements cho từng item (chỉ thay đổi vị trí DOM).
-     * → Immutable-data patterns (mỗi update tạo object mới) được handle tự động.
+     * Cache key:
+     *   - `keyFn` (compiler emit từ @key(expr)) → field keying (`item.id`)
+     *   - không có → object reference của item (identity keying)
+     * Duplicate keys/primitive items phân biệt bằng occurrence (ForeachSlotCache).
+     * Ref đổi nhưng key trùng → recreate (closure đóng gói item cũ) — slot cũ
+     * được Reactive.prunePass destroy.
      *
-     * @example Compiled output:
+     * @example Compiled output (@key(item.id)):
      * ctrl.__foreach(items, (item, key, index, loop) => [
-     *     this.html('id', 'div', p, {}, () => [this.text(item.name)])
-     * ])
+     *     this.html(`id-${item.id}`, 'div', p, {}, () => [this.text(item.name)])
+     * ], (item) => item.id)
      */
-    __foreach(list, callback) {
+    /**
+     * @children — render slot content từ parent include (compiler emit:
+     * `...this.__children(__ONE_CHILDREN_CONTENT__, parentElement)`).
+     *
+     * content có 2 dạng (xem COMPILER _gen_children_slot):
+     *   - function `(parentElement) => elements` — element factory từ
+     *     @importInclude/custom tag phía parent. Factory đóng gói `this` của
+     *     PARENT ctrl → elements thuộc parent scope (state/registry parent),
+     *     giống React children.
+     *   - string — SSR data hoặc default '' → render text tĩnh (rỗng → []).
+     */
+    __children(content, parentElement) {
+        if (typeof content === 'function') {
+            const out = content(parentElement);
+            if (out === null || out === undefined)
+                return [];
+            return Array.isArray(out) ? out : [out];
+        }
+        if (content === null || content === undefined || content === '')
+            return [];
+        return [this.text(String(content))];
+    }
+    __foreach(list, callback, keyFn) {
         if (!list || typeof list !== 'object')
             return [];
         // Lấy cache đang active (null = không có cache, dùng behavior cũ)
@@ -1008,11 +1173,14 @@ export class ViewController {
                 list.forEach((item, index) => {
                     loopCtx.setCurrentTimes(index);
                     // ── Cache-aware path ──────────────────────────────────────
+                    let claimOcc = 0;
+                    let cacheKey = item;
                     if (cache) {
-                        const slot = cache.get(item);
+                        cacheKey = keyFn ? keyFn(item, index) : item;
+                        const { slot, occ } = cache.claim(cacheKey, item);
+                        claimOcc = occ;
                         if (slot) {
-                            // Cache HIT: item ref giống → reuse elements cũ.
-                            // Elements vẫn close over cùng object ref → data đúng.
+                            // HIT: reuse elements cũ — closure vẫn trỏ đúng object ref.
                             result.push(...slot.elements);
                             return; // skip callback
                         }
@@ -1027,7 +1195,7 @@ export class ViewController {
                         const elements = Array.isArray(output) ? output : [output];
                         result.push(...elements);
                         if (cache) {
-                            cache.set(item, elements);
+                            cache.store(cacheKey, claimOcc, item, elements);
                         }
                     }
                 });
@@ -1234,7 +1402,15 @@ export class ViewController {
         this.parent = parent;
     }
     addChild(child) {
-        this.children.push(child);
+        if (!this.children.includes(child))
+            this.children.push(child);
+    }
+    removeChild(child) {
+        const index = this.children.indexOf(child);
+        if (index >= 0)
+            this.children.splice(index, 1);
+        if (child.parent === this)
+            child.setParent(null);
     }
     /**
      * For nested views: set the chain of super views up to the root, so each view has a reference to its layout parents.

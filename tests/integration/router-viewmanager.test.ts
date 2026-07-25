@@ -110,6 +110,7 @@ let vm: ViewManager;
 let router: Router;
 
 function setup() {
+    window.history.replaceState({}, '', '/');
     container = document.createElement('div');
     document.body.appendChild(container);
 
@@ -135,6 +136,7 @@ afterEach(() => {
     StoreService.instance('ViewManager').clear();
     (app() as any).unset?.('View');
     (app() as any).unset?.('Router');
+    window.history.replaceState({}, '', '/');
 });
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -223,6 +225,117 @@ describe('Router ↔ ViewManager integration', () => {
 });
 
 describe('Router — query string + guard + navigationType', () => {
+    it('chỉ commit history + active route sau khi view mount thành công', async () => {
+        setup();
+
+        await (router as any).handleRoute('/about', 'push');
+
+        expect(window.location.pathname).toBe('/about');
+        expect(router.getCurrentRoute()?.$uri).toBe('/about');
+        expect(vm.getCurrentView()?.__ctrl__.urlPath).toBe('/about');
+        expect(container.querySelector('#about-page')).not.toBeNull();
+    });
+
+    it('render lỗi → không commit URL/route và giữ page cũ active', async () => {
+        setup();
+        await (router as any).handleRoute('/', 'initial');
+        const home = vm.getCurrentView()!;
+
+        vm.registerView('web.invalid', () => {
+            const invalid = new View('web.invalid', 'view');
+            invalid.__ctrl__.setup({ superView: null, data: {}, render: () => null } as any);
+            return invalid;
+        });
+        router.addRoute('/invalid', 'web.invalid');
+
+        await (router as any).handleRoute('/invalid', 'push');
+
+        expect(window.location.pathname).toBe('/');
+        expect(router.getCurrentRoute()?.$uri).toBe('/');
+        expect(vm.getCurrentView()).toBe(home);
+        expect(home.__ctrl__.lifecycleState).toBe('active');
+        expect(container.querySelector('#home-page')).not.toBeNull();
+    });
+
+    it('navigation mới hủy fetch cũ; chỉ request mới nhất được commit', async () => {
+        setup();
+        const application = app() as any;
+        const previousHttp = application.get('Http');
+        let resolveFetch!: (value: any) => void;
+        const pendingFetch = new Promise((resolve) => { resolveFetch = resolve; });
+        application.set('Http', { get: () => pendingFetch });
+        const committed: string[] = [];
+        router.afterEach((to) => committed.push(to.path));
+
+        vm.registerView('web.slow-route', () => {
+            const slow = new View('web.slow-route', 'view');
+            slow.__ctrl__.setup({
+                superView: null,
+                data: {},
+                hasAwaitData: true,
+                fetch: { url: '/slow-route' },
+                render(this: any) {
+                    return this.wrapper((p: any) => [this.text('SLOW')]);
+                },
+            } as any);
+            return slow;
+        });
+        router.addRoute('/slow-route', 'web.slow-route');
+
+        try {
+            const stale = (router as any).handleRoute('/slow-route', 'push');
+            await Promise.resolve();
+            router.navigate('/about');
+            resolveFetch({ data: { ok: true } });
+            await stale;
+            await frame();
+
+            expect(window.location.pathname).toBe('/about');
+            expect(router.getCurrentRoute()?.$uri).toBe('/about');
+            expect(container.querySelector('#about-page')).not.toBeNull();
+            expect(container.textContent).not.toContain('SLOW');
+            expect(committed).toEqual(['/about']);
+        } finally {
+            application.set('Http', previousHttp);
+        }
+    });
+
+    it('fetch fallback dùng URL đích dù history chưa commit', async () => {
+        setup();
+        const application = app() as any;
+        const previousHttp = application.get('Http');
+        let requestedUrl = '';
+        application.set('Http', {
+            get: async (url: string) => {
+                requestedUrl = url;
+                return { data: { ok: true } };
+            },
+        });
+        vm.registerView('web.payload', () => {
+            const payload = new View('web.payload', 'view');
+            payload.__ctrl__.setup({
+                superView: null,
+                data: {},
+                hasFetchData: true,
+                render(this: any) {
+                    return this.wrapper((p: any) => [this.text('PAYLOAD')]);
+                },
+            } as any);
+            return payload;
+        });
+        router.addRoute('/payload', 'web.payload');
+
+        try {
+            await (router as any).handleRoute('/payload?tab=1', 'push');
+
+            expect(new URL(requestedUrl).pathname + new URL(requestedUrl).search).toBe('/payload?tab=1');
+            expect(window.location.pathname + window.location.search).toBe('/payload?tab=1');
+            expect(container.textContent).toContain('PAYLOAD');
+        } finally {
+            application.set('Http', previousHttp);
+        }
+    });
+
     it('URL có query string vẫn match route (query tách TRƯỚC khi match)', () => {
         setup();
         const match = (router as any).matchRoute('/about?utm=x&tab=2');
@@ -273,6 +386,50 @@ describe('Router — query string + guard + navigationType', () => {
 
         expect(vm.getCurrentView()).toBe(home); // cùng instance — restore, không render lại
         expect(home.__ctrl__.lifecycleState).toBe('active');
+    });
+});
+
+describe('Router — click interception', () => {
+    it('không chặn Ctrl/Cmd click hoặc link download', () => {
+        setup();
+        const link = document.createElement('a');
+        link.href = '/about';
+        document.body.appendChild(link);
+
+        const modified = {
+            target: link, button: 0, ctrlKey: true, metaKey: false,
+            shiftKey: false, altKey: false, defaultPrevented: false,
+            preventDefault() { this.defaultPrevented = true; },
+        } as any;
+        (router as any).handleAutoNavigation(modified);
+        expect(modified.defaultPrevented).toBe(false);
+
+        link.setAttribute('download', 'about.html');
+        const download = {
+            target: link, button: 0, ctrlKey: false, metaKey: false,
+            shiftKey: false, altKey: false, defaultPrevented: false,
+            preventDefault() { this.defaultPrevented = true; },
+        } as any;
+        (router as any).handleAutoNavigation(download);
+        expect(download.defaultPrevented).toBe(false);
+    });
+
+    it('click link nội bộ giữ fragment và đi qua SPA transaction', async () => {
+        setup();
+        router.start(true);
+        const link = document.createElement('a');
+        link.href = '/about#details';
+        document.body.appendChild(link);
+
+        const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+        link.dispatchEvent(click);
+        await frame();
+
+        expect(click.defaultPrevented).toBe(true);
+        expect(window.location.pathname).toBe('/about');
+        expect(window.location.hash).toBe('#details');
+        expect(router.getCurrentRoute()?.$fragment).toBe('details');
+        expect(container.querySelector('#about-page')).not.toBeNull();
     });
 });
 

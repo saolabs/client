@@ -42,6 +42,8 @@ type RenderPageViewSuccess = {
     result: ViewInterface | unknown;
     superView: ViewInterface | null;
     finalView: ViewInterface;
+    /** Origin → outermost: [page, inner layout, ..., root layout]. */
+    chain: ViewInterface[];
 };
 type RenderPageViewError = {
     type: 'error';
@@ -50,8 +52,18 @@ type RenderPageViewError = {
     result: null;
     superView: null;
     finalView: ViewInterface;
+    chain: ViewInterface[];
 };
-type RenderPageViewResult = RenderPageViewSuccess | RenderPageViewError;
+type RenderPageViewCancelled = {
+    type: 'cancelled';
+    message: string;
+    view: ViewInterface;
+    result: null;
+    superView: null;
+    finalView: ViewInterface;
+    chain: ViewInterface[];
+};
+type RenderPageViewResult = RenderPageViewSuccess | RenderPageViewError | RenderPageViewCancelled;
 export declare class ViewManager implements ViewManagerInterface {
     /** DI container */
     private App;
@@ -68,6 +80,8 @@ export declare class ViewManager implements ViewManagerInterface {
     /** Current layout path — for layout reuse detection */
     private currentLayoutPath;
     private currentLayoutView;
+    /** Mounted layouts ordered outermost → innermost. */
+    private currentLayoutChain;
     private currentPageView;
     private currentViewType;
     /**
@@ -76,6 +90,8 @@ export declare class ViewManager implements ViewManagerInterface {
      * tiên → hydrateView; các route sau là CSR (SPA takeover).
      */
     private ssrBoot;
+    /** Exact Page/Layout instance relationships exported by Blade for hydration. */
+    private ssrViewData;
     /** Current layout view info — reused if same layout */
     private currentLayout;
     private cachedLayouts;
@@ -85,6 +101,8 @@ export declare class ViewManager implements ViewManagerInterface {
     private _isInitialized;
     /** Render counter for debugging */
     private renderCount;
+    /** Invalidates fire-and-forget render work when a newer navigation begins. */
+    private navigationGeneration;
     store: StoreService;
     blockManager: BlockManagerService;
     constructor(app?: ApplicationInterface);
@@ -93,6 +111,8 @@ export declare class ViewManager implements ViewManagerInterface {
      * Dùng để guard duplicate mount hoặc kiểm tra trạng thái từ bên ngoài.
      */
     isViewMounted(path: string): boolean;
+    /** Invalidate async render/fetch work owned by the current navigation. */
+    cancelNavigation(): void;
     /**
      * Destroy ViewManager hoàn toàn — dọn sạch mọi view, DOM, state.
      * Gọi khi teardown app (hot reload, test cleanup, unmount root).
@@ -133,6 +153,7 @@ export declare class ViewManager implements ViewManagerInterface {
         registry?: Record<string, any>;
         ssr?: SSRBootInfo | null;
         systemData?: Record<string, any>;
+        ssrData?: Record<string, any>;
     }): void;
     showError(message: string, details?: any): void;
     hasView(name: string): boolean;
@@ -149,54 +170,105 @@ export declare class ViewManager implements ViewManagerInterface {
     generateViewId(): string;
     view(name: string, data: Record<string, any>, cache: boolean): any;
     private createRenderPageViewError;
+    private createRenderPageViewCancelled;
+    private isNavigationCurrent;
     private createRenderPageViewSuccess;
     private getRenderResultType;
-    callViewRenderFactory(view: ViewInterface, method?: 'render' | 'prerender', data?: Record<string, any>, mountRoot?: HtmlInterface | null, initMode?: InitMode, cache?: boolean, renderLevel?: number): Promise<RenderPageViewResult>;
+    callViewRenderFactory(view: ViewInterface, method?: 'render' | 'prerender', data?: Record<string, any>, mountRoot?: HtmlInterface | null, initMode?: InitMode, cache?: boolean, renderLevel?: number, navigationGeneration?: number): Promise<RenderPageViewResult>;
     /**
      * Discover viewId của một layout/superView từ SSR DOM (hydration).
      *
      * Page gọi extendView() KHÔNG truyền viewId của layout (server tự sinh id),
-     * nên client đọc lại từ marker <!--s:v:{id}-s--> mà server đã render trong
-     * container. Trả về id view marker đầu tiên chưa nằm trong excludeIds.
+     * nên client lấy lại id từ quan hệ instance mà Blade export. Nếu output cũ
+     * chưa có quan hệ này, client mới discover từ metadata/marker trong DOM.
      *
-     * ⚠ Hiện xử lý single layout. Nested layout (chain > 1) cần match marker
-     *   theo độ sâu lồng nhau — TODO khi hỗ trợ nested hydration.
+     * Nested chain ưu tiên quan hệ parent chính xác trong APP_CONFIGS.view.ssrData,
+     * sau đó mới tới `data-view-name`/`data-view-id`; marker scan là fallback.
      */
     private discoverChainViewId;
-    renderPageView(view: ViewInterface, data: Record<string, any>, mountRoot?: HtmlInterface | null, initMode?: InitMode, cache?: boolean, renderLevel?: number): Promise<RenderPageViewResult>;
+    renderPageView(view: ViewInterface, data: Record<string, any>, mountRoot?: HtmlInterface | null, initMode?: InitMode, cache?: boolean, renderLevel?: number, navigationGeneration?: number): Promise<RenderPageViewResult>;
     /**
      * Mount view khi navigate — luồng chuẩn (ROUTE_RENDER_FLOW.md):
-     *   sweep TTL → duplicate guard → pause+cache trang cũ →
-     *   pop? restore từ PageCache : mount mới (render → mount DOM → commitData → start)
+     *   sweep TTL → duplicate guard → pause+cache trang cũ (standalone LẪN
+     *   page thuộc layout) → thử restore từ PageCache (theo view name + URI,
+     *   trong TTL, mọi navigation type) → mount mới
+     *   (render → mount DOM → commitData → start).
      *
-     * LƯU Ý Phase 2: mới hoàn thiện nhánh standalone (không layout).
-     * Nhánh layout (extends) thuộc Phase 3.
+     * Lifecycle khi RỜI trang (deactivatePage):
+     *   - page cacheable  → pause (pausing/paused) + detach DOM → PageCache
+     *   - page cache:false → destroy (stopping/stopped → unmounting/unmounted → destroyed)
+     *   - layout KHÔNG đổi → không hook nào fire trên layout (giữ nguyên DOM + subscription)
+     *   - layout đổi/về standalone → destroy layout chain
      */
     mountView(name: string, data?: Record<string, any>, route?: ActiveRouteInterface, navigationType?: RouterNavigationType): Promise<any>;
-    /** Destroy toàn bộ chain page + layout cũ (đổi layout hoặc về standalone) */
+    /** Commit the successfully mounted/hydrated chain as the only active route state. */
+    private commitActiveChain;
+    /**
+     * Common post-render transaction. Rendering decides the Page/Layout chain;
+     * this step applies the DOM strategy, activates it, then publishes one
+     * coherent active-chain state.
+     */
+    private activateRenderedChain;
+    /** CSR strategy: insert new DOM, while preserving/reusing a compatible Layout. */
+    private activateCreatedChain;
+    /** Hydration strategy: claim Blade DOM without insert/clear mutations. */
+    private activateHydratedChain;
+    /**
+     * Destroy layout cũ (đổi layout hoặc về standalone).
+     * Page cũ đã rời ở Phase 1 (deactivatePage) — không destroy tại đây.
+     */
+    private destroyLayoutView;
     private destroyLayoutChain;
     /** bfcache-style cache cho trang đã ghé (ROUTE_RENDER_FLOW.md §8) */
     pageCache: PageCacheService;
     /**
-     * Navigate đi khỏi trang standalone: pause + detach DOM → PageCache.
-     * View khai báo cache:false (hoặc ttl 0) → destroy luôn.
+     * Cache key = `${viewName}::${requestUri}` — URI gồm path + query,
+     * KHÔNG gồm hash (strip defensive tại đây).
      */
-    private deactivateStandalonePage;
-    /** Back/forward hit cache: gắn lại DOM + resume — không render, không gọi API */
-    private restoreFromCache;
+    private cacheKey;
+    /** Cache key cho layout — namespace riêng, không đụng key page (name::uri) */
+    private layoutCacheKey;
+    private layoutChainIdentity;
     /**
-     * Build DOM từ finalView's Wrapper vào container.
-     * Wrapper.render() sẽ execute childrenFactory → tạo DOM tree.
+     * Rời một layout (đổi layout / về standalone): pause + detach toàn vùng DOM
+     * → PageCache (key `__layout__::{path}`). KHÁC destroy ở 2 điểm:
+     *   1. Instance GIỮ NGUYÊN trong store — extendView của page sau trả lại
+     *      đúng instance này (đang paused) → resumeLayoutFromCache nhận ra.
+     *   2. Outlets gỡ khỏi BlockManager registry (không destroy) — tránh
+     *      mountAll đụng outlet trùng tên của layout đang nằm trong cache.
+     * Layout khai cache:false (hoặc ttl 0) → destroy như cũ.
      */
-    private buildViewDOM;
-    private stopPageView;
-    private stopLayoutView;
-    private stopBlockContent;
-    private startViewChain;
-    private startLayoutView;
-    private startBlockContent;
-    private commitViewChain;
-    private unmountLayoutDOM;
+    private deactivateLayout;
+    private deactivateLayoutChain;
+    /**
+     * Layout lấy từ store đang PAUSED (đã vào cache trước đó) → reattach
+     * fragment + resume thay vì mount lại. Trả false nếu layout không paused
+     * (layout mới tạo → caller mount bình thường).
+     */
+    private resumeLayoutChainFromCache;
+    /** Đăng ký lại outlets của layout vừa resume vào BlockManager registry */
+    private reregisterLayoutOutlets;
+    /**
+     * Navigate rời một page: pause + detach DOM → PageCache.
+     *   - Standalone: detach toàn vùng wrapper (markers + content).
+     *   - Page thuộc layout: detach block content THEO OUTLET — layout giữ nguyên,
+     *     không hook nào fire trên layout.
+     * View khai cache:false (hoặc ttl 0) → destroy luôn.
+     */
+    private deactivatePage;
+    /** Roll back an early Layout-page detach when prepare/render did not commit. */
+    private restoreDeactivatedPage;
+    /**
+     * Cache hit: gắn lại DOM + resume — không render, không gọi API.
+     *   - Entry standalone: layout cũ (nếu còn) pause+cache → gắn fragment vào container.
+     *   - Entry layout-page: layout đang mount trùng layoutPath → restore thẳng
+     *     vào outlets. Không trùng → thử resurrect layout từ layout cache
+     *     (bfcache đầy đủ: restore CẢ layout LẪN page trong một lần). Layout
+     *     cũng không có trong cache → putBack entry (còn TTL thì lần điều hướng
+     *     sau restore được), trả null để caller mount tươi.
+     * Scroll: pop → khôi phục vị trí cũ; push → về đầu trang.
+     */
+    private restoreFromCache;
     unmountAll(): void;
     unmountView(path: string): void;
     /**

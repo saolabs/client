@@ -59,6 +59,8 @@ export interface RouterConfig {
 
 export type NavigationGuard = (to: Route, from: ActiveRoute | null, urlPath: string) => boolean | Promise<boolean>;
 export type AfterNavigationHook = (to: Route, from: ActiveRoute | null) => void;
+type NavigationType = 'push' | 'replace' | 'pop' | 'initial';
+type NavigationRequest = { id: number; path: string; type: NavigationType };
 
 // ─── ActiveRoute ────────────────────────────────────────────────
 
@@ -170,6 +172,8 @@ export class Router {
     /** State */
     private isStarted = false;
     private isNavigating = false;
+    private navigationSequence = 0;
+    private activeNavigationUrl: string | null = null;
 
     /** Bound handlers for cleanup */
     private _handlePopState: () => void;
@@ -481,6 +485,10 @@ export class Router {
      */
     destroy(): void {
         this.stop();
+        this.navigationSequence++;
+        this.pendingNavigation = null;
+        this.activeNavigationUrl = null;
+        this.viewManager?.cancelNavigation?.();
         this.routes = [];
         this.routeConfigs = {};
         this.routeCache.clear();
@@ -493,12 +501,15 @@ export class Router {
     // ─── Helper ────────────────────────────────
     getFullUrl(): string {
         if (typeof window === 'undefined') return '';
+        if (this.activeNavigationUrl) {
+            return new URL(this.activeNavigationUrl, window.location.href).href;
+        }
         return window.location.href;
     }
     // ─── Internal: Route Handling ────────────────────────────────
 
     /** Kiểu navigation nội bộ — quyết định thao tác history + nav type xuống ViewManager */
-    private pendingNavigation: { path: string; type: 'push' | 'replace' | 'pop' | 'initial' } | null = null;
+    private pendingNavigation: NavigationRequest | null = null;
 
     /**
      * Tách một URL string thành pathname / query string / fragment.
@@ -526,19 +537,27 @@ export class Router {
      * Đang navigate dở → ghi nhận request MỚI NHẤT, xử lý sau khi xong
      * (không drop im lặng như trước).
      */
-    private requestNavigation(path: string, type: 'push' | 'replace' | 'pop' | 'initial'): void {
+    private requestNavigation(path: string, type: NavigationType): void {
+        const request: NavigationRequest = { id: ++this.navigationSequence, path, type };
         if (this.isNavigating) {
-            this.pendingNavigation = { path, type };
+            this.pendingNavigation = request;
+            // Cho ViewManager thoát sớm khỏi fetch/render cũ. Request mới nhất
+            // sẽ được chạy trong finally, không commit DOM/history trung gian.
+            (this.viewManager ?? this.App?.View)?.cancelNavigation?.();
             return;
         }
-        void this.handleRoute(path, type);
+        void this.handleRoute(path, type, request.id);
     }
 
     /**
-     * Core route handler — tách query → match route → guard → cập nhật history →
-     * mount/hydrate view → afterEach.
+     * Core route handler — prepare/guard/render trước, chỉ commit history +
+     * active route sau khi ViewManager đã mount/hydrate thành công.
      */
-    private async handleRoute(path: string, type: 'push' | 'replace' | 'pop' | 'initial' = 'push'): Promise<void> {
+    private async handleRoute(
+        path: string,
+        type: NavigationType = 'push',
+        requestId: number = ++this.navigationSequence,
+    ): Promise<void> {
         this.isNavigating = true;
 
         try {
@@ -568,39 +587,54 @@ export class Router {
                 const allow = await this._beforeEach(route, from, normalizedPath);
                 if (allow === false) return;
             }
+            if (requestId !== this.navigationSequence) return;
 
-            // Cập nhật history sau khi guard cho phép
             const historyTarget = fragment ? `${uri}#${fragment}` : uri;
-            if (this.mode === 'history') {
-                if (type === 'push') window.history.pushState({}, '', historyTarget);
-                else if (type === 'replace') window.history.replaceState({}, '', historyTarget);
-                // pop/initial: URL đã đúng, không đụng history
-            } else if (type === 'push' || type === 'replace') {
-                // hash mode: đặt hash; hashchange echo bị chặn bởi guard `uri === currentUri`
-                window.location.hash = historyTarget;
-            }
-
-            // Update global state
-            Router.activeRoute = activeRoute;
-            this.currentRoute = activeRoute;
-            this.currentUri = uri;
+            this.activeNavigationUrl = historyTarget;
 
             // Mount view via ViewManager.
             // Route ĐẦU TIÊN sau SSR: nếu view khớp entry server đã render →
             // hydrateView (claim DOM) thay vì mountView. consumeSSRViewId() chỉ
             // trả id 1 lần → các navigate sau là CSR (SPA takeover).
             const viewComponent = route.component || route.view;
+            let transitionSucceeded = true;
             if (viewComponent) {
                 const vm = this.viewManager ?? this.App?.View;
                 if (vm) {
                     const ssrViewId = vm.consumeSSRViewId?.(viewComponent) ?? null;
+                    let result: any;
                     if (ssrViewId) {
-                        await vm.hydrateView(viewComponent, { __SSR_VIEW_ID__: ssrViewId, ...params }, activeRoute);
+                        result = await vm.hydrateView(viewComponent, { __SSR_VIEW_ID__: ssrViewId, ...params }, activeRoute);
                     } else {
-                        await vm.mountView(viewComponent, params, activeRoute, type === 'pop' ? 'pop' : 'push');
+                        result = await vm.mountView(viewComponent, params, activeRoute, type === 'pop' ? 'pop' : 'push');
                     }
+                    // mountView(null) có thể là duplicate no-op; xác nhận chain
+                    // active đang thật sự thuộc URI đích trước khi commit Router.
+                    transitionSucceeded = result != null
+                        || vm.getCurrentView?.()?.__ctrl__?.urlPath === uri;
+                } else {
+                    transitionSucceeded = false;
                 }
             }
+            if (requestId !== this.navigationSequence) return;
+            if (!transitionSucceeded) {
+                if (type === 'pop') this.restoreUrlAfterFailedPop(from);
+                return;
+            }
+
+            // Commit point: từ đây URL, Router state và mounted view cùng
+            // đại diện cho một navigation duy nhất.
+            if (this.mode === 'history') {
+                if (type === 'push') window.history.pushState({}, '', historyTarget);
+                else if (type === 'replace') window.history.replaceState({}, '', historyTarget);
+            } else if (type === 'push' || type === 'replace') {
+                window.location.hash = historyTarget;
+            }
+
+            Router.activeRoute = activeRoute;
+            this.currentRoute = activeRoute;
+            this.currentUri = uri;
+            this.applyScroll(type, fragment);
 
             // After hook
             if (this._afterEach) {
@@ -610,12 +644,35 @@ export class Router {
             console.error('[Router] Navigation error:', error);
         } finally {
             this.isNavigating = false;
+            if (requestId === this.navigationSequence) this.activeNavigationUrl = null;
             // Có navigation đến trong lúc đang xử lý → chạy request mới nhất
             const pending = this.pendingNavigation;
             this.pendingNavigation = null;
             if (pending) {
-                void this.handleRoute(pending.path, pending.type);
+                void this.handleRoute(pending.path, pending.type, pending.id);
             }
+        }
+    }
+
+    /** Pop đã đổi address bar; render fail thì đưa URL về chain còn active. */
+    private restoreUrlAfterFailedPop(from: ActiveRoute | null): void {
+        if (this.mode !== 'history' || !from) return;
+        const target = from.$fragment ? `${from.$uri}#${from.$fragment}` : from.$uri;
+        window.history.replaceState(window.history.state, '', target);
+    }
+
+    private applyScroll(type: NavigationType, fragment: string): void {
+        if (typeof window === 'undefined') return;
+        if (fragment) {
+            let id = fragment;
+            try { id = decodeURIComponent(fragment); } catch { /* malformed fragment */ }
+            const target = document.getElementById(id) || document.getElementsByName(id)[0];
+            target?.scrollIntoView?.();
+            return;
+        }
+        // PageCache tự khôi phục pop position; initial giữ vị trí SSR/browser.
+        if (type === 'push' || type === 'replace') {
+            try { window.scrollTo(0, 0); } catch { /* non-browser/test runtime */ }
         }
     }
 
@@ -624,7 +681,7 @@ export class Router {
      */
     private handlePopState(): void {
         const path = this.mode === 'history'
-            ? window.location.pathname + window.location.search
+            ? window.location.pathname + window.location.search + window.location.hash
             : window.location.hash.slice(1) || this.defaultRoute;
         this.requestNavigation(path, 'pop');
     }
@@ -633,7 +690,9 @@ export class Router {
      * Auto-navigation: intercept clicks on <a>, [data-nav-link], [data-navigate].
      */
     private handleAutoNavigation(e: MouseEvent): void {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         const target = e.target as HTMLElement;
+        if (!target?.closest) return;
 
         // 1. [data-nav-link] — highest priority
         const navLinkEl = target.closest('[data-nav-link]') as HTMLElement;
@@ -664,7 +723,8 @@ export class Router {
         if (!link) return;
 
         // Skip: target="_blank", disabled, special protocols
-        if (link.target === '_blank') return;
+        if (link.target && link.target !== '_self') return;
+        if (link.hasAttribute('download')) return;
         if (link.dataset.nav === 'disabled' || link.dataset.nav === 'false') return;
         const href = link.href;
         if (href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) return;
@@ -675,8 +735,8 @@ export class Router {
             const currentUrl = new URL(window.location.href);
             if (linkUrl.host !== currentUrl.host) return; // External
 
-            const path = linkUrl.pathname + linkUrl.search;
-            if (path === this.currentUri) return; // Same page
+            const path = linkUrl.pathname + linkUrl.search + linkUrl.hash;
+            if (path === this.currentUri && !linkUrl.hash) return; // Same page
             e.preventDefault();
             this.navigate(path);
         } catch {

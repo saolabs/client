@@ -50,6 +50,8 @@ export declare class Wrapper implements WrapperInterface {
     stop(): void;
     /** Remove all nodes between markers from the DOM */
     clear(): void;
+    /** Registry guard — wrapper đã destroy không được reuse (ViewController.wrapper) */
+    __destroyed__: boolean;
     destroy(): void;
     get isSaoElement(): boolean;
     set isSaoElement(value: boolean);

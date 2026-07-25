@@ -335,6 +335,17 @@ this.html(`d69e6b1d`, "div", parentElement, { classes: [...] }, (parentElement) 
 5. Nếu tìm thấy → claim DOM node (không tạo mới) → giữ lại SSR structure
 6. Nếu không tìm thấy → partial hydration fallback (tạo element mới)
 
+Với Layout lồng nhau, runtime resolve `viewId` của từng Layout theo metadata
+Blade đã export:
+
+```html
+<script type="application/json" data-ref="view-data"
+        data-view-name="layouts.app" data-view-id="v-layout-app">...</script>
+```
+
+`data-view-name` là identity của từng mắt xích. Marker scan chỉ là fallback
+cho HTML/fixture một Layout không có metadata này.
+
 ### Phạm vi claim (top-down isolation)
 
 ```
@@ -535,3 +546,30 @@ ViewController.render()
 - `__showBinding`: truthy/falsy conditions, stateKeys không ảnh hưởng
 - `__styleBinding`: filtering null/undefined/false/'', giữ 0, empty array, invalid input guard
 - `__classBinding`: static classes, binding classes với checker, no-checker guard, closure state, defensive guard cho non-array
+
+---
+
+## §16 — Runtime assets: `<script>`, `<style>`, `<link rel="stylesheet">`
+
+Compiler thu các tag asset khỏi template và emit vào `ViewController.setup()`:
+
+- `<script src="...">` → `{ type: 'src', src, attributes }`
+- `<script>...</script>` không chứa config export → `{ type: 'code', content, attributes }`
+- `<style>` → global `{ type: 'code', content }`
+- `<style scoped>` → `{ type: 'code', content, scoped: true }`
+- `<link rel="stylesheet" href="...">` → `{ type: 'href', href, attributes }`
+
+Các tag này không được render lần hai trong subtree View. `export default`/`script setup`
+là code cấu hình compile-time, không phải runtime asset.
+
+Runtime identity/lifecycle:
+
+- CSS global và stylesheet dedup theo content/URL cùng toàn bộ attributes, xuyên View path.
+- Scoped CSS dedup trong cùng View path; mỗi path có scope-id riêng và mọi instance dùng chung một `<style>`.
+- Style/link tăng ref khi mount/resume, giảm ref khi pause/unmount/destroy, remove khi ref về 0.
+- Script là side effect cấp document: dedup theo content/src + attributes và execute tối đa một lần;
+  node được giữ tới teardown app. Logic cần chạy/dọn theo mỗi instance phải đặt trong lifecycle hook.
+
+Blade SSR hiện không đưa runtime asset của `.sao` vào response head; chúng được acquire khi
+client hydrate. CSS critical cần nằm trong bundle/head Laravel cho tới khi có asset manifest
+SSR với identity marker để client claim mà không duplicate.

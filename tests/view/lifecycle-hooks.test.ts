@@ -3,7 +3,7 @@
  * Cặp before/after: mounting/mounted, starting/started, pausing/paused,
  * resuming/resumed, stopping/stopped, unmounting/unmounted, destroying/destroyed.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mountView, nextFrame, Harness } from '../helpers/harness';
 import AssetManager from '../../src/core/services/AssetManager';
 
@@ -50,6 +50,22 @@ describe('Lifecycle hooks — cặp before/after fire đúng thứ tự', () => 
         expect(log).toEqual(['stopping', 'stopped']);
     });
 
+    it('start/stop idempotent — không nhân đôi subscription và hook', () => {
+        const log: string[] = [];
+        h = makeView({
+            starting: () => log.push('starting'),
+            started: () => log.push('started'),
+            stopping: () => log.push('stopping'),
+            stopped: () => log.push('stopped'),
+        });
+
+        h.ctrl.start();
+        h.ctrl.stop();
+        h.ctrl.stop();
+
+        expect(log).toEqual(['starting', 'started', 'stopping', 'stopped']);
+    });
+
     it('destroy fire destroying→unmounting→unmounted→destroyed', () => {
         const log: string[] = [];
         const hooks: any = {};
@@ -58,6 +74,19 @@ describe('Lifecycle hooks — cặp before/after fire đúng thứ tự', () => 
         local.ctrl.destroy();
         local.container.remove();
         expect(log).toEqual(['destroying', 'unmounting', 'unmounted', 'destroyed']);
+    });
+
+    it('destroy một view active phải stop trước khi unmount', () => {
+        const log: string[] = [];
+        const names = ['destroying', 'stopping', 'stopped', 'unmounting', 'unmounted', 'destroyed'];
+        const hooks: any = {};
+        for (const name of names) hooks[name] = () => log.push(name);
+
+        const local = makeView(hooks);
+        local.ctrl.destroy();
+        local.container.remove();
+
+        expect(log).toEqual(names);
     });
 
     it('legacy alias vẫn fire: onMounted (start), onPause/onResume, onDeactivated (stop), onDestroy', () => {
@@ -88,9 +117,23 @@ describe('Lifecycle hooks — cặp before/after fire đúng thứ tự', () => 
         await nextFrame();
         expect(h.ctrl.lifecycleState).toBe('active'); // vẫn active dù hook lỗi
     });
+
+    it('hook async reject được log, không thành unhandled rejection', async () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        h = makeView({ mounted: async () => { throw new Error('async boom'); } });
+
+        await Promise.resolve();
+
+        expect(h.ctrl.lifecycleState).toBe('active');
+        expect(error).toHaveBeenCalledWith(
+            expect.stringContaining('async hook "mounted" error'),
+            expect.any(Error),
+        );
+        error.mockRestore();
+    });
 });
 
-describe('AssetManager — global style ref-count theo component path', () => {
+describe('AssetManager — global style ref-count theo asset identity', () => {
     const GLOBAL_STYLE = [{ type: 'code', content: '.gx{color:red}' }];
 
     function headStyles(): HTMLStyleElement[] {
@@ -148,6 +191,53 @@ describe('AssetManager — global style ref-count theo component path', () => {
         a.ctrl.destroy(); a.container.remove();
         b.ctrl.destroy(); b.container.remove();
     });
+
+    it('2 path khác nhau khai báo cùng CSS global → dùng chung đúng 1 node', () => {
+        const a = makeView({}, { path: 'comp.A', styles: GLOBAL_STYLE });
+        const b = makeView({}, { path: 'comp.B', styles: GLOBAL_STYLE });
+        expect(headStyles().length).toBe(1);
+
+        a.ctrl.destroy(); a.container.remove();
+        expect(headStyles().length).toBe(1);
+
+        b.ctrl.destroy(); b.container.remove();
+        expect(headStyles().length).toBe(0);
+    });
+
+    it('stylesheet cùng href + attributes được dedup; media khác là asset khác', () => {
+        const shared = [{ type: 'href', href: '/shared.css', attributes: { media: 'screen' } }];
+        const a = makeView({}, { path: 'comp.A', styles: shared });
+        const b = makeView({}, { path: 'comp.B', styles: shared });
+        const c = makeView({}, {
+            path: 'comp.C',
+            styles: [{ type: 'href', href: '/shared.css', attributes: { media: 'print' } }],
+        });
+        expect(document.head.querySelectorAll('link[data-sao-asset]').length).toBe(2);
+        a.ctrl.destroy(); a.container.remove();
+        b.ctrl.destroy(); b.container.remove();
+        c.ctrl.destroy(); c.container.remove();
+    });
+
+    it('hydrate adopt stylesheet Blade SSR, không chèn link thứ hai', () => {
+        const ssrLink = document.createElement('link');
+        ssrLink.rel = 'stylesheet';
+        ssrLink.href = '/shared-ssr.css';
+        ssrLink.media = 'screen';
+        document.head.appendChild(ssrLink);
+
+        const local = makeView({}, {
+            path: 'comp.SSR',
+            styles: [{ type: 'href', href: '/shared-ssr.css', attributes: { media: 'screen' } }],
+        });
+
+        const links = document.head.querySelectorAll('link[href$="/shared-ssr.css"]');
+        expect(links.length).toBe(1);
+        expect(links[0]).toBe(ssrLink);
+        expect(ssrLink.getAttribute('data-sao-asset')).toBe('comp.SSR');
+
+        local.ctrl.destroy(); local.container.remove();
+        expect(document.head.querySelector('link[href$="/shared-ssr.css"]')).toBeNull();
+    });
 });
 
 describe('AssetManager — scoped style', () => {
@@ -165,16 +255,45 @@ describe('AssetManager — scoped style', () => {
         expect(span?.getAttribute('data-sao-scope')).toBe(scopeId);
         local.ctrl.destroy(); local.container.remove();
     });
+
+    it('cùng CSS scoped nhưng khác View path → scope và style node tách biệt', () => {
+        const styles = [{ type: 'code', content: '.box{color:blue}', scoped: true }];
+        const a = makeView({}, { path: 'comp.SA', styles });
+        const b = makeView({}, { path: 'comp.SB', styles });
+        const nodes = Array.from(document.head.querySelectorAll('style[data-sao-scope]'));
+        expect(nodes.length).toBe(2);
+        expect(nodes[0].getAttribute('data-sao-scope')).not.toBe(nodes[1].getAttribute('data-sao-scope'));
+        a.ctrl.destroy(); a.container.remove();
+        b.ctrl.destroy(); b.container.remove();
+    });
 });
 
 describe('AssetManager — script (không export)', () => {
-    it('insert <script> inline, ref-count + remove khi hết instance', () => {
+    it('inline script cùng identity chỉ insert một lần và giữ tới teardown document', () => {
         const a = makeView({}, { path: 'comp.J', scripts: [{ type: 'code', content: 'window.__x=1' }] });
-        const b = makeView({}, { path: 'comp.J', scripts: [{ type: 'code', content: 'window.__x=1' }] });
+        const b = makeView({}, { path: 'comp.K', scripts: [{ type: 'code', content: 'window.__x=1' }] });
         expect(document.head.querySelectorAll('script[data-sao-asset]').length).toBe(1);
         a.ctrl.destroy(); a.container.remove();
         expect(document.head.querySelectorAll('script[data-sao-asset]').length).toBe(1);
         b.ctrl.destroy(); b.container.remove();
-        expect(document.head.querySelectorAll('script[data-sao-asset]').length).toBe(0);
+        // Gỡ <script> không hoàn tác side effect; giữ node/record để back không execute lại.
+        expect(document.head.querySelectorAll('script[data-sao-asset]').length).toBe(1);
+    });
+
+    it('script src dedup theo src + attributes và không reload khi pause/resume', () => {
+        const scripts = [{ type: 'src', src: '/shared.js', attributes: { defer: true } }];
+        const a = makeView({}, { path: 'comp.JA', scripts });
+        const b = makeView({}, { path: 'comp.JB', scripts });
+        const node = document.head.querySelector('script[src="/shared.js"]');
+        expect(document.head.querySelectorAll('script[src="/shared.js"]').length).toBe(1);
+
+        a.ctrl.pause();
+        b.ctrl.pause();
+        expect(document.head.querySelector('script[src="/shared.js"]')).toBe(node);
+
+        a.ctrl.resume();
+        expect(document.head.querySelector('script[src="/shared.js"]')).toBe(node);
+        a.ctrl.destroy(); a.container.remove();
+        b.ctrl.destroy(); b.container.remove();
     });
 });

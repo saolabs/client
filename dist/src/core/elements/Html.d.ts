@@ -66,6 +66,8 @@ export declare class Html implements HtmlInterface {
     private initializeClasses;
     private initializeStyles;
     private initializeEvents;
+    addEventListeners(): void;
+    removeEventListeners(): void;
     setParentElement(parent: HtmlInterface | null): void;
     setParent(parent: HtmlInterface | null): void;
     setChildrenFactory(factory: SaoChildrenFactory): void;

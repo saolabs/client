@@ -85,6 +85,11 @@ export declare class Reactive implements ReactiveInterface {
      */
     private _renderChildren;
     /**
+     * Chạy childrenFactory với cửa sổ cache foreach (nếu có) mở đúng quanh
+     * factory call. beginPass reset occurrence counters + touched set.
+     */
+    private _runFactoryWithCache;
+    /**
      * Hydrate children — tạo JS element objects từ factory nhưng KHÔNG insert DOM.
      * Html children đã claim server DOM nodes trong constructor.
      * Output/Reactive children gọi render() để claim markers.

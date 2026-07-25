@@ -1,6 +1,7 @@
 import { InitModes } from "../contracts/common";
 import { generateUUID } from "../helpers/utils";
-import { mountChildrenBeforeAnchor } from "../helpers/view";
+import { activateView, claimHydratedView, commitView, mountChildrenBeforeAnchor } from "../helpers/view";
+import markerRegistry from "../services/MarkerRegistry";
 export class Component {
     constructor({ ctx, parent = null, id = null, stateKeys = [], data = {}, dataFactory = null, path = null, type = 'default', condition = null, initMode = InitModes.CREATE, }) {
         this.saoType = 'Component';
@@ -24,14 +25,55 @@ export class Component {
         this.parent = parent;
         this.stateKeys = stateKeys;
         this.data = data || {};
-        this.openTag = document.createComment(`component-start`);
-        this.closeTag = document.createComment(`component-end`);
-        this.id = `${ctx.viewId}-${id ?? generateUUID(10)}`; // Unique ID for debugging
+        // id khớp server: Blade emit @startMarker('component', '{hash}') →
+        // <!--s:c:{parentViewId}-{hash}-s--> (MarkerRegistryDirectiveService)
+        this.id = `${ctx.viewId}-${id ?? generateUUID(10)}`;
         this.dataFactory = dataFactory;
         this.path = path;
         this.type = type;
         this.condition = condition;
         this.initMode = initMode ?? InitModes.CREATE;
+        if (this.initMode === InitModes.HYDRATE) {
+            // ── Hydrate: claim cặp marker component server đã render ─────
+            const claimed = this.claimSSRMarkers();
+            if (claimed) {
+                this.openTag = claimed.open;
+                this.closeTag = claimed.close;
+            }
+            else {
+                // Partial hydration fallback (server không render vùng này)
+                this.openTag = markerRegistry.createMarkerStart('component', this.id);
+                this.closeTag = markerRegistry.createMarkerEnd('component', this.id);
+            }
+        }
+        else {
+            // Format chuẩn s:c:{id}-s/-e — PHẢI khớp server để SSR/CSR cùng kết quả
+            this.openTag = markerRegistry.createMarkerStart('component', this.id);
+            this.closeTag = markerRegistry.createMarkerEnd('component', this.id);
+        }
+    }
+    /**
+     * Tìm cặp marker component từ server-rendered HTML (format chuẩn §5.1):
+     *   open: s:c:{id}-s   close: s:c:{id}-e
+     */
+    claimSSRMarkers() {
+        const searchRoot = this.parent?.element ?? document.body;
+        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
+        const openText = markerRegistry.openComment('component', this.id);
+        const closeText = markerRegistry.closeComment('component', this.id);
+        let openNode = null;
+        let node;
+        while ((node = walker.nextNode())) {
+            const value = node.nodeValue?.trim() ?? '';
+            if (!openNode && value === openText) {
+                openNode = node;
+                continue;
+            }
+            if (openNode && value === closeText) {
+                return { open: openNode, close: node };
+            }
+        }
+        return null;
     }
     mergeData(newData) {
         this.data = { ...this.data, ...newData };
@@ -60,10 +102,37 @@ export class Component {
      *   2. Resolve child view từ registry (App.View)
      *   3. Render child wrapper GIỮA markers, liên kết parent ↔ child
      *   4. commitData cho child (start sẽ do lifecycle cascade gọi)
+     *
+     * Hydrate mode (markers claim được từ SSR): child view được tạo với đúng
+     * viewId server đã dùng (discover từ marker view bên trong) → toàn bộ cây
+     * con CLAIM DOM server thay vì tạo mới — SSR/CSR cho cùng kết quả.
      */
     render() {
         if (this.__destroyed__)
             return;
+        // ── Hydrate path: markers đã có trong SSR DOM ──────────────────
+        if (this.initMode === InitModes.HYDRATE) {
+            if (this.openTag.parentNode) {
+                // Điều kiện đánh giá với state ĐÃ commit (hydrateView commit trước
+                // render) → kết quả khớp server-rendered output.
+                if (this.type === 'when' && this.condition && !this.condition.checker()) {
+                    this.initMode = InitModes.CREATE;
+                    return; // server cũng không render child (điều kiện falsy)
+                }
+                if (this.type === 'if') {
+                    const viewManager = this.ctx.App?.View;
+                    if (!viewManager?.exists?.(this.path ?? '')) {
+                        this.initMode = InitModes.CREATE;
+                        return;
+                    }
+                }
+                this.hydrateChild();
+                this.initMode = InitModes.CREATE; // re-render sau này dùng CSR flow
+                return;
+            }
+            // Partial hydration fallback: server không render component này → CSR
+            this.initMode = InitModes.CREATE;
+        }
         // 1. Markers
         if (!this.openTag.parentNode) {
             const parentEl = this.parent?.element;
@@ -88,28 +157,69 @@ export class Component {
         }
         this.mountChild();
     }
+    /**
+     * Discover viewId server đã dùng cho child view: quét comment giữa cặp
+     * marker component, tìm marker view mở đầu tiên <!--s:v:{id}-s-->.
+     */
+    discoverChildViewId() {
+        let current = this.openTag.nextSibling;
+        while (current && current !== this.closeTag) {
+            if (current.nodeType === Node.COMMENT_NODE) {
+                const parsed = markerRegistry.parseComment(current.nodeValue ?? '');
+                if (parsed && parsed.tag === 'view' && !parsed.isClose)
+                    return parsed.id;
+            }
+            else if (current.nodeType === Node.ELEMENT_NODE) {
+                const walker = document.createTreeWalker(current, NodeFilter.SHOW_COMMENT);
+                let node;
+                while ((node = walker.nextNode())) {
+                    const parsed = markerRegistry.parseComment(node.nodeValue ?? '');
+                    if (parsed && parsed.tag === 'view' && !parsed.isClose)
+                        return parsed.id;
+                }
+            }
+            current = current.nextSibling;
+        }
+        return null;
+    }
+    /**
+     * Hydrate child view — thứ tự chuẩn hydration (như ViewManager.hydrateView):
+     * discover viewId → tạo instance → commit state → flush discard →
+     * render claim DOM → mount() (hook + asset). KHÔNG chèn node mới.
+     */
+    hydrateChild() {
+        if (this._childMounted && this.viewRef)
+            return;
+        const childView = this.resolveChildView();
+        if (!childView)
+            return;
+        const childCtrl = childView.__ctrl__;
+        // Ghi đè viewId = viewId server (trước render — Wrapper/Html/Output của
+        // child claim theo marker/class prefix bằng viewId này)
+        const ssrViewId = this.discoverChildViewId();
+        if (ssrViewId) {
+            childCtrl.viewId = ssrViewId;
+        }
+        // Commit state TRƯỚC render (factory @if/@foreach sinh đúng cây khớp SSR);
+        // flush ngay khi chưa subscribe → discard pending, không phá DOM claim.
+        childCtrl.initMode = InitModes.HYDRATE;
+        commitView(childCtrl, true);
+        const wrapper = childCtrl.render();
+        if (wrapper && typeof wrapper === 'object' && 'openTag' in wrapper && this.parent) {
+            claimHydratedView(childCtrl, this.parent, wrapper);
+        }
+        childCtrl.initMode = InitModes.CREATE;
+        this.finishChildMount(childCtrl);
+    }
     /** Tạo + mount child view giữa markers (nếu chưa có) */
     mountChild() {
         if (this._childMounted && this.viewRef)
             return;
-        const viewManager = this.ctx.App?.View;
-        if (!viewManager || !this.path) {
-            console.error(`[Component] Không resolve được view "${this.path}" — App.View chưa sẵn sàng.`);
+        const childView = this.resolveChildView();
+        if (!childView)
             return;
-        }
-        const data = this.dataFactory ? this.dataFactory(this.parent) : this.data;
-        const childView = viewManager.view(this.path, data ?? {}, false);
-        if (!childView) {
-            console.error(`[Component] View "${this.path}" không tồn tại trong registry.`);
-            return;
-        }
-        this.viewRef = childView;
-        // Liên kết parent ↔ child
         const childCtrl = childView.__ctrl__;
-        childCtrl.setParent(this.ctx);
-        this.ctx.addChild(childCtrl);
         // Render child tree giữa markers
-        childCtrl.setParentElement(this.parent);
         const wrapper = childCtrl.render();
         if (wrapper && typeof wrapper === 'object' && 'openTag' in wrapper) {
             const insertBeforeClose = (node) => {
@@ -122,13 +232,38 @@ export class Component {
         }
         // mount(): nội dung child đã nằm giữa markers → fire mounting/mounted + acquire asset
         childCtrl.mount();
-        childCtrl.commitData();
-        this._childMounted = true;
-        // Nếu component đang active (mount trong re-render) → start child ngay
-        if (this._isStarted) {
-            childCtrl.start();
-            childCtrl.active();
+        commitView(childCtrl);
+        this.markChildMounted(childCtrl);
+    }
+    /** Resolve one child instance and establish ownership before either DOM strategy. */
+    resolveChildView() {
+        const viewManager = this.ctx.App?.View;
+        if (!viewManager || !this.path) {
+            console.error(`[Component] Không resolve được view "${this.path}" — App.View chưa sẵn sàng.`);
+            return null;
         }
+        const data = this.dataFactory ? this.dataFactory(this.parent) : this.data;
+        const childView = viewManager.view(this.path, data ?? {}, false);
+        if (!childView) {
+            console.error(`[Component] View "${this.path}" không tồn tại trong registry.`);
+            return null;
+        }
+        this.viewRef = childView;
+        const childCtrl = childView.__ctrl__;
+        childCtrl.setParent(this.ctx);
+        this.ctx.addChild(childCtrl);
+        childCtrl.setParentElement(this.parent);
+        return childView;
+    }
+    /** Hydration mounts after commit/claim; CSR commits immediately after mount. */
+    finishChildMount(childCtrl) {
+        childCtrl.mount();
+        this.markChildMounted(childCtrl);
+    }
+    markChildMounted(childCtrl) {
+        this._childMounted = true;
+        if (this._isStarted)
+            activateView(childCtrl);
     }
     /** Gỡ child (when=false hoặc destroy) */
     unmountChild() {
@@ -155,8 +290,7 @@ export class Component {
             return;
         this._isStarted = true;
         if (this.viewRef) {
-            this.viewRef.__ctrl__.start();
-            this.viewRef.__ctrl__.active();
+            activateView(this.viewRef.__ctrl__);
         }
         if (this.stateKeys.length > 0) {
             this.unsubscribeData = this.ctx.states.__.subscribe(this.stateKeys, () => {
@@ -188,8 +322,8 @@ export class Component {
     destroy() {
         if (this.__destroyed__)
             return;
-        this.__destroyed__ = true;
         this.stop();
+        this.__destroyed__ = true;
         this.unmountChild();
         this.openTag.remove();
         this.closeTag.remove();

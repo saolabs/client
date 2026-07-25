@@ -49,6 +49,8 @@ export interface ViewManagerInterface {
     getViewStack(): ViewInterface[];
     /** Check if a view is mounted */
     isViewMounted(path: string): boolean;
+    /** Invalidate async work of the navigation currently being rendered. */
+    cancelNavigation?(): void;
     /** Full destroy */
     destroy(): void;
     /**

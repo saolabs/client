@@ -1,4 +1,16 @@
-import type { HtmlInterface, SaoNodeInterface, SaoElementChildren, DOMElement, SaoChildrenFactoryOutput } from "../contracts/ElementInterface";
+import type { HtmlInterface, SaoNodeInterface, SaoElementChildren, DOMElement, WrapperInterface, SaoChildrenFactoryOutput } from "../contracts/ElementInterface";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
+/** Commit initial data; hydration discards pending notifications before subscribe. */
+export declare function commitView(ctrl: ViewControllerInterface, discardPending?: boolean): void;
+/** Flush state + reactive queues after a lifecycle transition. */
+export declare function flushView(ctrl: ViewControllerInterface): void;
+/** Start a view through its controller, then make the initial DOM snapshot current. */
+export declare function activateView(ctrl: ViewControllerInterface): void;
+/**
+ * Claim an already-rendered Wrapper tree without inserting or clearing DOM.
+ * Used by both route hydration and nested @include hydration.
+ */
+export declare function claimHydratedView(ctrl: ViewControllerInterface, root: HtmlInterface, wrapper?: WrapperInterface | null): void;
 /**
  * Mount danh sách children vào TRƯỚC một anchor node (RUNTIME_CONTRACT.md §2 —
  * insertion point tường minh). Dùng cho Component (@include), và mọi chỗ cần

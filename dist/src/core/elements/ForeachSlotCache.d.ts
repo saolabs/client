@@ -2,72 +2,79 @@
  * ForeachSlotCache — keyed slot manager cho @foreach reconciliation.
  *
  * # Cơ chế
- * Mỗi item trong list được identify bằng **object reference** (identity keying).
- * Khi list thay đổi, cache cho phép tái sử dụng Saola elements của item đã tồn tại,
- * chỉ destroy/create elements cho items mới/xoá.
+ * Mỗi item được identify bằng một cache key:
+ *   - Có @key(expr)   → key = giá trị expr (field keying, vd `item.id`)
+ *   - Không có @key   → key = object reference của item (identity keying)
+ * Duplicate keys (primitive lists `['a','b','a']`, refs lặp) được phân biệt
+ * bằng occurrence index trong pass — key thứ n trùng nhau map vào slot thứ n.
  *
- * # Tại sao identity keying?
- * Compiler output hiện tại đóng gói `item` trực tiếp vào closure:
- *   `this.output('id', p, true, [], () => item.name)`
- * Khi object reference không đổi → closure vẫn trỏ đúng data → reuse an toàn.
- * Khi object reference thay đổi → closure cũ trỏ object cũ → phải recreate.
+ * # Reuse contract
+ * Slot chỉ được REUSE khi cache key khớp VÀ item ref không đổi
+ * (`slot.item === item`). Ref đổi → recreate, vì compiled output đóng gói
+ * `item` trực tiếp vào closure (`() => item.name`) — reuse với ref cũ sẽ
+ * hiển thị data cũ. Field key vì vậy chủ yếu mang lại: bookkeeping đúng cho
+ * duplicate/primitive items + ý định tường minh của developer.
  *
- * # Giới hạn
- * - Mutation-in-place (cùng ref, đổi thuộc tính) sẽ KHÔNG trigger recreate.
- *   Đây là hành vi đúng nếu dùng immutable data (mỗi update tạo object mới).
- * - Keyed reconciliation theo field (e.g. `@key="id"`) cần compiler hỗ trợ
- *   __foreachKeyed() — sẽ implement ở Phase 5b.
+ * # Pass protocol (một chu kỳ render)
+ *   1. `beginPass()`  — reset occurrence counters + tập slot touched
+ *   2. `claim(key, item)` mỗi item theo thứ tự list:
+ *        hit  (slot.item === item) → dùng lại, slot được mark touched
+ *        miss → caller tạo elements rồi `store(key, occ, item, elements)`
+ *   3. `prunePass(onRemove)` — slot KHÔNG được touch trong pass = item đã rời
+ *      list → callback destroy + gỡ khỏi cache. (Trước đây bước này là dead
+ *      code — cache không bao giờ gỡ entry → element của item bị xoá leak.)
  *
  * # Quan hệ với Reactive
- * Reactive với type === 'foreach' giữ một ForeachSlotCache instance.
- * Khi re-render, Reactive gọi renderForeach() thay cho clearContent() + factory.
+ * Reactive type 'foreach' giữ một instance; cửa sổ `_currentForeachCache`
+ * chỉ mở quanh CHÍNH childrenFactory call (không mở trong child.render() —
+ * tránh nested @foreach ghi nhầm vào cache của loop ngoài).
  *
  * @see Reactive.renderForeach()
  * @see ViewController.__foreach()
  */
 /** Một slot tương ứng với một item trong foreach list. */
 export interface ForeachSlot {
-    /** Reference tới item gốc (dùng làm cache key) */
+    /** Reference tới item gốc — điều kiện reuse là ref không đổi */
     item: any;
     /** Saola elements sinh ra bởi item factory — Html, Output, Reactive, ... */
     elements: any[];
 }
+/** Kết quả claim: slot khi reuse được, occ để store khi phải tạo mới. */
+export interface ForeachClaim {
+    slot: ForeachSlot | null;
+    occ: number;
+}
 export declare class ForeachSlotCache {
-    /** Map từ item reference → slot */
+    /** Map key → danh sách slot theo occurrence (duplicate keys) */
     private _map;
-    /**
-     * Số slot hiện có (= số item đã cache).
-     * Dùng để phát hiện trường hợp list rỗng nhanh.
-     */
+    /** Occurrence counter của pass hiện tại */
+    private _passOcc;
+    /** Slots được claim-hit hoặc store trong pass hiện tại */
+    private _touched;
+    /** Tổng số slot đang cache (mọi occurrence). */
     get size(): number;
+    /** Bắt đầu một chu kỳ render — reset counters + touched set. */
+    beginPass(): void;
     /**
-     * Lấy slot đã cache cho một item ref.
-     * Trả về null nếu item chưa được cache (item mới).
+     * Claim slot cho (key, item) theo thứ tự list.
+     * Trả slot khi reuse được (key khớp + ref không đổi); ngược lại slot=null
+     * và caller phải store(key, occ, ...) sau khi tạo elements.
      */
-    get(item: any): ForeachSlot | null;
+    claim(key: any, item: any): ForeachClaim;
     /**
-     * Lưu slot mới cho một item ref.
-     * Gọi bởi __foreach() sau khi tạo elements cho item chưa có trong cache.
+     * Lưu slot mới tại (key, occ) — ghi đè slot cũ nếu ref đã đổi
+     * (slot cũ không được touch → prunePass sẽ destroy).
      */
-    set(item: any, elements: any[]): ForeachSlot;
+    store(key: any, occ: number, item: any, elements: any[]): ForeachSlot;
     /**
-     * Xoá slot khỏi cache (sau khi item bị removed khỏi list).
-     * Caller chịu trách nhiệm gọi destroy() trên các elements trước khi remove.
+     * Kết thúc pass: mọi slot không được touch = item đã rời list (hoặc bị
+     * thay bằng ref mới) → gọi onRemove(slot) để destroy elements, gỡ khỏi cache.
      */
-    remove(item: any): boolean;
-    /**
-     * Snapshot toàn bộ entries hiện tại — dùng để so sánh old vs new.
-     * Trả về Map copy (không phải reference trực tiếp).
-     */
-    snapshot(): Map<any, ForeachSlot>;
+    prunePass(onRemove: (slot: ForeachSlot) => void): void;
     /**
      * Xoá toàn bộ cache — dùng khi Reactive bị destroy.
      * KHÔNG tự gọi destroy() trên elements — caller phải làm trước.
      */
     clear(): void;
-    /**
-     * Trả về true nếu item đã có trong cache.
-     */
-    has(item: any): boolean;
 }
 //# sourceMappingURL=ForeachSlotCache.d.ts.map

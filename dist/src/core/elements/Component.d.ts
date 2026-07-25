@@ -40,6 +40,11 @@ export declare class Component implements ComponentInterface {
         } | null;
         initMode?: InitMode;
     });
+    /**
+     * Tìm cặp marker component từ server-rendered HTML (format chuẩn §5.1):
+     *   open: s:c:{id}-s   close: s:c:{id}-e
+     */
+    private claimSSRMarkers;
     mergeData(newData: Record<string, any>): void;
     setDataFactory(factory: (parentElement: HtmlInterface | null) => Record<string, any>): void;
     setCondition(condition: {
@@ -63,10 +68,30 @@ export declare class Component implements ComponentInterface {
      *   2. Resolve child view từ registry (App.View)
      *   3. Render child wrapper GIỮA markers, liên kết parent ↔ child
      *   4. commitData cho child (start sẽ do lifecycle cascade gọi)
+     *
+     * Hydrate mode (markers claim được từ SSR): child view được tạo với đúng
+     * viewId server đã dùng (discover từ marker view bên trong) → toàn bộ cây
+     * con CLAIM DOM server thay vì tạo mới — SSR/CSR cho cùng kết quả.
      */
     render(): void;
+    /**
+     * Discover viewId server đã dùng cho child view: quét comment giữa cặp
+     * marker component, tìm marker view mở đầu tiên <!--s:v:{id}-s-->.
+     */
+    private discoverChildViewId;
+    /**
+     * Hydrate child view — thứ tự chuẩn hydration (như ViewManager.hydrateView):
+     * discover viewId → tạo instance → commit state → flush discard →
+     * render claim DOM → mount() (hook + asset). KHÔNG chèn node mới.
+     */
+    private hydrateChild;
     /** Tạo + mount child view giữa markers (nếu chưa có) */
     private mountChild;
+    /** Resolve one child instance and establish ownership before either DOM strategy. */
+    private resolveChildView;
+    /** Hydration mounts after commit/claim; CSR commits immediately after mount. */
+    private finishChildMount;
+    private markChildMounted;
     /** Gỡ child (when=false hoặc destroy) */
     private unmountChild;
     /**

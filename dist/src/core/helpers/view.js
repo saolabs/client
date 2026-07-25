@@ -1,3 +1,32 @@
+/** Commit initial data; hydration discards pending notifications before subscribe. */
+export function commitView(ctrl, discardPending = false) {
+    ctrl.commitData();
+    if (discardPending)
+        ctrl.states.__.flushNow();
+}
+/** Flush state + reactive queues after a lifecycle transition. */
+export function flushView(ctrl) {
+    ctrl.states.__.flushNow();
+    ctrl.flushReactiveUpdatesNow();
+}
+/** Start a view through its controller, then make the initial DOM snapshot current. */
+export function activateView(ctrl) {
+    ctrl.start();
+    flushView(ctrl);
+}
+/**
+ * Claim an already-rendered Wrapper tree without inserting or clearing DOM.
+ * Used by both route hydration and nested @include hydration.
+ */
+export function claimHydratedView(ctrl, root, wrapper = ctrl.mainElement) {
+    ctrl.setParentElement(root);
+    if (!wrapper)
+        return;
+    wrapper.setParentElement(root);
+    const children = wrapper.render();
+    if (children && children.length > 0)
+        hydrateElementList(root, children);
+}
 /**
  * Mount danh sách children vào TRƯỚC một anchor node (RUNTIME_CONTRACT.md §2 —
  * insertion point tường minh). Dùng cho Component (@include), và mọi chỗ cần

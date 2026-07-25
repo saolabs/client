@@ -9,7 +9,8 @@
  *     { "container": "#app-root", "view": "web.modules.home", "viewId": "v_abc" }
  *   </script>
  *
- * viewId của layout chain KHÔNG cần ở đây — client tự discover từ DOM view marker.
+ * viewId của layout chain được đọc từ APP_CONFIGS.view.ssrData khi server có
+ * cung cấp; DOM marker chỉ là fallback tương thích cho output cũ.
  * Trả null nếu không phải trang server-rendered → CSR boot bình thường.
  */
 export function readSSRBoot() {
@@ -64,6 +65,9 @@ export function readBootConfig() {
     }
     if (cfg.view?.systemData && typeof cfg.view.systemData === 'object') {
         view.systemData = cfg.view.systemData;
+    }
+    if (cfg.view?.ssrData && typeof cfg.view.ssrData === 'object') {
+        view.ssrData = cfg.view.ssrData;
     }
     if (Object.keys(view).length > 0) {
         out.view = view;

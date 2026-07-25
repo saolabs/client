@@ -19,6 +19,8 @@ export class Wrapper {
         this.children = [];
         this.initMode = InitModes.CREATE;
         this.domChildren = []; // For compatibility with HtmlInterface; Wrapper itself doesn't have a single root element
+        /** Registry guard — wrapper đã destroy không được reuse (ViewController.wrapper) */
+        this.__destroyed__ = false;
         this.ctx = ctx;
         this.parent = parentElement;
         this.childrenFactory = childrenFactory;
@@ -145,6 +147,7 @@ export class Wrapper {
         this.nodes = [];
     }
     destroy() {
+        this.__destroyed__ = true;
         this.clear();
         this.openTag.remove();
         this.closeTag.remove();

@@ -214,7 +214,7 @@ describe('Reactive — @foreach', () => {
     });
 });
 
-describe('ViewController.start() (bug đã biết: _rootTree không bao giờ được gán)', () => {
+describe('ViewController.start()', () => {
     it('ctrl.start() phải kích hoạt subscriptions của tree (không cần gọi wrapper.start() tay)', async () => {
         // Harness mặc định gọi wrapper.start() — test này tự mount không start wrapper
         h = mountView(function () {
@@ -226,13 +226,12 @@ describe('ViewController.start() (bug đã biết: _rootTree không bao giờ đ
             ]);
         }, { states: { x: '1' } });
 
-        // stop những gì harness đã start, rồi thử start qua ctrl
-        h.wrapper.stop();
+        // Lifecycle phải đi qua controller để state nội bộ và element tree đồng bộ.
+        h.ctrl.stop();
         h.ctrl.start();
 
         h.setState('x', '2');
         await nextFrame();
-        // ⚠ RED dự kiến: ctrl.start() no-op vì _rootTree = null
         expect(visibleText(h.container.querySelector('span')!)).toBe('2');
     });
 });

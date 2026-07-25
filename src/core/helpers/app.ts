@@ -41,6 +41,11 @@ const appFactory = <T>(key?: ServiceKey, value?: any): Application | T | any | v
         // Không truyền gì → trả về container
         return AppInstance;
     }
+    // Compiler contract: mọi generated view dùng app("App"). Alias này phải
+    // tồn tại cả sau flush()/test teardown, không phụ thuộc singleton map.
+    if (key === 'App' && value === undefined) {
+        return AppInstance;
+    }
     if (value !== undefined) {
         // Truyền 2 tham số → đăng ký instance
         AppInstance.instance(key, value);

@@ -4,7 +4,7 @@ import { HtmlInterface, SaoChildrenFactory } from "../contracts/ElementInterface
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { ViewInterface } from "../contracts/ViewInterface";
 import { generateUUID } from "../helpers/utils";
-import { mountChildrenBeforeAnchor, hydrateElementList } from "../helpers/view";
+import { activateView, claimHydratedView, commitView, mountChildrenBeforeAnchor } from "../helpers/view";
 import markerRegistry from "../services/MarkerRegistry";
 import { SaoObjectType } from "../types/utils";
 
@@ -233,25 +233,9 @@ export class Component implements ComponentInterface {
      */
     private hydrateChild(): void {
         if (this._childMounted && this.viewRef) return;
-
-        const viewManager = (this.ctx as any).App?.View;
-        if (!viewManager || !this.path) {
-            console.error(`[Component] Không resolve được view "${this.path}" — App.View chưa sẵn sàng.`);
-            return;
-        }
-
-        const data = this.dataFactory ? this.dataFactory(this.parent) : this.data;
-        const childView = viewManager.view(this.path, data ?? {}, false);
-        if (!childView) {
-            console.error(`[Component] View "${this.path}" không tồn tại trong registry.`);
-            return;
-        }
-        this.viewRef = childView;
-
+        const childView = this.resolveChildView();
+        if (!childView) return;
         const childCtrl = childView.__ctrl__;
-        childCtrl.setParent(this.ctx);
-        this.ctx.addChild(childCtrl);
-        childCtrl.setParentElement(this.parent);
 
         // Ghi đè viewId = viewId server (trước render — Wrapper/Html/Output của
         // child claim theo marker/class prefix bằng viewId này)
@@ -263,49 +247,25 @@ export class Component implements ComponentInterface {
         // Commit state TRƯỚC render (factory @if/@foreach sinh đúng cây khớp SSR);
         // flush ngay khi chưa subscribe → discard pending, không phá DOM claim.
         childCtrl.initMode = InitModes.HYDRATE;
-        childCtrl.commitData();
-        childCtrl.states.__.flushNow();
+        commitView(childCtrl, true);
 
         const wrapper = childCtrl.render();
         if (wrapper && typeof wrapper === 'object' && 'openTag' in wrapper && this.parent) {
-            hydrateElementList(this.parent, (wrapper as any).render());
+            claimHydratedView(childCtrl, this.parent, wrapper as any);
         }
 
         childCtrl.initMode = InitModes.CREATE;
-        childCtrl.mount(); // DOM đã ở real DOM — fire mounting/mounted + acquire asset
-        this._childMounted = true;
-
-        if (this._isStarted) {
-            childCtrl.start();
-            childCtrl.active();
-        }
+        this.finishChildMount(childCtrl);
     }
 
     /** Tạo + mount child view giữa markers (nếu chưa có) */
     private mountChild(): void {
         if (this._childMounted && this.viewRef) return;
-
-        const viewManager = (this.ctx as any).App?.View;
-        if (!viewManager || !this.path) {
-            console.error(`[Component] Không resolve được view "${this.path}" — App.View chưa sẵn sàng.`);
-            return;
-        }
-
-        const data = this.dataFactory ? this.dataFactory(this.parent) : this.data;
-        const childView = viewManager.view(this.path, data ?? {}, false);
-        if (!childView) {
-            console.error(`[Component] View "${this.path}" không tồn tại trong registry.`);
-            return;
-        }
-        this.viewRef = childView;
-
-        // Liên kết parent ↔ child
+        const childView = this.resolveChildView();
+        if (!childView) return;
         const childCtrl = childView.__ctrl__;
-        childCtrl.setParent(this.ctx);
-        this.ctx.addChild(childCtrl);
 
         // Render child tree giữa markers
-        childCtrl.setParentElement(this.parent);
         const wrapper = childCtrl.render();
         if (wrapper && typeof wrapper === 'object' && 'openTag' in wrapper) {
             const insertBeforeClose = (node: Node) => {
@@ -319,14 +279,42 @@ export class Component implements ComponentInterface {
 
         // mount(): nội dung child đã nằm giữa markers → fire mounting/mounted + acquire asset
         childCtrl.mount();
-        childCtrl.commitData();
-        this._childMounted = true;
+        commitView(childCtrl);
+        this.markChildMounted(childCtrl);
+    }
 
-        // Nếu component đang active (mount trong re-render) → start child ngay
-        if (this._isStarted) {
-            childCtrl.start();
-            childCtrl.active();
+    /** Resolve one child instance and establish ownership before either DOM strategy. */
+    private resolveChildView(): ViewInterface | null {
+        const viewManager = (this.ctx as any).App?.View;
+        if (!viewManager || !this.path) {
+            console.error(`[Component] Không resolve được view "${this.path}" — App.View chưa sẵn sàng.`);
+            return null;
         }
+
+        const data = this.dataFactory ? this.dataFactory(this.parent) : this.data;
+        const childView = viewManager.view(this.path, data ?? {}, false);
+        if (!childView) {
+            console.error(`[Component] View "${this.path}" không tồn tại trong registry.`);
+            return null;
+        }
+
+        this.viewRef = childView;
+        const childCtrl = childView.__ctrl__;
+        childCtrl.setParent(this.ctx);
+        this.ctx.addChild(childCtrl);
+        childCtrl.setParentElement(this.parent);
+        return childView;
+    }
+
+    /** Hydration mounts after commit/claim; CSR commits immediately after mount. */
+    private finishChildMount(childCtrl: ViewControllerInterface): void {
+        childCtrl.mount();
+        this.markChildMounted(childCtrl);
+    }
+
+    private markChildMounted(childCtrl: ViewControllerInterface): void {
+        this._childMounted = true;
+        if (this._isStarted) activateView(childCtrl);
     }
 
     /** Gỡ child (when=false hoặc destroy) */
@@ -355,8 +343,7 @@ export class Component implements ComponentInterface {
         this._isStarted = true;
 
         if (this.viewRef) {
-            this.viewRef.__ctrl__.start();
-            this.viewRef.__ctrl__.active();
+            activateView(this.viewRef.__ctrl__);
         }
 
         if (this.stateKeys.length > 0) {
@@ -385,8 +372,8 @@ export class Component implements ComponentInterface {
 
     destroy(): void {
         if (this.__destroyed__) return;
-        this.__destroyed__ = true;
         this.stop();
+        this.__destroyed__ = true;
         this.unmountChild();
         this.openTag.remove();
         this.closeTag.remove();

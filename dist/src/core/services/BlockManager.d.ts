@@ -40,6 +40,14 @@ export declare class BlockManagerService implements BlockManagerInterface {
      */
     mountAll(): void;
     /**
+     * Mount only blocks owned by one Page/Layout controller. Nested layout
+     * chains call this from outer to inner, so an inner outlet exists before
+     * the next owner is mounted and retained layouts are not rebuilt.
+     */
+    mountViewBlocks(viewId: string): void;
+    /** Hydration counterpart of mountViewBlocks(). */
+    hydrateViewBlocks(viewId: string): void;
+    /**
      * Mount a single block's content into an outlet.
      * Clear nội dung cũ trước, render content mới GIỮA outlet markers
      * (cùng insertion model với Reactive — RUNTIME_CONTRACT.md §2).
@@ -60,6 +68,27 @@ export declare class BlockManagerService implements BlockManagerInterface {
      * trên children để claim DOM, KHÔNG chèn node mới. Track children cho lifecycle.
      */
     private hydrateBlockIntoOutlet;
+    /** Tìm outlet theo tên (outlet key = `${layoutViewId}-ob-${name}`) */
+    private findOutletByName;
+    /**
+     * Detach block content của một page (rời trang, vào PageCache):
+     * gỡ DOM giữa markers của từng outlet vào DocumentFragment, lấy children
+     * đang track ra khỏi manager (KHÔNG destroy — instance sống trong cache).
+     *
+     * Trả Map<outletName, {fragment, children}> để restore sau này.
+     */
+    detachPageContent(viewId: string): Map<string, {
+        fragment: DocumentFragment;
+        children: any[];
+    }>;
+    /**
+     * Restore block content của một page từ PageCache vào outlets hiện tại.
+     * Tiền đề: layout đang mount trùng với layout lúc detach (ViewManager guard).
+     */
+    restorePageContent(viewId: string, contents: Map<string, {
+        fragment: DocumentFragment;
+        children: any[];
+    }>): void;
     /** Start toàn bộ block content đang mounted (gọi sau mountAll) */
     startAll(): void;
     /** Stop toàn bộ block content (trước khi swap page) */
@@ -69,6 +98,13 @@ export declare class BlockManagerService implements BlockManagerInterface {
      * clear outlet đang chứa content của nó + xoá block đăng ký.
      */
     unmountView(viewId: string): void;
+    /**
+     * Gỡ outlets của một layout khỏi registry mà KHÔNG destroy — layout pause
+     * vào PageCache. Nếu để lại, mountAll/findOutletByName có thể đụng outlet
+     * (trùng tên) của layout đang detached. Re-register khi resume qua
+     * addOutlet (ViewManager.reregisterLayoutOutlets).
+     */
+    detachOutletsOfView(viewId: string): void;
     /** Gỡ outlets của một layout bị destroy */
     removeOutletsOfView(viewId: string): void;
     /**
@@ -76,6 +112,8 @@ export declare class BlockManagerService implements BlockManagerInterface {
      * Removes all DOM nodes between a named outlet's markers.
      */
     clearOutlet(name: string): void;
+    private outletKey;
+    private clearOutletInstance;
     /**
      * Clear all outlets (for full layout teardown).
      */

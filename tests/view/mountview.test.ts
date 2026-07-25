@@ -46,6 +46,49 @@ function makePageFactory(pathName: string, initialMsg: string) {
     };
 }
 
+function makePrerenderPageFactory() {
+    return () => {
+        const view = new View('web.slow', 'view');
+        const ctrl = view.__ctrl__;
+        ctrl.setup({
+            superView: null,
+            data: {},
+            hasAwaitData: true,
+            hasPrerender: true,
+            fetch: { url: '/slow' },
+            prerender: function (this: any) {
+                return this.wrapper((parent: any) => [
+                    this.html('slow-loading', 'section', parent, {}, () => [this.text('LOADING')]),
+                ]);
+            },
+            render: function (this: any) {
+                return this.wrapper((parent: any) => [
+                    this.html('slow-main', 'main', parent, {}, () => [this.text('STALE MAIN')]),
+                ]);
+            },
+        } as any);
+        return view;
+    };
+}
+
+function makeAwaitPageFactory() {
+    return () => {
+        const view = new View('web.await', 'view');
+        view.__ctrl__.setup({
+            superView: null,
+            data: {},
+            hasAwaitData: true,
+            fetch: { url: '/await' },
+            render: function (this: any) {
+                return this.wrapper((parent: any) => [
+                    this.html('await-main', 'main', parent, {}, () => [this.text('AWAIT MAIN')]),
+                ]);
+            },
+        } as any);
+        return view;
+    };
+}
+
 function createManager() {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -182,5 +225,134 @@ describe('mountView — standalone', () => {
         const result = await vm.mountView('web.a', {}, route('/a'), 'push');
         expect(result).toBeNull();
         expect(vm.getCurrentView()).toBe(pageA);
+    });
+
+    it('prerender resolve trên route hiện tại → swap skeleton sang main', async () => {
+        const application = app() as any;
+        const previousHttp = application.get('Http');
+        let resolveFetch!: (value: any) => void;
+        const pending = new Promise((resolve) => { resolveFetch = resolve; });
+        application.set('Http', { get: () => pending });
+
+        try {
+            const { vm, container } = createManager();
+            vm.registerView('web.slow', makePrerenderPageFactory());
+
+            await vm.mountView('web.slow', {}, route('/slow'));
+            expect(container.textContent).toContain('LOADING');
+            expect(vm.getCurrentView()?.__ctrl__.lifecycleState).toBe('active');
+
+            resolveFetch({ data: { ready: true } });
+            await pending;
+            await frame();
+
+            expect(container.textContent).toContain('STALE MAIN');
+            expect(container.textContent).not.toContain('LOADING');
+        } finally {
+            application.set('Http', previousHttp);
+        }
+    });
+
+    it('prerender resolve sau khi đổi route → không được ghi đè DOM route mới', async () => {
+        const application = app() as any;
+        const previousHttp = application.get('Http');
+        let resolveFetch!: (value: any) => void;
+        const pending = new Promise((resolve) => { resolveFetch = resolve; });
+        application.set('Http', { get: () => pending });
+
+        try {
+            const { vm, container } = createManager();
+            vm.registerView('web.slow', makePrerenderPageFactory());
+
+            await vm.mountView('web.slow', {}, route('/slow'));
+            const slowView = vm.getCurrentView()!;
+            expect(container.textContent).toContain('LOADING');
+
+            await vm.mountView('web.b', {}, route('/b'));
+            expect(container.textContent).toContain('pageB');
+            // Skeleton chưa có mainElement hoàn chỉnh nên không đưa vào PageCache;
+            // controller phải destroy sạch và async response trở thành stale.
+            expect(slowView.__ctrl__.lifecycleState).toBe('destroyed');
+
+            resolveFetch({ data: { ready: true } });
+            await pending;
+            await frame();
+
+            expect(container.textContent).toContain('pageB');
+            expect(container.textContent).not.toContain('STALE MAIN');
+            expect(vm.getCurrentView()?.__ctrl__.path).toBe('web.b');
+        } finally {
+            application.set('Http', previousHttp);
+        }
+    });
+
+    it('await fetch của navigation cũ resolve muộn → transaction bị cancel', async () => {
+        const application = app() as any;
+        const previousHttp = application.get('Http');
+        let resolveFetch!: (value: any) => void;
+        const pending = new Promise((resolve) => { resolveFetch = resolve; });
+        application.set('Http', { get: () => pending });
+
+        try {
+            const { vm, container } = createManager();
+            vm.registerView('web.await', makeAwaitPageFactory());
+
+            const staleNavigation = vm.mountView('web.await', {}, route('/await'));
+            await Promise.resolve(); // cho navigation cũ đi tới điểm await Http.get()
+
+            await vm.mountView('web.b', {}, route('/b'));
+            expect(container.textContent).toContain('pageB');
+
+            resolveFetch({ data: { ready: true } });
+            const staleResult = await staleNavigation;
+            await frame();
+
+            expect(staleResult).toBeNull();
+            expect(container.textContent).toContain('pageB');
+            expect(container.textContent).not.toContain('AWAIT MAIN');
+            expect(vm.getCurrentView()?.__ctrl__.path).toBe('web.b');
+        } finally {
+            application.set('Http', previousHttp);
+        }
+    });
+
+    it('render lỗi → controller chưa mount được destroy sạch', async () => {
+        const { vm } = createManager();
+        let failedView: View | null = null;
+        vm.registerView('web.invalid', () => {
+            failedView = new View('web.invalid', 'view');
+            failedView.__ctrl__.setup({
+                superView: null,
+                data: {},
+                render: () => null,
+            } as any);
+            return failedView;
+        });
+
+        const result = await vm.mountView('web.invalid', {}, route('/invalid'));
+
+        expect(result).toBeNull();
+        expect(failedView!.__ctrl__.lifecycleState).toBe('destroyed');
+        expect(vm.getCurrentView()).toBeNull();
+    });
+
+    it('render route mới lỗi → page hiện tại vẫn active và DOM không bị thay', async () => {
+        const { vm, container } = createManager();
+        await vm.mountView('web.a', {}, route('/a'));
+        const pageA = vm.getCurrentView()!;
+
+        vm.registerView('web.invalid', () => {
+            const invalid = new View('web.invalid', 'view');
+            invalid.__ctrl__.setup({ superView: null, data: {}, render: () => null } as any);
+            return invalid;
+        });
+
+        const result = await vm.mountView('web.invalid', {}, route('/invalid'));
+
+        expect(result).toBeNull();
+        expect(vm.getCurrentView()).toBe(pageA);
+        expect(pageA.__ctrl__.lifecycleState).toBe('active');
+        expect(container.textContent).toContain('pageA');
+        expect(vm.pageCache.has('web.a::/a')).toBe(false);
     });
 });

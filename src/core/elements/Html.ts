@@ -431,10 +431,21 @@ export class Html implements HtmlInterface {
     }
 
     private initializeEvents() {
+        this.addEventListeners();
+    }
+
+    addEventListeners(){
         if (this.config.events) {
             for (const [eventName, handlers] of Object.entries(this.config.events)) {
                 this.ctx.addEventListener(this.element, eventName, handlers);
             }
+        }
+    }
+
+    removeEventListeners() {
+        if (!this.config.events) return;
+        for (const eventName of Object.keys(this.config.events)) {
+            this.ctx.removeEventListener(this.element, eventName);
         }
     }
 
@@ -535,7 +546,10 @@ export class Html implements HtmlInterface {
     public __destroyed__: boolean = false;
 
     destroy() {
+        if (this.__destroyed__) return;
         this.__destroyed__ = true;
+
+        this.removeEventListeners();
 
         // Abort all registered event listeners
         this.abortController.abort();

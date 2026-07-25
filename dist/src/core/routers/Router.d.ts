@@ -54,10 +54,12 @@ export type AfterNavigationHook = (to: Route, from: ActiveRoute | null) => void;
 export declare class ActiveRoute {
     readonly $route: Route;
     readonly $urlPath: string;
+    /** Request URI = path + query string (KHÔNG gồm hash) — dùng làm cache key */
+    readonly $uri: string;
     readonly $params: Record<string, string>;
     readonly $query: Record<string, string>;
     readonly $fragment: string;
-    constructor(route: Route, urlPath: string, params?: Record<string, string>, query?: Record<string, string>, fragment?: string);
+    constructor(route: Route, urlPath: string, params?: Record<string, string>, query?: Record<string, string>, fragment?: string, uri?: string);
     setQuery(query: Record<string, string>): void;
     getPath(): string;
     getParams(): Record<string, string>;
@@ -95,6 +97,8 @@ export declare class Router {
     /** State */
     private isStarted;
     private isNavigating;
+    private navigationSequence;
+    private activeNavigationUrl;
     /** Bound handlers for cleanup */
     private _handlePopState;
     private _handleAutoNavigation;
@@ -133,6 +137,8 @@ export declare class Router {
     afterEach(hook: AfterNavigationHook): this;
     /**
      * Navigate to a URL path.
+     * History chỉ được cập nhật SAU khi guard cho phép (trong handleRoute) —
+     * guard chặn thì URL không đổi, tránh desync URL ↔ view.
      */
     navigate(path: string): void;
     /** Alias for navigate */
@@ -187,10 +193,27 @@ export declare class Router {
      */
     destroy(): void;
     getFullUrl(): string;
+    /** Kiểu navigation nội bộ — quyết định thao tác history + nav type xuống ViewManager */
+    private pendingNavigation;
     /**
-     * Core route handler — match route, run guards, mount view.
+     * Tách một URL string thành pathname / query string / fragment.
+     * PHẢI tách query + hash TRƯỚC khi match route — pattern chỉ match pathname.
+     */
+    private splitLocation;
+    /**
+     * Điểm vào duy nhất cho mọi navigation (navigate/replace/popstate/initial).
+     * Đang navigate dở → ghi nhận request MỚI NHẤT, xử lý sau khi xong
+     * (không drop im lặng như trước).
+     */
+    private requestNavigation;
+    /**
+     * Core route handler — prepare/guard/render trước, chỉ commit history +
+     * active route sau khi ViewManager đã mount/hydrate thành công.
      */
     private handleRoute;
+    /** Pop đã đổi address bar; render fail thì đưa URL về chain còn active. */
+    private restoreUrlAfterFailedPop;
+    private applyScroll;
     /**
      * Handle browser back/forward.
      */

@@ -28,7 +28,7 @@ import { BlockOutlet } from "../elements/BlockOutlet";
 import { PageCacheService, PageCacheEntry, detachWrapperDOM } from "../services/PageCache";
 import { Html } from "../elements/Html";
 import { hasData } from "../helpers/utils";
-import { hydrateElementList } from "../helpers/view";
+import { activateView, claimHydratedView, commitView, flushView } from "../helpers/view";
 import markerRegistry from "../services/MarkerRegistry";
 import logger from "../services/LoggerService";
 import { StoreService } from "../services/StoreService";
@@ -56,6 +56,8 @@ type RenderPageViewSuccess = {
     result: ViewInterface | unknown;
     superView: ViewInterface | null;
     finalView: ViewInterface;
+    /** Origin → outermost: [page, inner layout, ..., root layout]. */
+    chain: ViewInterface[];
 };
 
 type RenderPageViewError = {
@@ -65,9 +67,20 @@ type RenderPageViewError = {
     result: null;
     superView: null;
     finalView: ViewInterface;
+    chain: ViewInterface[];
 };
 
-type RenderPageViewResult = RenderPageViewSuccess | RenderPageViewError;
+type RenderPageViewCancelled = {
+    type: 'cancelled';
+    message: string;
+    view: ViewInterface;
+    result: null;
+    superView: null;
+    finalView: ViewInterface;
+    chain: ViewInterface[];
+};
+
+type RenderPageViewResult = RenderPageViewSuccess | RenderPageViewError | RenderPageViewCancelled;
 
 function isRenderableObject(result: unknown): result is { saoType: string } {
     return typeof result === 'object' && result !== null && 'saoType' in result;
@@ -95,6 +108,8 @@ export class ViewManager implements ViewManagerInterface {
     private currentLayoutPath: string | null = null;
 
     private currentLayoutView: ViewInterface | null = null; // Store the current layout view instance for reuse
+    /** Mounted layouts ordered outermost → innermost. */
+    private currentLayoutChain: ViewInterface[] = [];
     private currentPageView: ViewInterface | null = null; // Store the current page view instance for reference in blocks and sections
     private currentViewType: 'view' | 'layout' | null = null; // Track whether the current view is a page or layout for correct lifecycle handling
 
@@ -104,6 +119,9 @@ export class ViewManager implements ViewManagerInterface {
      * tiên → hydrateView; các route sau là CSR (SPA takeover).
      */
     private ssrBoot: SSRBootInfo | null = null;
+
+    /** Exact Page/Layout instance relationships exported by Blade for hydration. */
+    private ssrViewData: Record<string, any> = {};
 
 
     /** Current layout view info — reused if same layout */
@@ -119,6 +137,9 @@ export class ViewManager implements ViewManagerInterface {
 
     /** Render counter for debugging */
     private renderCount = 0;
+
+    /** Invalidates fire-and-forget render work when a newer navigation begins. */
+    private navigationGeneration = 0;
 
     public store: StoreService = StoreService.instance("ViewManager");
 
@@ -147,11 +168,17 @@ export class ViewManager implements ViewManagerInterface {
         return this.activeViews.has(path);
     }
 
+    /** Invalidate async render/fetch work owned by the current navigation. */
+    cancelNavigation(): void {
+        this.navigationGeneration++;
+    }
+
     /**
      * Destroy ViewManager hoàn toàn — dọn sạch mọi view, DOM, state.
      * Gọi khi teardown app (hot reload, test cleanup, unmount root).
      */
     destroy(): void {
+        this.navigationGeneration++;
         // 1. Stop và destroy tất cả views đang active
         this.unmountAll();
         // 2. Dọn PageCache
@@ -214,7 +241,7 @@ export class ViewManager implements ViewManagerInterface {
     /**
      * Initialize the ViewManager.
      */
-    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; ssr?: SSRBootInfo | null; systemData?: Record<string, any> }): void {
+    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; ssr?: SSRBootInfo | null; systemData?: Record<string, any>; ssrData?: Record<string, any> }): void {
         // SSR boot info (server-rendered): chứa view entry + viewId để route đầu
         // tiên gọi hydrateView thay vì mountView. Xem RUNTIME_CONTRACT §6 (boot).
         if (config?.ssr && config.ssr.view && config.ssr.viewId) {
@@ -224,6 +251,9 @@ export class ViewManager implements ViewManagerInterface {
         // view factory ở view() để compiled view resolve superView/namespace.
         if (config?.systemData && typeof config.systemData === 'object') {
             this.systemData = { ...this.systemData, ...config.systemData };
+        }
+        if (config?.ssrData && typeof config.ssrData === 'object') {
+            this.ssrViewData = config.ssrData;
         }
         if (config?.container) {
             if (typeof config.container === 'string') {
@@ -332,14 +362,32 @@ export class ViewManager implements ViewManagerInterface {
             result: null,
             superView: null,
             finalView: view,
+            chain: [view],
         };
+    }
+
+    private createRenderPageViewCancelled(view: ViewInterface): RenderPageViewCancelled {
+        return {
+            type: 'cancelled',
+            message: '',
+            view,
+            result: null,
+            superView: null,
+            finalView: view,
+            chain: [view],
+        };
+    }
+
+    private isNavigationCurrent(generation: number): boolean {
+        return generation === this.navigationGeneration;
     }
 
     private createRenderPageViewSuccess(
         view: ViewInterface,
         result: ViewInterface | unknown,
         superView: ViewInterface | null,
-        finalView: ViewInterface
+        finalView: ViewInterface,
+        chain: ViewInterface[] = [view],
     ): RenderPageViewSuccess {
         return {
             type: 'success',
@@ -348,6 +396,7 @@ export class ViewManager implements ViewManagerInterface {
             result,
             superView,
             finalView,
+            chain,
         };
     }
 
@@ -363,8 +412,12 @@ export class ViewManager implements ViewManagerInterface {
         mountRoot: HtmlInterface | null = null,
         initMode: InitMode = InitModes.CREATE,
         cache: boolean = false,
-        renderLevel: number = 0
+        renderLevel: number = 0,
+        navigationGeneration: number = this.navigationGeneration,
     ): Promise<RenderPageViewResult> {
+        if (!this.isNavigationCurrent(navigationGeneration)) {
+            return this.createRenderPageViewCancelled(view);
+        }
         const ctrl = view.__ctrl__;
 
         if (hasData(data)) {
@@ -394,29 +447,56 @@ export class ViewManager implements ViewManagerInterface {
         if (resultType === OOTEnum.VIEW) {
             const superView = result as ViewInterface;
 
+            // CSR navigation may resolve @extends to the exact Layout instance
+            // that is already active. Its DOM, outlets and lifecycle are retained,
+            // so rendering it again only recreates declarations and can repeat
+            // user side effects. Reuse the already-resolved outer chain instead.
+            // Hydration must still render every level to claim Blade's SSR DOM.
+            if (initMode === InitModes.CREATE) {
+                const activeLayoutIndex = this.currentLayoutChain.indexOf(superView);
+                if (activeLayoutIndex >= 0) {
+                    const reusedChain = this.currentLayoutChain
+                        .slice(0, activeLayoutIndex + 1)
+                        .reverse();
+                    return this.createRenderPageViewSuccess(
+                        view,
+                        superView,
+                        superView,
+                        reusedChain[reusedChain.length - 1] ?? superView,
+                        [view, ...reusedChain],
+                    );
+                }
+            }
+
             // ── Hydrate: gán viewId của layout TRƯỚC khi render nó ──────────
             // Page gọi extendView(layoutPath, {}) → layout tự sinh viewId ngẫu
             // nhiên, KHÔNG khớp viewId server đã render. Phải gán đúng id ở đây
             // (trước render → trước khi Wrapper layout capture ctx.viewId), bằng
             // cách đọc lại từ DOM view marker <!--s:v:{id}-s--> server để lại.
             if (initMode === InitModes.HYDRATE) {
-                const discovered = this.discoverChainViewId(mountRoot, new Set([ctrl.viewId]));
+                const discovered = this.discoverChainViewId(
+                    mountRoot,
+                    new Set([ctrl.viewId]),
+                    superView.__ctrl__.path,
+                    ctrl.viewId,
+                );
                 if (discovered) {
                     superView.__ctrl__.viewId = discovered;
                 }
             }
 
             const superResult = await this.renderPageView(
-                superView, {}, mountRoot, initMode, cache, renderLevel + 1
+                superView, {}, mountRoot, initMode, cache, renderLevel + 1, navigationGeneration
             );
-            if (superResult.type === 'error') {
+            if (superResult.type !== 'success') {
                 return { ...superResult, view };
             }
             return this.createRenderPageViewSuccess(
                 view,
                 superView,
                 superResult.view,
-                superResult.finalView ?? superView
+                superResult.finalView ?? superView,
+                [view, ...superResult.chain],
             );
         }
 
@@ -428,13 +508,36 @@ export class ViewManager implements ViewManagerInterface {
      * Discover viewId của một layout/superView từ SSR DOM (hydration).
      *
      * Page gọi extendView() KHÔNG truyền viewId của layout (server tự sinh id),
-     * nên client đọc lại từ marker <!--s:v:{id}-s--> mà server đã render trong
-     * container. Trả về id view marker đầu tiên chưa nằm trong excludeIds.
+     * nên client lấy lại id từ quan hệ instance mà Blade export. Nếu output cũ
+     * chưa có quan hệ này, client mới discover từ metadata/marker trong DOM.
      *
-     * ⚠ Hiện xử lý single layout. Nested layout (chain > 1) cần match marker
-     *   theo độ sâu lồng nhau — TODO khi hỗ trợ nested hydration.
+     * Nested chain ưu tiên quan hệ parent chính xác trong APP_CONFIGS.view.ssrData,
+     * sau đó mới tới `data-view-name`/`data-view-id`; marker scan là fallback.
      */
-    private discoverChainViewId(mountRoot: HtmlInterface | null, excludeIds: Set<string>): string | null {
+    private discoverChainViewId(
+        mountRoot: HtmlInterface | null,
+        excludeIds: Set<string>,
+        viewPath?: string,
+        parentViewId?: string,
+    ): string | null {
+        if (viewPath) {
+            const instances = this.ssrViewData[viewPath]?.instances;
+            if (instances && typeof instances === 'object') {
+                for (const [instanceId, instance] of Object.entries(instances)) {
+                    const id = (instance as any)?.viewId ?? instanceId;
+                    if (id && !excludeIds.has(id)
+                        && (!parentViewId || (instance as any)?.parent?.id === parentViewId)) {
+                        return id;
+                    }
+                }
+            }
+            const records = document.querySelectorAll('script[data-ref="view-data"][data-view-id]');
+            for (const record of records) {
+                const id = record.getAttribute('data-view-id');
+                if (record.getAttribute('data-view-name') === viewPath
+                    && id && !excludeIds.has(id)) return id;
+            }
+        }
         const root = mountRoot?.getElement?.() ?? this.rootElement?.getElement?.();
         if (!root) return null;
 
@@ -455,9 +558,13 @@ export class ViewManager implements ViewManagerInterface {
         mountRoot: HtmlInterface | null = null,
         initMode: InitMode = InitModes.CREATE,
         cache: boolean = false,
-        renderLevel: number = 0
+        renderLevel: number = 0,
+        navigationGeneration: number = this.navigationGeneration,
     ): Promise<RenderPageViewResult> {
         try {
+            if (!this.isNavigationCurrent(navigationGeneration)) {
+                return this.createRenderPageViewCancelled(view);
+            }
             const ctrl = view.__ctrl__;
             if (hasData(data)) {
                 ctrl.updateData(data);
@@ -467,7 +574,7 @@ export class ViewManager implements ViewManagerInterface {
 
             // ── Case 1: Không có async data → render ngay ──
             if (!hasAsyncData) {
-                return this.callViewRenderFactory(view, 'render', data, mountRoot, initMode, cache, renderLevel);
+                return this.callViewRenderFactory(view, 'render', data, mountRoot, initMode, cache, renderLevel, navigationGeneration);
             }
 
             // ── Resolve fetch URL từ ViewController config hoặc fallback Router ──
@@ -478,22 +585,31 @@ export class ViewManager implements ViewManagerInterface {
 
             // ── Case 2: Có async + có prerender → prerender skeleton trước, fetch sau ──
             if (config.hasPrerender) {
-                const prerenderResult = await this.callViewRenderFactory(view, 'prerender', data, mountRoot, initMode, cache, renderLevel);
+                const renderGeneration = navigationGeneration;
+                const prerenderResult = await this.callViewRenderFactory(view, 'prerender', data, mountRoot, initMode, cache, renderLevel, navigationGeneration);
+                if (prerenderResult.type === 'cancelled') return prerenderResult;
                 if (prerenderResult.type === 'error') {
                     logger.error(`Error prerendering view "${ctrl.path}":`, prerenderResult.message);
                     // Fallback: render trực tiếp không qua prerender
-                    return this.callViewRenderFactory(view, 'render', data, mountRoot, initMode, cache, renderLevel);
+                    return this.callViewRenderFactory(view, 'render', data, mountRoot, initMode, cache, renderLevel, navigationGeneration);
                 }
 
                 // Fire-and-forget: fetch data → re-render → swap skeleton → main
                 Http.get(fetchUrl).then(async (response: any) => {
+                    // Route mới hoặc manager teardown đã bắt đầu: tuyệt đối không
+                    // render/mount kết quả cũ trở lại root DOM.
+                    if (renderGeneration !== this.navigationGeneration
+                        || ctrl.lifecycleState === 'destroyed') return;
+
                     const asyncData = response?.data ?? {};
                     if (hasData(asyncData)) {
                         ctrl.updateData(asyncData);
                     }
 
                     // Render main content (kết quả sẽ nằm trong ctrl.mainElement)
-                    const finalResult = await this.callViewRenderFactory(view, 'render', asyncData, mountRoot, initMode, cache, renderLevel);
+                    const finalResult = await this.callViewRenderFactory(view, 'render', asyncData, mountRoot, initMode, cache, renderLevel, navigationGeneration);
+                    if (renderGeneration !== this.navigationGeneration
+                        || ctrl.lifecycleState === 'destroyed') return;
                     if (finalResult.type === 'error') {
                         logger.error(`Error rendering view "${ctrl.path}" after async data fetch:`, finalResult.message);
                         return;
@@ -511,11 +627,13 @@ export class ViewManager implements ViewManagerInterface {
                         ctrl.mainElement.mountTo(mountRoot);
                     }
                     // 3. Commit data + start reactivity
-                    ctrl.commitData();
+                    commitView(ctrl);
                     ctrl.mainElement?.start?.();
                     logger.info(`[ViewManager] prerender → main swap done for "${ctrl.path}"`);
                 }).catch((err: any) => {
-                    logger.error(`Error fetching async data for view "${ctrl.path}":`, err);
+                    if (this.isNavigationCurrent(renderGeneration)) {
+                        logger.error(`Error fetching async data for view "${ctrl.path}":`, err);
+                    }
                 });
 
                 // Return prerender result ngay — mountView sẽ mount skeleton
@@ -528,14 +646,21 @@ export class ViewManager implements ViewManagerInterface {
                 const response = await Http.get(fetchUrl);
                 asyncData = response?.data ?? {};
             } catch (err) {
+                if (!this.isNavigationCurrent(navigationGeneration)) {
+                    return this.createRenderPageViewCancelled(view);
+                }
                 logger.error(`Error fetching async data for view "${ctrl.path}":`, err);
+            }
+
+            if (!this.isNavigationCurrent(navigationGeneration)) {
+                return this.createRenderPageViewCancelled(view);
             }
 
             if (!hasData(asyncData)) {
                 logger.warn(`View "${ctrl.path}" has async data config but fetch returned no data.`);
             }
 
-            return this.callViewRenderFactory(view, 'render', asyncData, mountRoot, initMode, cache, renderLevel);
+            return this.callViewRenderFactory(view, 'render', asyncData, mountRoot, initMode, cache, renderLevel, navigationGeneration);
         }
         catch (err) {
             logger.error(`Error rendering view ${view.__ctrl__.path}:`, err);
@@ -578,143 +703,237 @@ export class ViewManager implements ViewManagerInterface {
             return null; // đã đứng đúng trang này
         }
 
+        // Mọi async work của navigation trước trở thành stale từ thời điểm này.
+        const navigationGeneration = ++this.navigationGeneration;
+
         const oldPageView = this.currentPageView;
         const oldLayoutView = this.currentLayoutView;
-
-        // ── Phase 1: Rời trang cũ — pause + PageCache (hoặc destroy nếu cache:false).
-        // Layout cũ KHÔNG pause — page mới có thể dùng tiếp; quyết định ở Phase 5.
-        if (oldPageView) {
-            this.deactivatePage(oldPageView, oldLayoutView);
+        const oldLayoutChain = [...this.currentLayoutChain];
+        // BlockManager hiện đăng ký block theo outlet dùng chung. Với page
+        // thuộc Layout, phải detach ownership cũ trước khi render page mới;
+        // nếu không block mới sẽ ghi đè registry và cache sai DOM.
+        // Standalone không có ràng buộc này nên được giữ active tới commit.
+        const oldPageRequiresEarlyDeactivate = oldPageView !== null && oldLayoutChain.length > 0;
+        let oldPageDeactivated = false;
+        if (oldPageRequiresEarlyDeactivate) {
+            this.deactivatePage(oldPageView!, oldLayoutView);
+            this.currentPageView = null;
+            oldPageDeactivated = true;
         }
-        this.currentPageView = null;
 
-        // ── Phase 2: thử restore từ PageCache (key = view name + request URI) ──
+        // ── Phase 1: thử restore từ PageCache (key = view name + request URI) ──
         // Trong TTL: mọi navigation type đều restore (bfcache). Hết TTL → mount tươi.
         const cachedEntry = this.pageCache.take(this.cacheKey(name, targetUrl));
         if (cachedEntry) {
+            if (oldPageView && !oldPageDeactivated) {
+                this.deactivatePage(oldPageView, oldLayoutView);
+                oldPageDeactivated = true;
+            }
+            this.currentPageView = null;
             const restored = this.restoreFromCache(cachedEntry, oldLayoutView, navigationType);
             if (restored) return restored;
         }
 
-        // ── Phase 3: Load view (instance MỚI cho page — instance sống do PageCache giữ) ──
+        // ── Phase 2: Load + render chain trong khi page cũ vẫn active. ──
+        // Chỉ khi render thành công mới pause/destroy page cũ; fetch/render lỗi
+        // không được làm màn hình hiện tại biến mất.
         const view = this.view(name, data ?? {}, false);
         if (!view) {
-            this.showError(`Failed to load view "${name}".`);
+            const message = `Failed to load view "${name}".`;
+            if (oldPageView && oldPageDeactivated) {
+                this.restoreDeactivatedPage(oldPageView!, oldLayoutView);
+            }
+            if (oldPageView) logger.error(message);
+            else this.showError(message);
             return null;
         }
         view.__ctrl__.urlPath = targetUrl;
 
-        // ── Phase 4: Render chain ──
-        const renderResult = await this.renderPageView(view, data ?? {}, this.rootElement, InitModes.CREATE, false);
+        const renderResult = await this.renderPageView(
+            view, data ?? {}, this.rootElement, InitModes.CREATE, false, 0, navigationGeneration
+        );
+        if (renderResult.type === 'cancelled') {
+            view.__ctrl__.destroy();
+            if (oldPageView && oldPageDeactivated) {
+                this.restoreDeactivatedPage(oldPageView!, oldLayoutView);
+            }
+            return null;
+        }
         if (renderResult.type === 'error') {
-            this.showError(renderResult.message);
+            view.__ctrl__.destroy();
+            if (oldPageView && oldPageDeactivated) {
+                this.restoreDeactivatedPage(oldPageView!, oldLayoutView);
+            }
+            if (oldPageView) logger.error(renderResult.message);
+            else this.showError(renderResult.message);
             return null;
         }
 
-        const pageView: ViewInterface = renderResult.view;
-        const finalView: ViewInterface = renderResult.finalView;
-        const hasSuperView = renderResult.superView !== null;
-        const newLayoutPath = hasSuperView ? finalView.__ctrl__.path : null;
-
-        // ── Phase 5: Mount DOM ──
-        if (!hasSuperView) {
-            // Trang mới standalone — layout cũ (nếu có) pause + vào layout cache
-            // (page cũ đã rời ở Phase 1: pause+cache hoặc destroy)
-            if (oldLayoutView) {
-                this.deactivateLayout(oldLayoutView);
-                this.currentLayoutView = null;
-                this.currentLayoutPath = null;
-            }
-
-            // mount(): gắn DOM vào container + fire mounting/mounted + acquire style/script
-            pageView.__ctrl__.mount(this.rootElement!);
-
-            // ── Phase 6: Commit data → Start → Flush ──
-            pageView.__ctrl__.commitData();
-            pageView.__ctrl__.start();
-            pageView.__ctrl__.states.__.flushNow();
-            pageView.__ctrl__.flushReactiveUpdatesNow();
-            pageView.__ctrl__.active();
+        // ── Phase 3: commit transition ──
+        // Page/Layout mới đã resolve xong; bây giờ mới rời chain cũ và mount chain mới.
+        if (oldPageView && !oldPageDeactivated) {
+            this.deactivatePage(oldPageView, oldLayoutView);
         }
-        else {
-            // ═══ Layout branch (@extends) — ROUTE_RENDER_FLOW.md §4, §5 ═══
-            const isSameLayout = oldLayoutView !== null && finalView === oldLayoutView;
-
-            if (isSameLayout) {
-                // Layout giữ nguyên DOM + subscriptions — KHÔNG hook nào fire trên layout.
-                // Page cũ đã rời ở Phase 1 (pause + detach block content, hoặc destroy).
-                // 1. Mount block content page mới vào outlets (blocks đã đăng ký khi render)
-                this.blockManager.mountAll();
-                // 2. Commit + start CHỈ page mới — layout đứng ngoài
-                pageView.__ctrl__.mount(); // page content đã ở outlets → fire hook + acquire asset
-                pageView.__ctrl__.commitData();
-                this.blockManager.startAll();
-                pageView.__ctrl__.start();
-                pageView.__ctrl__.states.__.flushNow();
-                pageView.__ctrl__.flushReactiveUpdatesNow();
-                pageView.__ctrl__.active();
-            } else {
-                // Layout mới (hoặc trước đó là standalone/layout khác)
-                // 1. Layout cũ pause + vào layout cache (page cũ đã rời ở Phase 1)
-                if (oldLayoutView) {
-                    this.deactivateLayout(oldLayoutView);
-                }
-
-                // 2. Mount layout vào container. Layout lấy từ store đang PAUSED
-                // (đã ghé trước đó) → reattach DOM từ cache + resume — KHÔNG
-                // render lại, giữ nguyên state/DOM layout. Layout mới → mount thường.
-                const layoutCtrl = finalView.__ctrl__;
-                const layoutResumed = this.resumeLayoutFromCache(layoutCtrl);
-                if (!layoutResumed) {
-                    layoutCtrl.mount(this.rootElement!); // gắn DOM layout + fire hook + acquire asset layout
-                }
-
-                // 3. Mount block content của page vào outlets
-                this.blockManager.mountAll();
-                pageView.__ctrl__.mount(); // page content đã ở outlets → fire hook + acquire asset
-
-                // 4. Commit ngoài vào trong → start layout → start block content → page.
-                // Layout resume: KHÔNG start() lại (subscription còn nguyên;
-                // start sẽ fire started/onMounted sai lifecycle — resume chỉ có
-                // resuming/resumed). Chỉ flush update dồn trong lúc paused.
-                layoutCtrl.commitData();
-                pageView.__ctrl__.commitData();
-                if (!layoutResumed) {
-                    layoutCtrl.start();
-                }
-                layoutCtrl.states.__.flushNow();
-                layoutCtrl.flushReactiveUpdatesNow();
-                layoutCtrl.active();
-                this.blockManager.startAll();
-                pageView.__ctrl__.start();
-                pageView.__ctrl__.states.__.flushNow();
-                pageView.__ctrl__.flushReactiveUpdatesNow();
-                pageView.__ctrl__.active();
-            }
-        }
-
-        // ── Update state ──
-        this.currentPageView = pageView;
-        this.currentLayoutView = hasSuperView ? finalView : null;
-        this.currentLayoutPath = newLayoutPath;
-        this.currentViewType = hasSuperView ? 'layout' : 'view';
-        this.viewStack = hasSuperView ? [finalView, pageView] : [pageView];
-        this.renderCount++;
+        this.currentPageView = null;
+        this.activateRenderedChain(renderResult, InitModes.CREATE, oldLayoutChain);
 
         return renderResult;
+    }
+
+    /** Commit the successfully mounted/hydrated chain as the only active route state. */
+    private commitActiveChain(
+        pageView: ViewInterface,
+        layoutChain: ViewInterface[],
+    ): void {
+        this.currentPageView = pageView;
+        this.currentLayoutChain = [...layoutChain];
+        this.currentLayoutView = layoutChain[0] ?? null;
+        this.currentLayoutPath = this.currentLayoutView?.__ctrl__.path ?? null;
+        this.currentViewType = layoutChain.length > 0 ? 'layout' : 'view';
+        this.viewStack = [...layoutChain, pageView];
+        this.renderCount++;
+    }
+
+    /**
+     * Common post-render transaction. Rendering decides the Page/Layout chain;
+     * this step applies the DOM strategy, activates it, then publishes one
+     * coherent active-chain state.
+     */
+    private activateRenderedChain(
+        renderResult: RenderPageViewSuccess,
+        initMode: InitMode,
+        oldLayoutChain: ViewInterface[] = [],
+    ): void {
+        const pageView = renderResult.view;
+        const layoutChain = renderResult.chain.slice(1).reverse();
+
+        if (initMode === InitModes.HYDRATE) {
+            this.activateHydratedChain(pageView, layoutChain);
+        } else {
+            this.activateCreatedChain(pageView, layoutChain, oldLayoutChain);
+        }
+
+        this.commitActiveChain(pageView, layoutChain);
+    }
+
+    /** CSR strategy: insert new DOM, while preserving/reusing a compatible Layout. */
+    private activateCreatedChain(
+        pageView: ViewInterface,
+        layoutChain: ViewInterface[],
+        oldLayoutChain: ViewInterface[],
+    ): void {
+        const pageCtrl = pageView.__ctrl__;
+
+        if (layoutChain.length === 0) {
+            if (oldLayoutChain.length > 0) {
+                this.deactivateLayoutChain(oldLayoutChain);
+                this.currentLayoutView = null;
+                this.currentLayoutChain = [];
+                this.currentLayoutPath = null;
+            }
+            pageCtrl.mount(this.rootElement!);
+            commitView(pageCtrl);
+            activateView(pageCtrl);
+            return;
+        }
+
+        let common = 0;
+        while (common < oldLayoutChain.length
+            && common < layoutChain.length
+            && oldLayoutChain[common] === layoutChain[common]) {
+            common++;
+        }
+
+        if (common === 0 && oldLayoutChain.length > 0) {
+            this.deactivateLayoutChain(oldLayoutChain);
+        } else {
+            // Root layout vẫn dùng chung; chỉ dọn phần chain không còn reuse.
+            for (let i = oldLayoutChain.length - 1; i >= common; i--) {
+                this.destroyLayoutView(oldLayoutChain[i]);
+            }
+        }
+
+        const resumed = common === 0 && this.resumeLayoutChainFromCache(layoutChain);
+        const newLayouts: ViewInterface[] = [];
+
+        if (!resumed) {
+            let start = common;
+            if (common === 0) {
+                layoutChain[0].__ctrl__.mount(this.rootElement!);
+                newLayouts.push(layoutChain[0]);
+                start = 1;
+            }
+            for (let i = start; i < layoutChain.length; i++) {
+                const layout = layoutChain[i];
+                this.blockManager.mountViewBlocks(layout.__ctrl__.viewId);
+                layout.__ctrl__.mount();
+                newLayouts.push(layout);
+            }
+        }
+
+        this.blockManager.mountViewBlocks(pageCtrl.viewId);
+        pageCtrl.mount();
+        for (const layout of newLayouts) commitView(layout.__ctrl__);
+        commitView(pageCtrl);
+
+        for (const layout of newLayouts) activateView(layout.__ctrl__);
+        this.blockManager.startAll();
+        activateView(pageCtrl);
+    }
+
+    /** Hydration strategy: claim Blade DOM without insert/clear mutations. */
+    private activateHydratedChain(
+        pageView: ViewInterface,
+        layoutChain: ViewInterface[],
+    ): void {
+        const pageCtrl = pageView.__ctrl__;
+
+        if (layoutChain.length === 0) {
+            commitView(pageCtrl, true);
+            claimHydratedView(pageCtrl, this.rootElement!);
+            pageCtrl.mount();
+            pageCtrl.initMode = InitModes.CREATE;
+            activateView(pageCtrl);
+            return;
+        }
+
+        for (const layout of layoutChain) commitView(layout.__ctrl__, true);
+        commitView(pageCtrl, true);
+        const rootLayoutCtrl = layoutChain[0].__ctrl__;
+        claimHydratedView(rootLayoutCtrl, this.rootElement!);
+        rootLayoutCtrl.mount();
+        for (let i = 1; i < layoutChain.length; i++) {
+            const ctrl = layoutChain[i].__ctrl__;
+            this.blockManager.hydrateViewBlocks(ctrl.viewId);
+            ctrl.mount();
+        }
+        this.blockManager.hydrateViewBlocks(pageCtrl.viewId);
+        pageCtrl.mount();
+        for (const layout of layoutChain) layout.__ctrl__.initMode = InitModes.CREATE;
+        pageCtrl.initMode = InitModes.CREATE;
+
+        for (const layout of layoutChain) activateView(layout.__ctrl__);
+        this.blockManager.startAll();
+        activateView(pageCtrl);
     }
 
     /**
      * Destroy layout cũ (đổi layout hoặc về standalone).
      * Page cũ đã rời ở Phase 1 (deactivatePage) — không destroy tại đây.
      */
-    private destroyLayoutChain(oldLayoutView: ViewInterface): void {
-        const layoutPath = oldLayoutView.__ctrl__.path;
-        oldLayoutView.__ctrl__.destroy();
+    private destroyLayoutView(layoutView: ViewInterface): void {
+        const layoutPath = layoutView.__ctrl__.path;
+        layoutView.__ctrl__.destroy();
         // Layout cached theo path trong store (extendView dùng cache=true) —
         // instance đã destroy không được phép trả về từ cache nữa
         if (layoutPath && this.store.has(layoutPath)) {
             this.store.remove?.(layoutPath);
+        }
+    }
+
+    private destroyLayoutChain(layoutChain: ViewInterface[]): void {
+        for (let i = layoutChain.length - 1; i >= 0; i--) {
+            this.destroyLayoutView(layoutChain[i]);
         }
     }
 
@@ -736,6 +955,10 @@ export class ViewManager implements ViewManagerInterface {
         return `__layout__::${layoutPath}`;
     }
 
+    private layoutChainIdentity(layoutChain: ViewInterface[]): string {
+        return layoutChain.map(view => view.__ctrl__.path).join('>');
+    }
+
     /**
      * Rời một layout (đổi layout / về standalone): pause + detach toàn vùng DOM
      * → PageCache (key `__layout__::{path}`). KHÁC destroy ở 2 điểm:
@@ -746,21 +969,30 @@ export class ViewManager implements ViewManagerInterface {
      * Layout khai cache:false (hoặc ttl 0) → destroy như cũ.
      */
     private deactivateLayout(layoutView: ViewInterface): void {
-        const ctrl = layoutView.__ctrl__;
-        const cacheConfig = ctrl.getConfig('cache');
+        this.deactivateLayoutChain([layoutView]);
+    }
+
+    private deactivateLayoutChain(layoutChain: ViewInterface[]): void {
+        const rootCtrl = layoutChain[0]?.__ctrl__;
+        if (!rootCtrl) return;
+        const cacheConfig = rootCtrl.getConfig('cache');
         const ttl = typeof cacheConfig === 'object' && cacheConfig?.ttl != null ? cacheConfig.ttl : undefined;
-        const wrapper = ctrl.mainElement;
+        const wrapper = rootCtrl.mainElement;
 
         if (!wrapper || cacheConfig === false || ttl === 0) {
-            this.destroyLayoutChain(layoutView);
+            this.destroyLayoutChain(layoutChain);
             return;
         }
 
-        ctrl.pause(); // pausing/paused hooks + flush + dirty-mode + release assets
-        this.blockManager.detachOutletsOfView(ctrl.viewId);
+        for (let i = layoutChain.length - 1; i >= 0; i--) {
+            layoutChain[i].__ctrl__.pause();
+        }
+        for (const layout of layoutChain) {
+            this.blockManager.detachOutletsOfView(layout.__ctrl__.viewId);
+        }
         const fragment = detachWrapperDOM(wrapper);
-        this.pageCache.set(this.layoutCacheKey(ctrl.path), {
-            views: [layoutView],
+        this.pageCache.set(this.layoutCacheKey(this.layoutChainIdentity(layoutChain)), {
+            views: [...layoutChain],
             fragment,
             layoutPath: null,
             scroll: { x: 0, y: 0 },
@@ -773,22 +1005,18 @@ export class ViewManager implements ViewManagerInterface {
      * fragment + resume thay vì mount lại. Trả false nếu layout không paused
      * (layout mới tạo → caller mount bình thường).
      */
-    private resumeLayoutFromCache(layoutCtrl: ViewControllerInterface): boolean {
-        if (layoutCtrl.lifecycleState !== 'paused') return false;
+    private resumeLayoutChainFromCache(layoutChain: ViewInterface[]): boolean {
+        if (layoutChain.length === 0
+            || layoutChain.some(layout => layout.__ctrl__.lifecycleState !== 'paused')) return false;
 
-        const entry = this.pageCache.take(this.layoutCacheKey(layoutCtrl.path));
+        const entry = this.pageCache.take(this.layoutCacheKey(this.layoutChainIdentity(layoutChain)));
         if (entry) {
             this.rootElement!.getElement().appendChild(entry.fragment);
-            layoutCtrl.resume(); // resuming/resumed hooks + acquire assets + flush dirty
-            layoutCtrl.active();
+            for (const layout of layoutChain) layout.__ctrl__.resume();
         } else {
-            // Bất thường (evict lẽ ra đã destroy instance + gỡ store) — DOM mất,
-            // rebuild từ element tree còn sống.
-            layoutCtrl.resume();
-            layoutCtrl.active();
-            layoutCtrl.mount(this.rootElement!);
+            return false;
         }
-        this.reregisterLayoutOutlets(layoutCtrl);
+        for (const layout of layoutChain) this.reregisterLayoutOutlets(layout.__ctrl__);
         return true;
     }
 
@@ -810,7 +1038,11 @@ export class ViewManager implements ViewManagerInterface {
      *     không hook nào fire trên layout.
      * View khai cache:false (hoặc ttl 0) → destroy luôn.
      */
-    private deactivatePage(pageView: ViewInterface, layoutView: ViewInterface | null): void {
+    private deactivatePage(
+        pageView: ViewInterface,
+        layoutView: ViewInterface | null,
+        layoutChain: ViewInterface[] = this.currentLayoutChain,
+    ): void {
         const ctrl = pageView.__ctrl__;
         const urlPath = ctrl.urlPath;
         const cacheConfig = ctrl.getConfig('cache');
@@ -844,11 +1076,23 @@ export class ViewManager implements ViewManagerInterface {
             this.pageCache.set(this.cacheKey(ctrl.path, urlPath), {
                 views: [pageView],
                 outletContents,
-                layoutPath: layoutView.__ctrl__.path,
+                layoutPath: this.layoutChainIdentity(layoutChain.length > 0 ? layoutChain : [layoutView]),
                 scroll,
                 ttl,
             });
         }
+    }
+
+    /** Roll back an early Layout-page detach when prepare/render did not commit. */
+    private restoreDeactivatedPage(
+        pageView: ViewInterface,
+        layoutView: ViewInterface | null,
+    ): boolean {
+        const ctrl = pageView.__ctrl__;
+        if (!ctrl.urlPath) return false;
+        const entry = this.pageCache.take(this.cacheKey(ctrl.path, ctrl.urlPath));
+        if (!entry) return false;
+        return this.restoreFromCache(entry, layoutView, 'pop') !== null;
     }
 
     /**
@@ -871,22 +1115,23 @@ export class ViewManager implements ViewManagerInterface {
         if (entry.layoutPath) {
             // ── Page thuộc layout ────────────────────────────────────────
             // 1. Layout đang mount trùng path? → dùng luôn
-            let layoutView: ViewInterface | null =
-                (oldLayoutView && oldLayoutView.__ctrl__.path === entry.layoutPath)
-                    ? oldLayoutView : null;
+            let layoutChain = this.layoutChainIdentity(this.currentLayoutChain) === entry.layoutPath
+                ? [...this.currentLayoutChain]
+                : [];
+            let layoutView: ViewInterface | null = layoutChain[0] ?? null;
 
             // 2. Không trùng → thử resurrect layout từ layout cache
             if (!layoutView && entry.outletContents) {
                 const layoutEntry = this.pageCache.take(this.layoutCacheKey(entry.layoutPath));
                 if (layoutEntry) {
-                    if (oldLayoutView) {
-                        this.deactivateLayout(oldLayoutView); // layout hiện tại vào cache
+                    if (this.currentLayoutChain.length > 0) {
+                        this.deactivateLayoutChain(this.currentLayoutChain);
                     }
-                    const lv = layoutEntry.views[layoutEntry.views.length - 1];
+                    layoutChain = [...layoutEntry.views];
+                    const lv = layoutChain[0];
                     this.rootElement!.getElement().appendChild(layoutEntry.fragment);
-                    lv.__ctrl__.resume();
-                    lv.__ctrl__.active();
-                    this.reregisterLayoutOutlets(lv.__ctrl__);
+                    for (const layout of layoutChain) layout.__ctrl__.resume();
+                    for (const layout of layoutChain) this.reregisterLayoutOutlets(layout.__ctrl__);
                     layoutView = lv;
                 }
             }
@@ -900,28 +1145,29 @@ export class ViewManager implements ViewManagerInterface {
             this.blockManager.restorePageContent(pageView.__ctrl__.viewId, entry.outletContents);
             for (const v of entry.views) {
                 v.__ctrl__.resume();
-                v.__ctrl__.active();
             }
             this.currentPageView = pageView;
             this.currentLayoutView = layoutView;
+            this.currentLayoutChain = layoutChain;
             this.currentLayoutPath = layoutView.__ctrl__.path;
             this.currentViewType = 'layout';
-            this.viewStack = [layoutView, pageView];
+            this.viewStack = [...layoutChain, pageView];
         } else {
             // ── Standalone ───────────────────────────────────────────────
-            if (oldLayoutView) {
-                this.deactivateLayout(oldLayoutView); // pause+cache thay vì destroy
+            if (this.currentLayoutChain.length > 0) {
+                this.deactivateLayoutChain(this.currentLayoutChain);
                 this.currentLayoutView = null;
+                this.currentLayoutChain = [];
                 this.currentLayoutPath = null;
             }
             const container = this.rootElement!.getElement();
             container.appendChild(entry.fragment);
             for (const v of entry.views) {
                 v.__ctrl__.resume();
-                v.__ctrl__.active();
             }
             this.currentPageView = pageView;
             this.currentLayoutView = null;
+            this.currentLayoutChain = [];
             this.currentLayoutPath = null;
             this.currentViewType = 'view';
             this.viewStack = [...entry.views];
@@ -956,8 +1202,8 @@ export class ViewManager implements ViewManagerInterface {
         if (this.currentPageView) {
             this.currentPageView.__ctrl__.destroy();
         }
-        if (this.currentLayoutView) {
-            this.currentLayoutView.__ctrl__.destroy();
+        for (let i = this.currentLayoutChain.length - 1; i >= 0; i--) {
+            this.currentLayoutChain[i].__ctrl__.destroy();
         }
 
         this.blockManager.clearAllOutlets();
@@ -965,6 +1211,7 @@ export class ViewManager implements ViewManagerInterface {
 
         this.currentPageView = null;
         this.currentLayoutView = null;
+        this.currentLayoutChain = [];
         this.currentLayoutPath = null;
         this.currentViewType = null;
         this.activeViews.clear();
@@ -1025,7 +1272,9 @@ export class ViewManager implements ViewManagerInterface {
             return this.mountView(name, data, route);
         }
 
-        const targetUrl = route?.$urlPath ?? name;
+        const navigationGeneration = ++this.navigationGeneration;
+
+        const targetUrl = (route as any)?.$uri ?? route?.$urlPath ?? name;
 
         // Tách __SSR_VIEW_ID__ khỏi data TRƯỚC khi tạo view — đây là key nội bộ
         // hydration, không phải view data. Tạo factory với viewData PHẲNG đã sạch
@@ -1046,118 +1295,19 @@ export class ViewManager implements ViewManagerInterface {
 
         // Render ở HYDRATE mode — elements claim DOM thay vì tạo mới
         const renderResult = await this.renderPageView(
-            view, viewData, this.rootElement, InitModes.HYDRATE, false
+            view, viewData, this.rootElement, InitModes.HYDRATE, false, 0, navigationGeneration
         );
+        if (renderResult.type === 'cancelled') {
+            view.__ctrl__.destroy();
+            return null;
+        }
         if (renderResult.type === 'error') {
+            view.__ctrl__.destroy();
             this.showError(renderResult.message);
             return null;
         }
 
-        const pageView: ViewInterface = renderResult.view;
-        const finalView: ViewInterface = renderResult.finalView;
-        const hasSuperView = renderResult.superView !== null;
-
-        // ── Mount phase ─────────────────────────────────────────────────
-        // Khác mountView: KHÔNG gọi mountTo() (sẽ clearHTML → xoá DOM server).
-        // Thay vào đó gọi render() trên Wrapper để tạo element tree —
-        // các Html/Output con sẽ claim server DOM nodes qua hydrate mode.
-        // DOM structure đã có sẵn từ server, chỉ cần gắn JS references.
-        if (!hasSuperView) {
-            const ctrl = pageView.__ctrl__;
-            ctrl.setParentElement(this.rootElement!);
-
-            // ── Bước 1: Commit state TRƯỚC khi render (thứ tự đặc thù hydration) ──
-            // childrenFactory của @if/@foreach phụ thuộc state (vd `if (show)`).
-            // Phải khôi phục state = trạng thái server đã dùng → factory sinh đúng
-            // element tree → Html/Output con CLAIM đúng SSR DOM thay vì tạo mới.
-            ctrl.commitData();
-
-            // Discard pending changes do commitData sinh ra: SSR DOM đã phản ánh
-            // các giá trị này rồi. flushNow() lúc CHƯA subscribe → notify rỗng,
-            // chỉ xoá hàng đợi → tránh re-render phá DOM đã claim ở bước flush sau.
-            ctrl.states.__.flushNow();
-
-            // ── Bước 2: Render element tree ở HYDRATE mode (claim DOM) ──────────
-            if (ctrl.mainElement) {
-                ctrl.mainElement.setParentElement(this.rootElement!);
-                // Wrapper.render() tạo children trực tiếp; hydrateElementList gọi
-                // render() đệ quy cho từng con (Html claim DOM, Output/Reactive
-                // claim markers) mà KHÔNG appendChild — giữ nguyên DOM server.
-                const children = ctrl.mainElement.render();
-                if (children && children.length > 0) {
-                    hydrateElementList(this.rootElement!, children);
-                }
-            }
-
-            // ── Bước 3: mount() không root — DOM đã ở real DOM từ server.
-            // Fire mounting/mounted + acquire style/script (AssetManager ref-count)
-            // để lifecycle SSR đồng nhất với CSR.
-            ctrl.mount();
-
-            // ── Bước 4: Chuyển sang CREATE — re-render sau này dùng CSR flow ────
-            ctrl.initMode = InitModes.CREATE;
-
-            // ── Bước 5: Start (subscribe) → flush no-op → active ───────────────
-            ctrl.start();
-            ctrl.states.__.flushNow();
-            ctrl.flushReactiveUpdatesNow();
-            ctrl.active();
-        } else {
-            // ═══ Hydrate layout chain (@extends) ═══════════════════════════
-            const layoutCtrl = finalView.__ctrl__;
-            const pageCtrl = pageView.__ctrl__;
-
-            // Bước 1: Commit state cả layout + page TRƯỚC render; flush ngay
-            // (chưa subscribe → discard pending) để không re-render phá DOM claim.
-            layoutCtrl.commitData();
-            layoutCtrl.states.__.flushNow();
-            pageCtrl.commitData();
-            pageCtrl.states.__.flushNow();
-
-            // Bước 2: Claim DOM layout — Wrapper → Html(container) → BlockOutlet
-            // claim cặp marker server. KHÔNG mountTo (sẽ clearHTML phá SSR).
-            layoutCtrl.setParentElement(this.rootElement!);
-            if (layoutCtrl.mainElement) {
-                layoutCtrl.mainElement.setParentElement(this.rootElement!);
-                const children = layoutCtrl.mainElement.render();
-                if (children && children.length > 0) {
-                    hydrateElementList(this.rootElement!, children);
-                }
-            }
-
-            // Bước 3: Claim block content vào outlets ở HYDRATE mode — factory
-            // page chạy, Html/Output/Reactive con claim DOM server giữa marker.
-            // (pageCtrl.initMode vẫn HYDRATE tại đây để this.html() claim.)
-            this.blockManager.mountAllHydrate();
-
-            // Bước 3.5: mount() không root (DOM đã ở real DOM) — fire
-            // mounting/mounted + acquire asset, ngoài vào trong như mountView.
-            layoutCtrl.mount();
-            pageCtrl.mount();
-
-            // Bước 4: Chuyển sang CREATE — re-render sau này dùng CSR flow.
-            layoutCtrl.initMode = InitModes.CREATE;
-            pageCtrl.initMode = InitModes.CREATE;
-
-            // Bước 5: Start layout → block content → page (ngoài vào trong).
-            layoutCtrl.start();
-            layoutCtrl.states.__.flushNow();
-            layoutCtrl.flushReactiveUpdatesNow();
-            layoutCtrl.active();
-            this.blockManager.startAll();
-            pageCtrl.start();
-            pageCtrl.states.__.flushNow();
-            pageCtrl.flushReactiveUpdatesNow();
-            pageCtrl.active();
-        }
-
-        // ── Cập nhật state giống mountView ──────────────────────────────
-        this.currentPageView = pageView;
-        this.currentLayoutView = hasSuperView ? finalView : null;
-        this.currentLayoutPath = hasSuperView ? finalView.__ctrl__.path : null;
-        this.currentViewType = hasSuperView ? 'layout' : 'view';
-        this.viewStack = hasSuperView ? [finalView, pageView] : [pageView];
-        this.renderCount++;
+        this.activateRenderedChain(renderResult, InitModes.HYDRATE);
 
         return renderResult;
     }

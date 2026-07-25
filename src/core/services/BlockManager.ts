@@ -102,8 +102,34 @@ export class BlockManagerService implements BlockManagerInterface {
             if (block && block.contentRenderFactory) {
                 this.mountBlockIntoOutlet(block, outlet);
             } else {
-                this.clearOutlet(outlet.name);
+                this.clearOutletInstance(outlet);
             }
+        }
+    }
+
+    /**
+     * Mount only blocks owned by one Page/Layout controller. Nested layout
+     * chains call this from outer to inner, so an inner outlet exists before
+     * the next owner is mounted and retained layouts are not rebuilt.
+     */
+    mountViewBlocks(viewId: string): void {
+        for (const [, block] of this.blocks) {
+            if (block.viewId !== viewId || !block.contentRenderFactory) continue;
+            const outlet = this.findOutletByName(block.name);
+            if (!outlet) continue;
+            this.activeBlocks.set(block.name, block);
+            this.mountBlockIntoOutlet(block, outlet);
+        }
+    }
+
+    /** Hydration counterpart of mountViewBlocks(). */
+    hydrateViewBlocks(viewId: string): void {
+        for (const [, block] of this.blocks) {
+            if (block.viewId !== viewId || !block.contentRenderFactory) continue;
+            const outlet = this.findOutletByName(block.name);
+            if (!outlet) continue;
+            this.activeBlocks.set(block.name, block);
+            this.hydrateBlockIntoOutlet(block, outlet);
         }
     }
 
@@ -116,7 +142,7 @@ export class BlockManagerService implements BlockManagerInterface {
         if (!outlet.openTag.parentNode) return; // outlet chưa nằm trong DOM
 
         // Clear nội dung cũ (page trước) trước khi mount page mới
-        this.clearOutlet(outlet.name);
+        this.clearOutletInstance(outlet);
 
         const children: any[] = [];
         const insertBeforeClose = (node: Node) => {
@@ -156,7 +182,7 @@ export class BlockManagerService implements BlockManagerInterface {
         }
 
         // Track mounted children for lifecycle (start/stop/destroy)
-        this.mountedChildren.set(outlet.name, children);
+        this.mountedChildren.set(this.outletKey(outlet), children);
     }
 
     /**
@@ -204,15 +230,17 @@ export class BlockManagerService implements BlockManagerInterface {
             }
         }
 
-        this.mountedChildren.set(outlet.name, children);
+        this.mountedChildren.set(this.outletKey(outlet), children);
     }
 
     /** Tìm outlet theo tên (outlet key = `${layoutViewId}-ob-${name}`) */
     private findOutletByName(name: string): BlockOutletInterface | null {
+        let found: BlockOutletInterface | null = null;
         for (const [, outlet] of this.blockOutlets) {
-            if (outlet.name === name) return outlet;
+            if (outlet.name === name) found = outlet;
         }
-        return null;
+        // Nearest/deepest outlet is registered last while mounting a nested chain.
+        return found;
     }
 
     /**
@@ -238,8 +266,9 @@ export class BlockManagerService implements BlockManagerInterface {
                 }
             }
 
-            const children = this.mountedChildren.get(name) ?? [];
-            this.mountedChildren.delete(name);
+            const outletKey = outlet ? this.outletKey(outlet) : name;
+            const children = this.mountedChildren.get(outletKey) ?? [];
+            this.mountedChildren.delete(outletKey);
             this.activeBlocks.delete(name); // page rời đi — không còn active ở outlet này
             result.set(name, { fragment, children });
         }
@@ -256,7 +285,7 @@ export class BlockManagerService implements BlockManagerInterface {
             if (outlet && outlet.closeTag.parentNode) {
                 outlet.closeTag.parentNode.insertBefore(fragment, outlet.closeTag);
             }
-            this.mountedChildren.set(name, children);
+            if (outlet) this.mountedChildren.set(this.outletKey(outlet), children);
             // Re-activate block của page này (blocks map còn giữ — pause không xoá)
             const block = this.blocks.get(name + viewId);
             if (block) {
@@ -319,7 +348,7 @@ export class BlockManagerService implements BlockManagerInterface {
     removeOutletsOfView(viewId: string): void {
         for (const [key, outlet] of this.blockOutlets) {
             if ((outlet as any).ctx?.viewId === viewId) {
-                this.mountedChildren.delete(outlet.name);
+                this.mountedChildren.delete(this.outletKey(outlet));
                 this.blockOutlets.delete(key);
             }
         }
@@ -330,29 +359,27 @@ export class BlockManagerService implements BlockManagerInterface {
      * Removes all DOM nodes between a named outlet's markers.
      */
     clearOutlet(name: string): void {
-        // Find outlet by name
-        for (const [key, outlet] of this.blockOutlets) {
-            if (outlet.name === name) {
-                // Destroy tracked children first
-                const children = this.mountedChildren.get(name) || [];
-                if (children) {
-                    for (const child of children) {
-                        if ('destroy' in child && typeof child.destroy === 'function') {
-                            child.destroy();
-                        }
-                    }
-                    this.mountedChildren.delete(name);
-                }
+        const outlet = this.findOutletByName(name);
+        if (outlet) this.clearOutletInstance(outlet);
+    }
 
-                // Remove any remaining DOM nodes between markers
-                let current = outlet.openTag.nextSibling;
-                while (current && current !== outlet.closeTag) {
-                    const next = current.nextSibling;
-                    current.remove();
-                    current = next;
-                }
-                break;
-            }
+    private outletKey(outlet: BlockOutletInterface): string {
+        return String((outlet as any).id ?? `${(outlet as any).ctx?.viewId ?? ''}:${outlet.name}`);
+    }
+
+    private clearOutletInstance(outlet: BlockOutletInterface): void {
+        const key = this.outletKey(outlet);
+        const children = this.mountedChildren.get(key) ?? [];
+        for (const child of children) {
+            if ('destroy' in child && typeof child.destroy === 'function') child.destroy();
+        }
+        this.mountedChildren.delete(key);
+
+        let current = outlet.openTag.nextSibling;
+        while (current && current !== outlet.closeTag) {
+            const next = current.nextSibling;
+            current.remove();
+            current = next;
         }
     }
 
@@ -360,8 +387,8 @@ export class BlockManagerService implements BlockManagerInterface {
      * Clear all outlets (for full layout teardown).
      */
     clearAllOutlets(): void {
-        for (const [key, outlet] of this.blockOutlets) {
-            this.clearOutlet(outlet.name);
+        for (const [, outlet] of this.blockOutlets) {
+            this.clearOutletInstance(outlet);
         }
     }
 

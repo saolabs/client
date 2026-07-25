@@ -141,70 +141,96 @@ export class Html {
      */
     setupTwoWayBinding(stateKey) {
         const manager = this.ctx.states.__;
-        // 1. Khởi tạo value từ state (nếu state đã có)
+        const el = this.element;
+        const isSelect = el.tagName === 'SELECT';
+        const isCheckbox = el.type === 'checkbox';
+        const isRadio = el.type === 'radio';
+        const isNumber = el.type === 'number' || el.type === 'range';
+        // state → element (dùng cho cả khởi tạo lẫn reactive update)
+        const applyState = (val) => {
+            if (isCheckbox) {
+                el.checked = !!val;
+            }
+            else if (isRadio) {
+                // Radio group: checked khi state trùng value của radio này
+                el.checked = val !== null && val !== undefined && String(val) === el.value;
+            }
+            else {
+                el.value = val !== null && val !== undefined ? String(val) : '';
+            }
+        };
+        // 1. Khởi tạo từ state hiện tại (nếu có)
         const initial = manager.getStateByKey(stateKey);
         if (initial !== null && initial !== undefined) {
-            this.element.value = String(initial);
+            if (isSelect) {
+                // <option> children chưa được append lúc constructor chạy —
+                // set .value trước khi có options là no-op, nên defer 1 microtask.
+                queueMicrotask(() => applyState(manager.getStateByKey(stateKey)));
+            }
+            else {
+                applyState(initial);
+            }
         }
-        // 2. input/change event → update state
-        const inputHandler = (e) => {
-            const target = e.target;
+        // 2. element → state
+        const readValue = () => {
+            if (isCheckbox)
+                return el.checked;
+            if (isNumber) {
+                // Giữ number cho state; input dở dang ('1e', rỗng) → giữ string thô
+                const n = el.valueAsNumber;
+                return Number.isNaN(n) ? el.value : n;
+            }
+            // radio chỉ fire change khi được chọn → value là giá trị đã chọn
+            return el.value;
+        };
+        const inputHandler = () => {
             const setter = manager.setters[stateKey];
             if (typeof setter === 'function') {
-                setter(target.type === 'checkbox' ? target.checked : target.value);
+                setter(readValue());
             }
             else {
                 // Fallback: updateStateByKey trực tiếp
-                manager.updateStateByKey(stateKey, target.type === 'checkbox' ? target.checked : target.value);
+                manager.updateStateByKey(stateKey, readValue());
             }
         };
-        const eventType = this.element.type === 'checkbox' ? 'change' : 'input';
+        const eventType = isCheckbox || isRadio || isSelect ? 'change' : 'input';
         this.element.addEventListener(eventType, inputHandler, { signal: this.abortController.signal });
-        // 3. state → element.value (reactive update)
+        // 3. state → element (reactive update)
         const unsubscribe = manager.subscribe([stateKey], () => {
-            const newVal = manager.getStateByKey(stateKey);
-            if (this.element.type === 'checkbox') {
-                this.element.checked = !!newVal;
-            }
-            else {
-                this.element.value = newVal !== null && newVal !== undefined
-                    ? String(newVal) : '';
-            }
+            applyState(manager.getStateByKey(stateKey));
         });
         this.bindingUnsubscribes.push(unsubscribe);
     }
     initializeAttributes() {
         const attrs = this.config.attrs;
-        if (!attrs)
-            return;
-        // ─── Detect @bind directive (two-way binding) ─────────────
-        // Pattern từ compiler: { "bind": {type:'static', value:true}, "<stateKey>": {type:'static', value:true} }
-        // Tham chiếu: COMPILER_CONTRACT.md §5.
-        const bindAttr = attrs['bind'];
-        if (bindAttr?.type === 'static' && bindAttr?.value === true) {
-            const stateKey = Object.keys(attrs).find(k => {
-                if (k === 'bind')
-                    return false;
-                const v = attrs[k];
-                // State key marker: { type: 'static', value: true }
-                return v.type === 'static' && v.value === true;
-            });
-            if (stateKey) {
-                this.setupTwoWayBinding(stateKey);
-                // Sau khi xử lý bind, skip toàn bộ attr loop cho bind + stateKey attrs
-                // để không set attribute "bind=true" hay "newTodo=true" trên DOM.
-                for (const [attrName, attrConfig] of Object.entries(attrs)) {
-                    if (attrName === 'bind' || (attrConfig.type === 'static' && attrConfig.value === true))
-                        continue;
-                    this._applyAttr(attrName, attrConfig);
-                }
-                return;
+        if (attrs) {
+            // ─── Detect @bind directive (two-way binding) ─────────────
+            // Pattern từ compiler: { "bind": {type:'static', value:true}, "<stateKey>": {type:'static', value:true} }
+            // Tham chiếu: COMPILER_CONTRACT.md §5.
+            let bindStateKey;
+            const bindAttr = attrs['bind'];
+            if (bindAttr?.type === 'static' && bindAttr?.value === true) {
+                bindStateKey = Object.keys(attrs).find(k => {
+                    if (k === 'bind')
+                        return false;
+                    const v = attrs[k];
+                    // State key marker: { type: 'static', value: true }
+                    return v.type === 'static' && v.value === true;
+                });
+            }
+            // Apply attrs TRƯỚC binding — setupTwoWayBinding cần el.type ('checkbox',
+            // 'radio', 'number'...) đã có mặt. Khi có bind: skip "bind=true" và
+            // "<stateKey>=true" để không set marker lên DOM.
+            for (const [attrName, attrConfig] of Object.entries(attrs)) {
+                if (bindStateKey && (attrName === 'bind' || (attrConfig.type === 'static' && attrConfig.value === true)))
+                    continue;
+                this._applyAttr(attrName, attrConfig);
+            }
+            if (bindStateKey) {
+                this.setupTwoWayBinding(bindStateKey);
             }
         }
-        // ─── Normal attrs ──────────────────────────────────────────
-        for (const [attrName, attrConfig] of Object.entries(attrs)) {
-            this._applyAttr(attrName, attrConfig);
-        }
+        // props độc lập với attrs/bind — element chỉ có props vẫn phải chạy
         if (this.config.props) {
             for (const [propName, propConfig] of Object.entries(this.config.props)) {
                 if (propConfig.type === 'static' || propConfig.type === 'value') {
@@ -344,10 +370,20 @@ export class Html {
         }
     }
     initializeEvents() {
+        this.addEventListeners();
+    }
+    addEventListeners() {
         if (this.config.events) {
             for (const [eventName, handlers] of Object.entries(this.config.events)) {
                 this.ctx.addEventListener(this.element, eventName, handlers);
             }
+        }
+    }
+    removeEventListeners() {
+        if (!this.config.events)
+            return;
+        for (const eventName of Object.keys(this.config.events)) {
+            this.ctx.removeEventListener(this.element, eventName);
         }
     }
     setParentElement(parent) {
@@ -428,7 +464,10 @@ export class Html {
         this.element.remove();
     }
     destroy() {
+        if (this.__destroyed__)
+            return;
         this.__destroyed__ = true;
+        this.removeEventListeners();
         // Abort all registered event listeners
         this.abortController.abort();
         this.abortController = new AbortController();

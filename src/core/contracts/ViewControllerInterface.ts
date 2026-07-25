@@ -26,6 +26,9 @@ export interface ViewControllerInterface {
     /** Whether this view defines a super view (layout) */
     hasSuperView: boolean;
 
+    /** Exact DOM listener references, used for element-level cleanup before destroy. */
+    elementEventHandlers: Map<HTMLElement, Map<string, EventListener[]>>;
+
     /**
      * Active ForeachSlotCache — set bởi Reactive.renderForeach() trước khi gọi factory.
      * __foreach() dùng để quyết định reuse hay create elements.
@@ -47,6 +50,7 @@ export interface ViewControllerInterface {
 
     wrapper: (factory: SaoChildrenFactory) => WrapperInterface;
 
+    removeEventListener(element: HTMLElement, event: string): void;
     addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler): void;
     /** Called by reactive system to schedule an update */
     scheduleUpdate(reactive: ReactiveInterface): void;
@@ -112,8 +116,9 @@ export interface ViewControllerInterface {
     parent: ViewControllerInterface | null;
     /** Nested view tree (@include): child controllers */
     children: ViewControllerInterface[];
-    setParent(parent: ViewControllerInterface): void;
+    setParent(parent: ViewControllerInterface | null): void;
     addChild(child: ViewControllerInterface): void;
+    removeChild(child: ViewControllerInterface): void;
     /** Track the original page view's controller for block mounting */
     originView: ViewControllerInterface | null;
     /** Set the origin (page) controller reference */

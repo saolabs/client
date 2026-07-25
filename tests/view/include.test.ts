@@ -133,6 +133,23 @@ describe('@include — Component', () => {
 
         hostCtrl.destroy();
         expect(childCtrl.lifecycleState).toBe('destroyed');
+        expect(hostCtrl.children).toHaveLength(0);
+    });
+
+    it('pause/resume page lan truyền tới child view', async () => {
+        const { vm } = createManager();
+        await vm.mountView('web.host', {}, route('/host'));
+
+        const hostCtrl = vm.getCurrentView()!.__ctrl__;
+        const childCtrl = hostCtrl.children[0];
+
+        hostCtrl.pause();
+        expect(hostCtrl.lifecycleState).toBe('paused');
+        expect(childCtrl.lifecycleState).toBe('paused');
+
+        hostCtrl.resume();
+        expect(hostCtrl.lifecycleState).toBe('active');
+        expect(childCtrl.lifecycleState).toBe('active');
     });
 
     it('@includeWhen: condition đổi → unmount/mount child', async () => {

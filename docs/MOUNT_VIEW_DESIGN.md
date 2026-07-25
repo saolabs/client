@@ -1130,7 +1130,7 @@ Flow Case B (same layout):
 | **ViewController** | `commitData()` | P1 | Call commitConstructorData |
 | **BlockManager** | `startBlockContent()` | P0 | Start mounted children |
 | **BlockManager** | `stopBlockContent()` | P0 | Stop mounted children |
-| **BlockManager** | Sequential mounting for nested extends | P2 | Handle 3+ level chains |
+| **BlockManager** | Sequential mounting for nested extends | Done | Owner-scoped mount, common-prefix reuse, 3+ level chains |
 
 ### Cần sửa ⚠️
 

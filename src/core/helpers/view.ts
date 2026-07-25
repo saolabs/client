@@ -1,4 +1,39 @@
 import type { HtmlInterface, SaoNodeInterface, SaoElementChildren, SaoElement, DOMElement, WrapperInterface, TextInterface, SaoChildrenFactoryOutput } from "../contracts/ElementInterface";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
+
+/** Commit initial data; hydration discards pending notifications before subscribe. */
+export function commitView(ctrl: ViewControllerInterface, discardPending: boolean = false): void {
+    ctrl.commitData();
+    if (discardPending) ctrl.states.__.flushNow();
+}
+
+/** Flush state + reactive queues after a lifecycle transition. */
+export function flushView(ctrl: ViewControllerInterface): void {
+    ctrl.states.__.flushNow();
+    ctrl.flushReactiveUpdatesNow();
+}
+
+/** Start a view through its controller, then make the initial DOM snapshot current. */
+export function activateView(ctrl: ViewControllerInterface): void {
+    ctrl.start();
+    flushView(ctrl);
+}
+
+/**
+ * Claim an already-rendered Wrapper tree without inserting or clearing DOM.
+ * Used by both route hydration and nested @include hydration.
+ */
+export function claimHydratedView(
+    ctrl: ViewControllerInterface,
+    root: HtmlInterface,
+    wrapper: WrapperInterface | null = ctrl.mainElement,
+): void {
+    ctrl.setParentElement(root);
+    if (!wrapper) return;
+    wrapper.setParentElement(root);
+    const children = wrapper.render();
+    if (children && children.length > 0) hydrateElementList(root, children);
+}
 
 /**
  * Mount danh sách children vào TRƯỚC một anchor node (RUNTIME_CONTRACT.md §2 —
@@ -245,4 +280,4 @@ export function mountElementListBefore(root: HtmlInterface, elements: SaoNodeInt
         });
     }
     return mountedNodes as any;
-}   
+}

@@ -90,8 +90,36 @@ export class BlockManagerService {
                 this.mountBlockIntoOutlet(block, outlet);
             }
             else {
-                this.clearOutlet(outlet.name);
+                this.clearOutletInstance(outlet);
             }
+        }
+    }
+    /**
+     * Mount only blocks owned by one Page/Layout controller. Nested layout
+     * chains call this from outer to inner, so an inner outlet exists before
+     * the next owner is mounted and retained layouts are not rebuilt.
+     */
+    mountViewBlocks(viewId) {
+        for (const [, block] of this.blocks) {
+            if (block.viewId !== viewId || !block.contentRenderFactory)
+                continue;
+            const outlet = this.findOutletByName(block.name);
+            if (!outlet)
+                continue;
+            this.activeBlocks.set(block.name, block);
+            this.mountBlockIntoOutlet(block, outlet);
+        }
+    }
+    /** Hydration counterpart of mountViewBlocks(). */
+    hydrateViewBlocks(viewId) {
+        for (const [, block] of this.blocks) {
+            if (block.viewId !== viewId || !block.contentRenderFactory)
+                continue;
+            const outlet = this.findOutletByName(block.name);
+            if (!outlet)
+                continue;
+            this.activeBlocks.set(block.name, block);
+            this.hydrateBlockIntoOutlet(block, outlet);
         }
     }
     /**
@@ -103,7 +131,7 @@ export class BlockManagerService {
         if (!outlet.openTag.parentNode)
             return; // outlet chưa nằm trong DOM
         // Clear nội dung cũ (page trước) trước khi mount page mới
-        this.clearOutlet(outlet.name);
+        this.clearOutletInstance(outlet);
         const children = [];
         const insertBeforeClose = (node) => {
             outlet.closeTag.parentNode?.insertBefore(node, outlet.closeTag);
@@ -143,7 +171,7 @@ export class BlockManagerService {
             }
         }
         // Track mounted children for lifecycle (start/stop/destroy)
-        this.mountedChildren.set(outlet.name, children);
+        this.mountedChildren.set(this.outletKey(outlet), children);
     }
     /**
      * Hydrate version của mountAll — dùng khi SSR.
@@ -194,7 +222,66 @@ export class BlockManagerService {
                 }
             }
         }
-        this.mountedChildren.set(outlet.name, children);
+        this.mountedChildren.set(this.outletKey(outlet), children);
+    }
+    /** Tìm outlet theo tên (outlet key = `${layoutViewId}-ob-${name}`) */
+    findOutletByName(name) {
+        let found = null;
+        for (const [, outlet] of this.blockOutlets) {
+            if (outlet.name === name)
+                found = outlet;
+        }
+        // Nearest/deepest outlet is registered last while mounting a nested chain.
+        return found;
+    }
+    /**
+     * Detach block content của một page (rời trang, vào PageCache):
+     * gỡ DOM giữa markers của từng outlet vào DocumentFragment, lấy children
+     * đang track ra khỏi manager (KHÔNG destroy — instance sống trong cache).
+     *
+     * Trả Map<outletName, {fragment, children}> để restore sau này.
+     */
+    detachPageContent(viewId) {
+        const result = new Map();
+        for (const [name, block] of Array.from(this.activeBlocks)) {
+            if (block.viewId !== viewId)
+                continue;
+            const fragment = document.createDocumentFragment();
+            const outlet = this.findOutletByName(name);
+            if (outlet && outlet.openTag.parentNode) {
+                let current = outlet.openTag.nextSibling;
+                while (current && current !== outlet.closeTag) {
+                    const next = current.nextSibling;
+                    fragment.appendChild(current); // appendChild tự remove khỏi DOM
+                    current = next;
+                }
+            }
+            const outletKey = outlet ? this.outletKey(outlet) : name;
+            const children = this.mountedChildren.get(outletKey) ?? [];
+            this.mountedChildren.delete(outletKey);
+            this.activeBlocks.delete(name); // page rời đi — không còn active ở outlet này
+            result.set(name, { fragment, children });
+        }
+        return result;
+    }
+    /**
+     * Restore block content của một page từ PageCache vào outlets hiện tại.
+     * Tiền đề: layout đang mount trùng với layout lúc detach (ViewManager guard).
+     */
+    restorePageContent(viewId, contents) {
+        for (const [name, { fragment, children }] of contents) {
+            const outlet = this.findOutletByName(name);
+            if (outlet && outlet.closeTag.parentNode) {
+                outlet.closeTag.parentNode.insertBefore(fragment, outlet.closeTag);
+            }
+            if (outlet)
+                this.mountedChildren.set(this.outletKey(outlet), children);
+            // Re-activate block của page này (blocks map còn giữ — pause không xoá)
+            const block = this.blocks.get(name + viewId);
+            if (block) {
+                this.activeBlocks.set(name, block);
+            }
+        }
     }
     /** Start toàn bộ block content đang mounted (gọi sau mountAll) */
     startAll() {
@@ -231,11 +318,24 @@ export class BlockManagerService {
             }
         }
     }
+    /**
+     * Gỡ outlets của một layout khỏi registry mà KHÔNG destroy — layout pause
+     * vào PageCache. Nếu để lại, mountAll/findOutletByName có thể đụng outlet
+     * (trùng tên) của layout đang detached. Re-register khi resume qua
+     * addOutlet (ViewManager.reregisterLayoutOutlets).
+     */
+    detachOutletsOfView(viewId) {
+        for (const [key, outlet] of this.blockOutlets) {
+            if (outlet.ctx?.viewId === viewId) {
+                this.blockOutlets.delete(key);
+            }
+        }
+    }
     /** Gỡ outlets của một layout bị destroy */
     removeOutletsOfView(viewId) {
         for (const [key, outlet] of this.blockOutlets) {
             if (outlet.ctx?.viewId === viewId) {
-                this.mountedChildren.delete(outlet.name);
+                this.mountedChildren.delete(this.outletKey(outlet));
                 this.blockOutlets.delete(key);
             }
         }
@@ -245,36 +345,34 @@ export class BlockManagerService {
      * Removes all DOM nodes between a named outlet's markers.
      */
     clearOutlet(name) {
-        // Find outlet by name
-        for (const [key, outlet] of this.blockOutlets) {
-            if (outlet.name === name) {
-                // Destroy tracked children first
-                const children = this.mountedChildren.get(name) || [];
-                if (children) {
-                    for (const child of children) {
-                        if ('destroy' in child && typeof child.destroy === 'function') {
-                            child.destroy();
-                        }
-                    }
-                    this.mountedChildren.delete(name);
-                }
-                // Remove any remaining DOM nodes between markers
-                let current = outlet.openTag.nextSibling;
-                while (current && current !== outlet.closeTag) {
-                    const next = current.nextSibling;
-                    current.remove();
-                    current = next;
-                }
-                break;
-            }
+        const outlet = this.findOutletByName(name);
+        if (outlet)
+            this.clearOutletInstance(outlet);
+    }
+    outletKey(outlet) {
+        return String(outlet.id ?? `${outlet.ctx?.viewId ?? ''}:${outlet.name}`);
+    }
+    clearOutletInstance(outlet) {
+        const key = this.outletKey(outlet);
+        const children = this.mountedChildren.get(key) ?? [];
+        for (const child of children) {
+            if ('destroy' in child && typeof child.destroy === 'function')
+                child.destroy();
+        }
+        this.mountedChildren.delete(key);
+        let current = outlet.openTag.nextSibling;
+        while (current && current !== outlet.closeTag) {
+            const next = current.nextSibling;
+            current.remove();
+            current = next;
         }
     }
     /**
      * Clear all outlets (for full layout teardown).
      */
     clearAllOutlets() {
-        for (const [key, outlet] of this.blockOutlets) {
-            this.clearOutlet(outlet.name);
+        for (const [, outlet] of this.blockOutlets) {
+            this.clearOutletInstance(outlet);
         }
     }
     /**

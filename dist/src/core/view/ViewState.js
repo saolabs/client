@@ -228,14 +228,17 @@ export class StateManager {
         if (!this.listeners.has(key))
             this.listeners.set(key, []);
         this.listeners.get(key).push(callback);
-        const index = this.listeners.get(key).length - 1;
+        // Gỡ theo REFERENCE (không theo index chụp lúc đăng ký — listener trước
+        // unsubscribe làm index sau lệch → gỡ nhầm listener khác)
         return () => {
             const listeners = this.listeners.get(key);
-            if (listeners) {
-                listeners.splice(index, 1);
-                if (listeners.length === 0)
-                    this.listeners.delete(key);
-            }
+            if (!listeners)
+                return;
+            const idx = listeners.indexOf(callback);
+            if (idx !== -1)
+                listeners.splice(idx, 1);
+            if (listeners.length === 0)
+                this.listeners.delete(key);
         };
     }
     unsubscribe(key, callback) {

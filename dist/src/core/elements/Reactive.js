@@ -151,14 +151,8 @@ export class Reactive {
                 target.appendChild(this.closeTag);
             }
             this.mounted = true;
-            // Initial render — chạy factory lần đầu, ghi vào cache nếu là foreach
-            if (this._foreachCache) {
-                this.ctx._currentForeachCache = this._foreachCache;
-            }
+            // Initial render — _renderChildren tự mở cửa sổ cache quanh factory call
             this._renderChildren();
-            if (this._foreachCache) {
-                this.ctx._currentForeachCache = null;
-            }
         }
         else if (this._foreachCache) {
             // ── Re-render @foreach: dùng reconciler ──────────────────────────
@@ -176,7 +170,10 @@ export class Reactive {
      * Precondition: markers đã trong DOM.
      */
     _renderChildren() {
-        const output = this.childrenFactory(this, this.parentElement);
+        // Cửa sổ cache chỉ mở quanh factory call — KHÔNG mở trong child.render()
+        // phía dưới, tránh nested @foreach (chạy lúc render con) ghi nhầm entry
+        // vào cache của loop ngoài rồi bị prunePass destroy oan ở pass sau.
+        const output = this._runFactoryWithCache();
         const newChildren = [];
         for (const child of output) {
             if (child === null || child === undefined)
@@ -218,13 +215,30 @@ export class Reactive {
         }
     }
     /**
+     * Chạy childrenFactory với cửa sổ cache foreach (nếu có) mở đúng quanh
+     * factory call. beginPass reset occurrence counters + touched set.
+     */
+    _runFactoryWithCache() {
+        if (!this._foreachCache) {
+            return this.childrenFactory(this, this.parentElement);
+        }
+        this._foreachCache.beginPass();
+        this.ctx._currentForeachCache = this._foreachCache;
+        try {
+            return this.childrenFactory(this, this.parentElement);
+        }
+        finally {
+            this.ctx._currentForeachCache = null;
+        }
+    }
+    /**
      * Hydrate children — tạo JS element objects từ factory nhưng KHÔNG insert DOM.
      * Html children đã claim server DOM nodes trong constructor.
      * Output/Reactive children gọi render() để claim markers.
      * Sau hydrate, re-render tiếp theo dùng flow CSR bình thường.
      */
     _hydrateChildren() {
-        const output = this.childrenFactory(this, this.parentElement);
+        const output = this._runFactoryWithCache();
         for (const child of output) {
             if (child === null || child === undefined)
                 continue;
@@ -268,14 +282,11 @@ export class Reactive {
      *   cho unchanged items.
      */
     renderForeach() {
-        // ── Step 1: Snapshot slots đang hiển thị ─────────────────────────────
+        // ── Step 1: Ghi nhớ children đang hiển thị (phân biệt reuse/new) ─────
         const cache = this._foreachCache;
-        const prevSlotSnapshot = cache.snapshot(); // Map(item → slot)
         const prevChildren = new Set(this.children); // old Saola elements
-        // ── Step 2: Chạy factory với cache active ─────────────────────────────
-        this.ctx._currentForeachCache = cache;
-        const output = this.childrenFactory(this, this.parentElement);
-        this.ctx._currentForeachCache = null;
+        // ── Step 2: Chạy factory với cache active (beginPass + claim/store) ──
+        const output = this._runFactoryWithCache();
         // Flatten output thành danh sách children mới
         const newChildren = [];
         for (const child of output) {
@@ -285,22 +296,15 @@ export class Reactive {
                 newChildren.push(child);
             }
         }
-        const newChildSet = new Set(newChildren);
-        // ── Step 3: Destroy items đã bị xoá khỏi list ─────────────────────────
-        // Bất kỳ item trong prevSlots mà không xuất hiện trong cache.snapshot() mới
-        // → item đó không còn trong list → destroy elements + xoá khỏi cache.
-        const newSlotSnapshot = cache.snapshot();
-        for (const [item, slot] of prevSlotSnapshot) {
-            if (!newSlotSnapshot.has(item)) {
-                // Item đã bị xoá → destroy Saola elements
-                for (const el of slot.elements) {
-                    if (el && typeof el.destroy === 'function') {
-                        el.destroy();
-                    }
+        // ── Step 3: Destroy slot không được claim/store trong pass ───────────
+        // = item đã rời list, hoặc bị thay bằng ref mới (key trùng nhưng ref đổi).
+        cache.prunePass((slot) => {
+            for (const el of slot.elements) {
+                if (el && typeof el.destroy === 'function') {
+                    el.destroy();
                 }
-                cache.remove(item);
             }
-        }
+        });
         // ── Step 4: Reorder DOM ───────────────────────────────────────────────
         // insertBefore(closeTag) cho từng element mới:
         //   - Cached elements: DOM MOVE (đã có trong DOM, di chuyển đến vị trí đúng)
