@@ -16,6 +16,15 @@ export declare class Html implements HtmlInterface {
     private abortController;
     /** All state subscriptions for reactive bindings — cleanup on destroy */
     private bindingUnsubscribes;
+    /** Invalidates deferred/stale binding callbacks after a config reconciliation. */
+    private bindingGeneration;
+    /** DOM state owned by this Html config, used for exact cleanup before reuse. */
+    private managedAttributeNames;
+    private managedClassNames;
+    private managedStyleNames;
+    private managedPropertyNames;
+    /** Events actually registered through ViewController, independent of current config. */
+    private registeredEventNames;
     initMode: InitMode;
     constructor({ ctx, id, parentElement, tagName, element, config, childrenFactory, initMode, }: {
         ctx: ViewControllerInterface | ViewManagerInterface;
@@ -29,6 +38,9 @@ export declare class Html implements HtmlInterface {
     });
     updateConfig(newConfig: Partial<SaoElementConfig>): void;
     private initialize;
+    private isBindingCurrent;
+    private cleanupBindingResources;
+    private clearManagedDomState;
     /**
      * Chuẩn hóa tên attr từ camelCase → kebab-case cho data-* và aria-* attrs.
      *

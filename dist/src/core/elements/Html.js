@@ -1,5 +1,4 @@
 import { InitModes } from "../contracts/common";
-import { hasData } from "../helpers/utils";
 import { mountElementList, hydrateElementList } from "../helpers/view";
 import { TextElement } from "./TextElement";
 /**
@@ -27,6 +26,15 @@ export class Html {
         this.abortController = new AbortController();
         /** All state subscriptions for reactive bindings — cleanup on destroy */
         this.bindingUnsubscribes = [];
+        /** Invalidates deferred/stale binding callbacks after a config reconciliation. */
+        this.bindingGeneration = 0;
+        /** DOM state owned by this Html config, used for exact cleanup before reuse. */
+        this.managedAttributeNames = new Set();
+        this.managedClassNames = new Set();
+        this.managedStyleNames = new Set();
+        this.managedPropertyNames = new Set();
+        /** Events actually registered through ViewController, independent of current config. */
+        this.registeredEventNames = new Set();
         this.initMode = InitModes.CREATE;
         /** Registry guard — element đã destroy không được reuse (xem RUNTIME_CONTRACT.md §2) */
         this.__destroyed__ = false;
@@ -95,15 +103,85 @@ export class Html {
         this.initialize();
     }
     updateConfig(newConfig) {
-        if (hasData(newConfig)) {
-            this.config = { ...this.config, ...newConfig };
-        }
+        if (this.__destroyed__)
+            return;
+        // Reuse must behave like a fresh initialization without replacing the DOM
+        // node: remove every resource owned by the previous config first, then make
+        // the new managed sections authoritative. This prevents stale attrs,
+        // duplicate events, and state subscriptions retaining old closures.
+        this.removeEventListeners();
+        this.cleanupBindingResources();
+        this.clearManagedDomState();
+        this.config = {
+            ...this.config,
+            ...newConfig,
+            attrs: newConfig.attrs,
+            props: newConfig.props,
+            events: newConfig.events,
+            classes: newConfig.classes,
+            styles: newConfig.styles,
+        };
+        this.initialize();
     }
     initialize() {
         this.initializeAttributes();
         this.initializeClasses();
         this.initializeStyles();
         this.initializeEvents();
+    }
+    isBindingCurrent(generation) {
+        return !this.__destroyed__ && generation === this.bindingGeneration;
+    }
+    cleanupBindingResources(renewAbortController = true) {
+        this.bindingGeneration++;
+        this.abortController.abort();
+        if (renewAbortController) {
+            this.abortController = new AbortController();
+        }
+        for (const unsubscribe of this.bindingUnsubscribes) {
+            try {
+                unsubscribe();
+            }
+            catch (error) {
+                console.error('[Html] Failed to unsubscribe a reactive binding:', error);
+            }
+        }
+        this.bindingUnsubscribes = [];
+    }
+    clearManagedDomState() {
+        for (const attrName of this.managedAttributeNames) {
+            this.element.removeAttribute(attrName);
+        }
+        this.managedAttributeNames.clear();
+        for (const className of this.managedClassNames) {
+            this.element.classList.remove(className);
+        }
+        this.managedClassNames.clear();
+        for (const prop of this.managedStyleNames) {
+            this.element.style.removeProperty(prop);
+        }
+        this.managedStyleNames.clear();
+        const defaults = document.createElement(this.tagName);
+        const target = this.element;
+        for (const propName of this.managedPropertyNames) {
+            try {
+                if (propName in defaults) {
+                    target[propName] = defaults[propName];
+                }
+                else {
+                    delete target[propName];
+                }
+            }
+            catch {
+                // Some host properties are readonly. Removing an own property is
+                // still safe and avoids retaining user/config objects where possible.
+                try {
+                    delete target[propName];
+                }
+                catch { /* no-op */ }
+            }
+        }
+        this.managedPropertyNames.clear();
     }
     /**
      * Chuẩn hóa tên attr từ camelCase → kebab-case cho data-* và aria-* attrs.
@@ -142,6 +220,7 @@ export class Html {
     setupTwoWayBinding(stateKey) {
         const manager = this.ctx.states.__;
         const el = this.element;
+        const generation = this.bindingGeneration;
         const isSelect = el.tagName === 'SELECT';
         const isCheckbox = el.type === 'checkbox';
         const isRadio = el.type === 'radio';
@@ -165,7 +244,11 @@ export class Html {
             if (isSelect) {
                 // <option> children chưa được append lúc constructor chạy —
                 // set .value trước khi có options là no-op, nên defer 1 microtask.
-                queueMicrotask(() => applyState(manager.getStateByKey(stateKey)));
+                queueMicrotask(() => {
+                    if (this.isBindingCurrent(generation)) {
+                        applyState(manager.getStateByKey(stateKey));
+                    }
+                });
             }
             else {
                 applyState(initial);
@@ -184,6 +267,8 @@ export class Html {
             return el.value;
         };
         const inputHandler = () => {
+            if (!this.isBindingCurrent(generation))
+                return;
             const setter = manager.setters[stateKey];
             if (typeof setter === 'function') {
                 setter(readValue());
@@ -197,7 +282,9 @@ export class Html {
         this.element.addEventListener(eventType, inputHandler, { signal: this.abortController.signal });
         // 3. state → element (reactive update)
         const unsubscribe = manager.subscribe([stateKey], () => {
-            applyState(manager.getStateByKey(stateKey));
+            if (this.isBindingCurrent(generation)) {
+                applyState(manager.getStateByKey(stateKey));
+            }
         });
         this.bindingUnsubscribes.push(unsubscribe);
     }
@@ -233,10 +320,12 @@ export class Html {
         // props độc lập với attrs/bind — element chỉ có props vẫn phải chạy
         if (this.config.props) {
             for (const [propName, propConfig] of Object.entries(this.config.props)) {
+                this.managedPropertyNames.add(propName);
                 if (propConfig.type === 'static' || propConfig.type === 'value') {
                     this.element[propName] = propConfig.value;
                 }
                 else if (propConfig.type === 'binding') {
+                    const generation = this.bindingGeneration;
                     const value = propConfig.factory ? propConfig.factory() : '';
                     if (value !== undefined && value !== null && value !== false) {
                         this.element[propName] = value;
@@ -248,6 +337,8 @@ export class Html {
                     // Reactive binding for properties
                     if (propConfig.stateKeys?.length) {
                         const unsubscribe = this.ctx.states.__.subscribe(propConfig.stateKeys, () => {
+                            if (!this.isBindingCurrent(generation))
+                                return;
                             const newValue = propConfig.factory ? propConfig.factory() : '';
                             if (newValue !== undefined && newValue !== null && newValue !== false) {
                                 this.element[propName] = newValue;
@@ -271,13 +362,18 @@ export class Html {
     _applyAttr(attrName, attrConfig) {
         // FIX(Phase4): chuẩn hóa tên — dataCount → data-count
         const normalizedName = this.normalizeAttrName(attrName);
+        this.managedAttributeNames.add(normalizedName);
         // FIX(baseline#1): contract chuẩn là 'static' (compiler emit); 'value' giữ làm legacy alias
         if (attrConfig.type === 'static' || attrConfig.type === 'value') {
             if (attrConfig.value !== undefined && attrConfig.value !== null && attrConfig.value !== false) {
                 this.element.setAttribute(normalizedName, String(attrConfig.value));
             }
+            else {
+                this.element.removeAttribute(normalizedName);
+            }
         }
         else if (attrConfig.type === 'binding') {
+            const generation = this.bindingGeneration;
             const value = attrConfig.factory ? attrConfig.factory() : '';
             if (value !== undefined && value !== null && value !== false) {
                 this.element.setAttribute(normalizedName, String(value));
@@ -287,6 +383,8 @@ export class Html {
             }
             if (attrConfig.stateKeys?.length) {
                 const unsubscribe = this.ctx.states.__.subscribe(attrConfig.stateKeys, () => {
+                    if (!this.isBindingCurrent(generation))
+                        return;
                     const newValue = attrConfig.factory ? attrConfig.factory() : '';
                     if (newValue !== undefined && newValue !== null && newValue !== false) {
                         this.element.setAttribute(normalizedName, String(newValue));
@@ -308,15 +406,19 @@ export class Html {
                 if (!classConfig || !classConfig.value)
                     continue;
                 const className = classConfig.value;
+                this.managedClassNames.add(className);
                 if (classConfig.type === 'static') {
                     this.element.classList.add(className);
                     continue;
                 }
                 if (classConfig.type === 'binding') {
+                    const generation = this.bindingGeneration;
                     const initialValue = classConfig.factory ? classConfig.factory() : false;
                     this.element.classList.toggle(className, !!initialValue);
                     if (classConfig.stateKeys?.length) {
                         const unsubscribe = this.ctx.states.__.subscribe(classConfig.stateKeys, () => {
+                            if (!this.isBindingCurrent(generation))
+                                return;
                             const newValue = classConfig.factory ? classConfig.factory() : false;
                             this.element.classList.toggle(className, !!newValue);
                         });
@@ -327,18 +429,22 @@ export class Html {
             return;
         }
         for (const [className, classConfig] of Object.entries(this.config.classes)) {
+            this.managedClassNames.add(className);
             if (classConfig.type === 'static') {
                 if (classConfig.value) {
                     this.element.classList.add(className);
                 }
             }
             else if (classConfig.type === 'binding') {
+                const generation = this.bindingGeneration;
                 // Initial value
                 const initialValue = classConfig.factory ? classConfig.factory() : !!classConfig.value;
                 this.element.classList.toggle(className, !!initialValue);
                 // Subscribe for reactive updates
                 if (classConfig.stateKeys?.length) {
                     const unsubscribe = this.ctx.states.__.subscribe(classConfig.stateKeys, () => {
+                        if (!this.isBindingCurrent(generation))
+                            return;
                         const newValue = classConfig.factory ? classConfig.factory() : false;
                         this.element.classList.toggle(className, !!newValue);
                     });
@@ -351,16 +457,20 @@ export class Html {
         if (!this.config.styles)
             return;
         for (const [prop, styleConfig] of Object.entries(this.config.styles)) {
+            this.managedStyleNames.add(prop);
             if (styleConfig.type === 'static' || styleConfig.type === 'value') {
                 this.element.style.setProperty(prop, styleConfig.value ?? '');
             }
             else if (styleConfig.type === 'binding') {
+                const generation = this.bindingGeneration;
                 // Initial value
                 const initialValue = styleConfig.factory ? styleConfig.factory() : (styleConfig.value ?? '');
                 this.element.style.setProperty(prop, initialValue);
                 // Subscribe for reactive updates
                 if (styleConfig.stateKeys?.length) {
                     const unsubscribe = this.ctx.states.__.subscribe(styleConfig.stateKeys, () => {
+                        if (!this.isBindingCurrent(generation))
+                            return;
                         const newValue = styleConfig.factory ? styleConfig.factory() : '';
                         this.element.style.setProperty(prop, newValue);
                     });
@@ -376,15 +486,20 @@ export class Html {
         if (this.config.events) {
             for (const [eventName, handlers] of Object.entries(this.config.events)) {
                 this.ctx.addEventListener(this.element, eventName, handlers);
+                this.registeredEventNames.add(eventName);
             }
         }
     }
     removeEventListeners() {
-        if (!this.config.events)
-            return;
-        for (const eventName of Object.keys(this.config.events)) {
-            this.ctx.removeEventListener(this.element, eventName);
+        for (const eventName of this.registeredEventNames) {
+            try {
+                this.ctx.removeEventListener(this.element, eventName);
+            }
+            catch (error) {
+                console.error(`[Html] Failed to remove "${eventName}" listener:`, error);
+            }
         }
+        this.registeredEventNames.clear();
     }
     setParentElement(parent) {
         this.parent = parent;
@@ -468,14 +583,8 @@ export class Html {
             return;
         this.__destroyed__ = true;
         this.removeEventListeners();
-        // Abort all registered event listeners
-        this.abortController.abort();
-        this.abortController = new AbortController();
-        // Cleanup reactive binding subscriptions
-        for (const unsub of this.bindingUnsubscribes) {
-            unsub();
-        }
-        this.bindingUnsubscribes = [];
+        // Abort @bind listeners and unsubscribe every reactive attr/prop/class/style.
+        this.cleanupBindingResources(false);
         // Destroy children recursively
         this.children.forEach(child => {
             if ('destroy' in child && typeof child.destroy === 'function') {
