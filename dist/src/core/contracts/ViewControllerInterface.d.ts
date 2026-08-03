@@ -1,7 +1,7 @@
 import type { SaoObjectType } from "../types/utils";
 import type { ViewInterface, ViewRenderFactory } from "./ViewInterface";
 import type { ViewStateInterface } from "./ViewStateInterface";
-import type { HtmlInterface, FragmentInterface, SaoElementEventHandler, SaoChildrenFactory, WrapperInterface } from "./ElementInterface";
+import type { HtmlInterface, FragmentInterface, SaoElementEventHandler, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, WrapperInterface } from "./ElementInterface";
 import type { ReactiveInterface } from "./ReactiveInterface";
 import type { BlockInterface } from "./BlockInterface";
 import type { LoopContextInterface } from "./LoopContextInterface";
@@ -76,8 +76,8 @@ export interface ViewControllerInterface {
     active(): void;
     deactive(): void;
     pushBlockAndSections(): void;
-    /** @children slot — render children content từ parent include */
-    __children(content: any, parentElement: any): any[];
+    /** Materialize the lazy parent-owned slot only when ChildrenNode is rendered. */
+    __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput;
     /** Loop directives */
     __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: any) => any, keyFn?: (item: T, index: number) => any): any[];
     __for(loopType?: string, start?: number, end?: number, execute?: (loop: any) => any): any;

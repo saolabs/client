@@ -36,6 +36,8 @@ export class ViewManager {
         /** DI container */
         this.App = null;
         this.systemData = {}; // For internal use, not exposed to views
+        this.contextRevision = null;
+        this.contextViews = null;
         /** ROOT DOM container where views mount */
         this.container = null;
         this.rootElement = null; // Html wrapper for the root container
@@ -171,6 +173,12 @@ export class ViewManager {
         // view factory ở view() để compiled view resolve superView/namespace.
         if (config?.systemData && typeof config.systemData === 'object') {
             this.systemData = { ...this.systemData, ...config.systemData };
+        }
+        if (typeof config?.revision === 'string') {
+            this.contextRevision = config.revision;
+        }
+        if (typeof config?.contextViews === 'string') {
+            this.contextViews = config.contextViews;
         }
         if (config?.ssrData && typeof config.ssrData === 'object') {
             this.ssrViewData = config.ssrData;
@@ -445,7 +453,7 @@ export class ViewManager {
                     if (renderGeneration !== this.navigationGeneration
                         || ctrl.lifecycleState === 'destroyed')
                         return;
-                    const asyncData = response?.data ?? {};
+                    const asyncData = this.extractAsyncData(response);
                     if (hasData(asyncData)) {
                         ctrl.updateData(asyncData);
                     }
@@ -485,7 +493,7 @@ export class ViewManager {
             let asyncData = {};
             try {
                 const response = await Http.get(fetchUrl);
-                asyncData = response?.data ?? {};
+                asyncData = this.extractAsyncData(response);
             }
             catch (err) {
                 if (!this.isNavigationCurrent(navigationGeneration)) {
@@ -985,6 +993,47 @@ export class ViewManager {
         this.currentViewType = null;
         this.activeViews.clear();
         this.viewStack = [];
+    }
+    /**
+     * Apply an atomic context update received from a JSON response before the
+     * Router retries navigation with the newly materialized route table.
+     */
+    applyViewContext(state) {
+        var _a;
+        const revision = typeof state?.revision === 'string' ? state.revision : null;
+        if (!revision || revision === this.contextRevision)
+            return false;
+        this.cancelNavigation();
+        this.contextRevision = revision;
+        this.contextViews = typeof state.views === 'string' ? state.views : this.contextViews;
+        if (state.systemData && typeof state.systemData === 'object') {
+            this.systemData = { ...this.systemData, ...state.systemData };
+        }
+        // Cached pages/layout factories belong to the previous namespace.
+        this.pageCache.clear();
+        this.store.clear();
+        this.ssrBoot = null;
+        if (typeof window !== 'undefined') {
+            const appConfigs = (_a = window).APP_CONFIGS ?? (_a.APP_CONFIGS = {});
+            appConfigs.view ?? (appConfigs.view = {});
+            appConfigs.view.revision = revision;
+            appConfigs.view.contextViews = this.contextViews;
+            appConfigs.view.systemData = { ...this.systemData };
+        }
+        return true;
+    }
+    getContextRevision() {
+        return this.contextRevision;
+    }
+    extractAsyncData(response) {
+        const payload = response?.data ?? {};
+        if (payload && typeof payload === 'object'
+            && Object.prototype.hasOwnProperty.call(payload, 'data')
+            && (Object.prototype.hasOwnProperty.call(payload, 'viewContext')
+                || Object.prototype.hasOwnProperty.call(payload, 'view'))) {
+            return payload.data ?? {};
+        }
+        return payload;
     }
     unmountView(path) {
         const info = this.activeViews.get(path);

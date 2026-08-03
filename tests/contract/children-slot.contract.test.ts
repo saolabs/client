@@ -122,6 +122,94 @@ function makePageFactory() {
     };
 }
 
+/** Leaf include nằm trong projected children — dùng để khóa destroy/recreate registry. */
+function makeLeafFactory() {
+    return () => {
+        const view = new View('components.leaf', 'view');
+        view.__ctrl__.setup({
+            superView: null,
+            data: {},
+            commitConstructorData() {},
+            updateVariableData() {},
+            prerender() { return null; },
+            render(this: any) {
+                return this.wrapper((p: any) => [
+                    this.html('leaf-root', 'span', p, {
+                        classes: [{ type: 'static', value: 'slot-leaf' }],
+                    }, (p2: any) => [this.text('leaf')]),
+                ]);
+            },
+        } as any);
+        return view;
+    };
+}
+
+/** Child đặt @children trong một reactive @if. */
+function makeToggleCardFactory() {
+    return (__data__: Record<string, any> = {}) => {
+        const view = new View('components.toggle-card', 'view');
+        const ctrl = view.__ctrl__;
+        const manager: any = ctrl.states.__;
+        manager.useState(true, 'show');
+        let { __ONE_CHILDREN_CONTENT__ = '' } = __data__;
+
+        ctrl.setup({
+            superView: null,
+            data: __data__,
+            commitConstructorData() {},
+            updateVariableData(this: any, data: Record<string, any>) {
+                if ('__ONE_CHILDREN_CONTENT__' in data) {
+                    __ONE_CHILDREN_CONTENT__ = data.__ONE_CHILDREN_CONTENT__;
+                }
+            },
+            prerender() { return null; },
+            render(this: any) {
+                return this.wrapper((p: any) => [
+                    this.html('toggle-root', 'div', p, {}, (p2: any) => [
+                        this.reactive('slot-if', 'if', null, p2, ['show'],
+                            (_parentReactive: any, parentElement: any) => {
+                                if (!manager.states['show'].value) return [];
+                                return this.__children(__ONE_CHILDREN_CONTENT__, parentElement);
+                            }),
+                    ]),
+                ]);
+            },
+        } as any);
+        return view;
+    };
+}
+
+function makeTogglePageFactory(onMaterialize: () => void) {
+    return () => {
+        const view = new View('web.toggle-page', 'view');
+        view.__ctrl__.setup({
+            superView: null,
+            data: {},
+            commitConstructorData() {},
+            updateVariableData() {},
+            prerender() { return null; },
+            render(this: any) {
+                return this.wrapper((p: any) => [
+                    this.html('toggle-page-root', 'main', p, {}, (p2: any) => [
+                        this.include('inc-toggle', 'components.toggle-card', p2, [], () => ({
+                            __ONE_CHILDREN_CONTENT__: (parentElement: any) => {
+                                onMaterialize();
+                                return [
+                                    this.html('projected-root', 'p', parentElement, {
+                                        classes: [{ type: 'static', value: 'projected' }],
+                                    }, (p3: any) => [this.text('projected')]),
+                                    this.include('projected-leaf', 'components.leaf', parentElement, [], () => ({})),
+                                ];
+                            },
+                        })),
+                    ]),
+                ]);
+            },
+        } as any);
+        return view;
+    };
+}
+
 let container: HTMLElement;
 let vm: ViewManager;
 
@@ -150,6 +238,25 @@ afterEach(() => {
 });
 
 describe('@children — slot content từ parent include', () => {
+    it('slot factory chỉ materialize khi ChildrenNode được render và tạo lại mỗi lần', () => {
+        const view = new View('components.lazy-slot-contract', 'view');
+        const ctrl = view.__ctrl__;
+        let materializations = 0;
+        const slot = () => {
+            materializations += 1;
+            return [];
+        };
+
+        // Truyền/giữ factory không được phép render children sớm.
+        expect(materializations).toBe(0);
+        expect(ctrl.__children(slot, null)).toEqual([]);
+        expect(materializations).toBe(1);
+
+        // Mỗi lần placeholder render lại (kể cả sau remount) tạo materialization mới.
+        expect(ctrl.__children(slot, null)).toEqual([]);
+        expect(materializations).toBe(2);
+    });
+
     it('CSR: children render bên trong card-body, props render đúng', async () => {
         createManager();
         await vm.mountView('web.page', {}, route('/'));
@@ -192,5 +299,45 @@ describe('@children — slot content từ parent include', () => {
         expect(body).not.toBeNull();
         expect(body.textContent).toBe('');
         expect(container.querySelector('h3')!.textContent).toBe('T');
+    });
+
+    it('structural re-render: destroy rồi materialize lại cả HTML và include trong slot', async () => {
+        let materializations = 0;
+        container = document.createElement('div');
+        document.body.appendChild(container);
+        vm = new ViewManager(app() as any);
+        vm.setApp(app() as any);
+        (app() as any).set('View', vm);
+        vm.init({
+            container,
+            registry: {
+                'web.toggle-page': makeTogglePageFactory(() => { materializations += 1; }),
+                'components.toggle-card': makeToggleCardFactory(),
+                'components.leaf': makeLeafFactory(),
+            },
+        });
+
+        await vm.mountView('web.toggle-page', {}, route('/toggle'));
+        const parentCtrl = vm.getCurrentView()!.__ctrl__;
+        const toggleCtrl: any = parentCtrl.children[0];
+        const firstProjected = container.querySelector('.projected')!;
+
+        expect(materializations).toBe(1);
+        expect(firstProjected).not.toBeNull();
+        expect(container.querySelector('.slot-leaf')?.textContent).toBe('leaf');
+
+        toggleCtrl.states.__.updateStateByKey('show', false);
+        await frame();
+        expect(container.querySelector('.projected')).toBeNull();
+        expect(container.querySelector('.slot-leaf')).toBeNull();
+        expect(firstProjected.isConnected).toBe(false);
+
+        toggleCtrl.states.__.updateStateByKey('show', true);
+        await frame();
+        const secondProjected = container.querySelector('.projected')!;
+        expect(materializations).toBe(2);
+        expect(secondProjected).not.toBeNull();
+        expect(secondProjected).not.toBe(firstProjected);
+        expect(container.querySelector('.slot-leaf')?.textContent).toBe('leaf');
     });
 });

@@ -66,6 +66,12 @@ export function readBootConfig() {
     if (cfg.view?.systemData && typeof cfg.view.systemData === 'object') {
         view.systemData = cfg.view.systemData;
     }
+    if (typeof cfg.view?.revision === 'string') {
+        view.revision = cfg.view.revision;
+    }
+    if (typeof cfg.view?.contextViews === 'string') {
+        view.contextViews = cfg.view.contextViews;
+    }
     if (cfg.view?.ssrData && typeof cfg.view.ssrData === 'object') {
         view.ssrData = cfg.view.ssrData;
     }

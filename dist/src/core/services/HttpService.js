@@ -81,6 +81,14 @@ export class HttpService {
             signal: options.signal ?? controller.signal,
             ...options,
         };
+        if (typeof window !== 'undefined') {
+            const revision = window.APP_CONFIGS?.view?.revision;
+            const headers = config.headers;
+            if (typeof revision === 'string' && !headers['X-Saola-View-Revision']) {
+                headers['X-Saola-View-Revision'] = revision;
+                headers['X-Sao-Response'] ?? (headers['X-Sao-Response'] = 'json');
+            }
+        }
         // Apply request interceptors
         for (const i of this.interceptors) {
             if (i.request)
@@ -114,6 +122,17 @@ export class HttpService {
             const raw = await fetch(fullUrl, config);
             clearTimeout(timeoutId);
             const responseData = await raw.json().catch(() => ({}));
+            const viewContext = responseData?.viewContext;
+            const currentContext = typeof window !== 'undefined'
+                ? window.APP_CONFIGS?.view?.systemData?.__context__
+                : null;
+            if (viewContext?.changed === true
+                && (!currentContext || viewContext.context === currentContext)
+                && typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('saola:view-context', {
+                    detail: viewContext,
+                }));
+            }
             let response = {
                 status: raw.ok,
                 statusCode: raw.status,

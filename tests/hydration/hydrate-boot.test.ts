@@ -133,6 +133,9 @@ describe('readBootConfig', () => {
         (window as any).APP_CONFIGS = {
             container: '#app-root',
             view: {
+                revision: 'rev-web-12',
+                contextViews: 'themes.storefront',
+                systemData: { __context__: 'web', __base__: 'themes.storefront.' },
                 ssrData: {
                     'web.home': { instances: { 'v-home': { viewId: 'v-home' } } },
                 },
@@ -148,6 +151,9 @@ describe('readBootConfig', () => {
         const cfg = readBootConfig();
         expect(cfg).not.toBeNull();
         expect(cfg!.view.container).toBe('#app-root');
+        expect(cfg!.view.revision).toBe('rev-web-12');
+        expect(cfg!.view.contextViews).toBe('themes.storefront');
+        expect(cfg!.view.systemData.__base__).toBe('themes.storefront.');
         expect(cfg!.view.ssrData['web.home'].instances['v-home'].viewId).toBe('v-home');
         expect(cfg!.router.mode).toBe('history');
         expect(cfg!.router.routes).toHaveLength(2);

@@ -1,5 +1,9 @@
 import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface } from "../contracts/ElementInterface";
+import type {
+    FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput,
+    SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface,
+    TextInterface, WrapperInterface, YieldInterface
+} from "../contracts/ElementInterface";
 import type { LoopContextInterface } from "../contracts/LoopContextInterface";
 import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig } from "../contracts/ViewControllerInterface";
@@ -1156,8 +1160,8 @@ export class ViewController implements ViewControllerInterface {
         dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>
     ): Component {
         id = this.resolveIncludeId(id, 'include', path);
-        const existing = this.elements.get(id);
-        if (existing instanceof Component) {
+        const existing = this.aliveFromRegistry(id, Component);
+        if (existing) {
             existing.setDataFactory(dataFactory);
             if (stateKeys) {
                 existing.setStateKeys(stateKeys);
@@ -1181,8 +1185,8 @@ export class ViewController implements ViewControllerInterface {
 
     includeIf(id: string | null = null, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component {
         id = this.resolveIncludeId(id, 'includeIf', path);
-        const existing = this.elements.get(id);
-        if (existing instanceof Component) {
+        const existing = this.aliveFromRegistry(id, Component);
+        if (existing) {
             existing.setDataFactory(dataFactory);
             if (stateKeys) {
                 existing.setStateKeys(stateKeys);
@@ -1205,8 +1209,8 @@ export class ViewController implements ViewControllerInterface {
 
     includeWhen(id: string | null, condition: { stateKeys: string[], checker: () => any }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component {
         id = this.resolveIncludeId(id, 'includeWhen', path);
-        const existing = this.elements.get(id);
-        if (existing instanceof Component) {
+        const existing = this.aliveFromRegistry(id, Component);
+        if (existing) {
             existing.setDataFactory(dataFactory);
             existing.setCondition(condition);
             if (stateKeys) {
@@ -1289,7 +1293,8 @@ export class ViewController implements ViewControllerInterface {
      * ], (item) => item.id)
      */
     /**
-     * @children — render slot content từ parent include (compiler emit:
+     * @children / {{ $children }} — materialize slot content from the parent
+     * include only when render traversal reaches ChildrenNode (compiler emit:
      * `...this.__children(__ONE_CHILDREN_CONTENT__, parentElement)`).
      *
      * content có 2 dạng (xem COMPILER _gen_children_slot):
@@ -1299,7 +1304,7 @@ export class ViewController implements ViewControllerInterface {
      *     giống React children.
      *   - string — SSR data hoặc default '' → render text tĩnh (rỗng → []).
      */
-    __children(content: any, parentElement: HtmlInterface | null): any[] {
+    __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput {
         if (typeof content === 'function') {
             const out = content(parentElement);
             if (out === null || out === undefined) return [];

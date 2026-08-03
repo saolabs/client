@@ -19,6 +19,8 @@ export interface RouteDefinition {
     path: string;
     /** View name: 'web.home', 'layouts.main' */
     component?: string;
+    /** Worker-stable alias retained by the server route registry. */
+    logicalComponent?: string;
     /** @deprecated Use component */
     view?: string;
     /** Named route identifier */
@@ -102,6 +104,7 @@ export declare class Router {
     /** Bound handlers for cleanup */
     private _handlePopState;
     private _handleAutoNavigation;
+    private _handleViewContextChange;
     constructor(app?: any);
     /**
      * init — nạp config và wire các dependency.
@@ -129,6 +132,8 @@ export declare class Router {
      * Add multiple routes at once.
      */
     addRoutes(routes: RouteDefinition[]): this;
+    /** Atomically replace the materialized route table for a new context revision. */
+    replaceRoutes(routes: RouteDefinition[]): this;
     /**
      * Configure router from a config object.
      */
@@ -188,6 +193,7 @@ export declare class Router {
      * Stop the router — remove event listeners.
      */
     stop(): void;
+    private handleViewContextChange;
     /**
      * Full destroy — cleanup everything.
      */

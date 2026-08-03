@@ -1015,8 +1015,8 @@ export class ViewController {
     }
     include(id = null, path = '', parentElement, stateKeys, dataFactory) {
         id = this.resolveIncludeId(id, 'include', path);
-        const existing = this.elements.get(id);
-        if (existing instanceof Component) {
+        const existing = this.aliveFromRegistry(id, Component);
+        if (existing) {
             existing.setDataFactory(dataFactory);
             if (stateKeys) {
                 existing.setStateKeys(stateKeys);
@@ -1038,8 +1038,8 @@ export class ViewController {
     }
     includeIf(id = null, path, parentElement, stateKeys, dataFactory) {
         id = this.resolveIncludeId(id, 'includeIf', path);
-        const existing = this.elements.get(id);
-        if (existing instanceof Component) {
+        const existing = this.aliveFromRegistry(id, Component);
+        if (existing) {
             existing.setDataFactory(dataFactory);
             if (stateKeys) {
                 existing.setStateKeys(stateKeys);
@@ -1061,8 +1061,8 @@ export class ViewController {
     }
     includeWhen(id, condition, path, parentElement, stateKeys, dataFactory) {
         id = this.resolveIncludeId(id, 'includeWhen', path);
-        const existing = this.elements.get(id);
-        if (existing instanceof Component) {
+        const existing = this.aliveFromRegistry(id, Component);
+        if (existing) {
             existing.setDataFactory(dataFactory);
             existing.setCondition(condition);
             if (stateKeys) {
@@ -1139,7 +1139,8 @@ export class ViewController {
      * ], (item) => item.id)
      */
     /**
-     * @children — render slot content từ parent include (compiler emit:
+     * @children / {{ $children }} — materialize slot content from the parent
+     * include only when render traversal reaches ChildrenNode (compiler emit:
      * `...this.__children(__ONE_CHILDREN_CONTENT__, parentElement)`).
      *
      * content có 2 dạng (xem COMPILER _gen_children_slot):

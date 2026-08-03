@@ -1,5 +1,5 @@
 import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface } from "../contracts/ElementInterface";
+import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface } from "../contracts/ElementInterface";
 import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig } from "../contracts/ViewControllerInterface";
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface";
@@ -364,7 +364,8 @@ export declare class ViewController implements ViewControllerInterface {
      * ], (item) => item.id)
      */
     /**
-     * @children — render slot content từ parent include (compiler emit:
+     * @children / {{ $children }} — materialize slot content from the parent
+     * include only when render traversal reaches ChildrenNode (compiler emit:
      * `...this.__children(__ONE_CHILDREN_CONTENT__, parentElement)`).
      *
      * content có 2 dạng (xem COMPILER _gen_children_slot):
@@ -374,7 +375,7 @@ export declare class ViewController implements ViewControllerInterface {
      *     giống React children.
      *   - string — SSR data hoặc default '' → render text tĩnh (rỗng → []).
      */
-    __children(content: any, parentElement: HtmlInterface | null): any[];
+    __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput;
     __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContext) => any, keyFn?: (item: T, index: number) => any): any[];
     __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContext) => any, emptyCallback?: () => any): any[];
     __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContext) => any): any[];

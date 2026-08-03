@@ -91,6 +91,8 @@ export class ViewManager implements ViewManagerInterface {
     private App: ApplicationInterface | null = null;
 
     private systemData: Record<string, any> = {}; // For internal use, not exposed to views
+    private contextRevision: string | null = null;
+    private contextViews: string | null = null;
 
     /** ROOT DOM container where views mount */
     private container: HTMLElement | null = null;
@@ -241,7 +243,7 @@ export class ViewManager implements ViewManagerInterface {
     /**
      * Initialize the ViewManager.
      */
-    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; ssr?: SSRBootInfo | null; systemData?: Record<string, any>; ssrData?: Record<string, any> }): void {
+    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; ssr?: SSRBootInfo | null; systemData?: Record<string, any>; ssrData?: Record<string, any>; revision?: string; contextViews?: string }): void {
         // SSR boot info (server-rendered): chứa view entry + viewId để route đầu
         // tiên gọi hydrateView thay vì mountView. Xem RUNTIME_CONTRACT §6 (boot).
         if (config?.ssr && config.ssr.view && config.ssr.viewId) {
@@ -251,6 +253,12 @@ export class ViewManager implements ViewManagerInterface {
         // view factory ở view() để compiled view resolve superView/namespace.
         if (config?.systemData && typeof config.systemData === 'object') {
             this.systemData = { ...this.systemData, ...config.systemData };
+        }
+        if (typeof config?.revision === 'string') {
+            this.contextRevision = config.revision;
+        }
+        if (typeof config?.contextViews === 'string') {
+            this.contextViews = config.contextViews;
         }
         if (config?.ssrData && typeof config.ssrData === 'object') {
             this.ssrViewData = config.ssrData;
@@ -601,7 +609,7 @@ export class ViewManager implements ViewManagerInterface {
                     if (renderGeneration !== this.navigationGeneration
                         || ctrl.lifecycleState === 'destroyed') return;
 
-                    const asyncData = response?.data ?? {};
+                    const asyncData = this.extractAsyncData(response);
                     if (hasData(asyncData)) {
                         ctrl.updateData(asyncData);
                     }
@@ -644,7 +652,7 @@ export class ViewManager implements ViewManagerInterface {
             let asyncData: Record<string, any> = {};
             try {
                 const response = await Http.get(fetchUrl);
-                asyncData = response?.data ?? {};
+                asyncData = this.extractAsyncData(response);
             } catch (err) {
                 if (!this.isNavigationCurrent(navigationGeneration)) {
                     return this.createRenderPageViewCancelled(view);
@@ -1216,6 +1224,52 @@ export class ViewManager implements ViewManagerInterface {
         this.currentViewType = null;
         this.activeViews.clear();
         this.viewStack = [];
+    }
+
+    /**
+     * Apply an atomic context update received from a JSON response before the
+     * Router retries navigation with the newly materialized route table.
+     */
+    applyViewContext(state: Record<string, any>): boolean {
+        const revision = typeof state?.revision === 'string' ? state.revision : null;
+        if (!revision || revision === this.contextRevision) return false;
+
+        this.cancelNavigation();
+        this.contextRevision = revision;
+        this.contextViews = typeof state.views === 'string' ? state.views : this.contextViews;
+        if (state.systemData && typeof state.systemData === 'object') {
+            this.systemData = { ...this.systemData, ...state.systemData };
+        }
+
+        // Cached pages/layout factories belong to the previous namespace.
+        this.pageCache.clear();
+        this.store.clear();
+        this.ssrBoot = null;
+
+        if (typeof window !== 'undefined') {
+            const appConfigs = (window as any).APP_CONFIGS ??= {};
+            appConfigs.view ??= {};
+            appConfigs.view.revision = revision;
+            appConfigs.view.contextViews = this.contextViews;
+            appConfigs.view.systemData = { ...this.systemData };
+        }
+
+        return true;
+    }
+
+    getContextRevision(): string | null {
+        return this.contextRevision;
+    }
+
+    private extractAsyncData(response: any): Record<string, any> {
+        const payload = response?.data ?? {};
+        if (payload && typeof payload === 'object'
+            && Object.prototype.hasOwnProperty.call(payload, 'data')
+            && (Object.prototype.hasOwnProperty.call(payload, 'viewContext')
+                || Object.prototype.hasOwnProperty.call(payload, 'view'))) {
+            return payload.data ?? {};
+        }
+        return payload;
     }
 
     unmountView(path: string): void {

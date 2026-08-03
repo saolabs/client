@@ -25,7 +25,11 @@ export interface ViewManagerInterface {
     /** Register a single view module */
     registerView(name: string, loader: ((...args: any[]) => any) | (() => Promise<any>)): void;
     /** Initialize with optional config */
-    init(config?: { container?: HTMLElement; registry?: Record<string, any> }): void;
+    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; systemData?: Record<string, any>; revision?: string; contextViews?: string }): void;
+    /** Apply a newer server-authoritative view context. Returns true when changed. */
+    applyViewContext?(state: Record<string, any>): boolean;
+    /** Current server view-context fingerprint. */
+    getContextRevision?(): string | null;
     /** Mount a view by name — main entry point */
     mountView(name: string, data?: Record<string, any>, route?: any, navigationType?: RouterNavigationType ): any;
     /**

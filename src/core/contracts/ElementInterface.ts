@@ -164,3 +164,11 @@ export type SaoChildrenFactoryOutput = Array<SaoElement | SaoNodeInterface | DOM
 
 /** Factory function that produces children given parent element */
 export type SaoChildrenFactory = (parentElement: HtmlInterface | null) => SaoChildrenFactoryOutput;
+
+/**
+ * Lazy payload passed from a parent component to one ChildrenNode placeholder.
+ * A factory is deliberately not executed while component data is resolved; the
+ * child view invokes it only when its render traversal reaches the placeholder.
+ */
+export type SaoChildrenSlotFactory = SaoChildrenFactory;
+export type SaoChildrenSlotContent = SaoChildrenSlotFactory | string | number | null | undefined;

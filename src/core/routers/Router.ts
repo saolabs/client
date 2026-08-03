@@ -23,6 +23,8 @@ export interface RouteDefinition {
     path: string;
     /** View name: 'web.home', 'layouts.main' */
     component?: string;
+    /** Worker-stable alias retained by the server route registry. */
+    logicalComponent?: string;
     /** @deprecated Use component */
     view?: string;
     /** Named route identifier */
@@ -178,6 +180,7 @@ export class Router {
     /** Bound handlers for cleanup */
     private _handlePopState: () => void;
     private _handleAutoNavigation: (e: MouseEvent) => void;
+    private _handleViewContextChange: (e: Event) => void;
 
     constructor(app?: any) {
         this.App = app || null;
@@ -187,6 +190,7 @@ export class Router {
 
         this._handlePopState = this.handlePopState.bind(this);
         this._handleAutoNavigation = this.handleAutoNavigation.bind(this);
+        this._handleViewContextChange = this.handleViewContextChange.bind(this);
     }
 
     // ─── Configuration ──────────────────────────────────────────
@@ -271,6 +275,14 @@ export class Router {
             }
         }
         return this;
+    }
+
+    /** Atomically replace the materialized route table for a new context revision. */
+    replaceRoutes(routes: RouteDefinition[]): this {
+        this.routes = [];
+        this.routeConfigs = {};
+        this.routeCache.clear();
+        return this.addRoutes(routes);
     }
 
     /**
@@ -461,6 +473,7 @@ export class Router {
             window.addEventListener('hashchange', this._handlePopState);
         }
         document.addEventListener('click', this._handleAutoNavigation);
+        window.addEventListener('saola:view-context', this._handleViewContextChange);
 
         // Handle initial route
         if (!skipInitial) {
@@ -477,7 +490,26 @@ export class Router {
         window.removeEventListener('popstate', this._handlePopState);
         window.removeEventListener('hashchange', this._handlePopState);
         document.removeEventListener('click', this._handleAutoNavigation);
+        window.removeEventListener('saola:view-context', this._handleViewContextChange);
         this.isStarted = false;
+    }
+
+    private handleViewContextChange(event: Event): void {
+        const state = (event as CustomEvent<Record<string, any>>).detail;
+        if (!state || state.changed !== true) return;
+
+        const vm = this.viewManager ?? this.App?.View;
+        const applied = vm?.applyViewContext?.(state) ?? false;
+        if (!applied) return;
+
+        if (Array.isArray(state.routes)) {
+            this.replaceRoutes(state.routes);
+        }
+
+        // If a fetch discovered the change mid-navigation, requestNavigation
+        // queues the same target and invalidates the old render generation.
+        const target = this.activeNavigationUrl || this.currentUri;
+        if (target) this.requestNavigation(target, 'replace');
     }
 
     /**

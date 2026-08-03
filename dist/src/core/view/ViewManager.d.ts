@@ -68,6 +68,8 @@ export declare class ViewManager implements ViewManagerInterface {
     /** DI container */
     private App;
     private systemData;
+    private contextRevision;
+    private contextViews;
     /** ROOT DOM container where views mount */
     private container;
     private rootElement;
@@ -154,6 +156,8 @@ export declare class ViewManager implements ViewManagerInterface {
         ssr?: SSRBootInfo | null;
         systemData?: Record<string, any>;
         ssrData?: Record<string, any>;
+        revision?: string;
+        contextViews?: string;
     }): void;
     showError(message: string, details?: any): void;
     hasView(name: string): boolean;
@@ -270,6 +274,13 @@ export declare class ViewManager implements ViewManagerInterface {
      */
     private restoreFromCache;
     unmountAll(): void;
+    /**
+     * Apply an atomic context update received from a JSON response before the
+     * Router retries navigation with the newly materialized route table.
+     */
+    applyViewContext(state: Record<string, any>): boolean;
+    getContextRevision(): string | null;
+    private extractAsyncData;
     unmountView(path: string): void;
     /**
      * hydrateView — Hydrate một view đã được server-side render.
