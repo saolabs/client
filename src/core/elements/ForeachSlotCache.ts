@@ -23,6 +23,11 @@
  *   3. `prunePass(onRemove)` — slot KHÔNG được touch trong pass = item đã rời
  *      list → callback destroy + gỡ khỏi cache. (Trước đây bước này là dead
  *      code — cache không bao giờ gỡ entry → element của item bị xoá leak.)
+ *      Slot bị `store()` GHI ĐÈ (cùng key, ref mới) cũng đi qua đây: nó rơi khỏi
+ *      `_map` ngay lúc ghi đè nên prunePass không còn thấy → phải giữ tạm trong
+ *      `_evicted`. Thiếu bước này thì refresh list từ server (`@key` giữ nguyên,
+ *      ref đổi) KHÔNG destroy elements cũ → view con của @include bị tái dùng
+ *      trong DOM đã detach và biến mất khỏi trang.
  *
  * # Quan hệ với Reactive
  * Reactive type 'foreach' giữ một instance; cửa sổ `_currentForeachCache`
@@ -54,6 +59,8 @@ export class ForeachSlotCache {
     private _passOcc: Map<any, number> = new Map();
     /** Slots được claim-hit hoặc store trong pass hiện tại */
     private _touched: Set<ForeachSlot> = new Set();
+    /** Slots bị store() ghi đè trong pass hiện tại — prunePass destroy rồi clear */
+    private _evicted: ForeachSlot[] = [];
 
     /** Tổng số slot đang cache (mọi occurrence). */
     get size(): number {
@@ -66,6 +73,7 @@ export class ForeachSlotCache {
     beginPass(): void {
         this._passOcc = new Map();
         this._touched = new Set();
+        this._evicted = [];
     }
 
     /**
@@ -86,8 +94,9 @@ export class ForeachSlotCache {
     }
 
     /**
-     * Lưu slot mới tại (key, occ) — ghi đè slot cũ nếu ref đã đổi
-     * (slot cũ không được touch → prunePass sẽ destroy).
+     * Lưu slot mới tại (key, occ) — ghi đè slot cũ nếu ref đã đổi.
+     * Slot bị ghi đè KHÔNG còn nằm trong `_map` nên prunePass duyệt `_map` sẽ
+     * không thấy nó nữa → phải chuyển sang `_evicted` để vẫn được destroy.
      */
     store(key: any, occ: number, item: any, elements: any[]): ForeachSlot {
         const slot: ForeachSlot = { item, elements };
@@ -95,6 +104,10 @@ export class ForeachSlotCache {
         if (!slots) {
             slots = [];
             this._map.set(key, slots);
+        }
+        const evicted = slots[occ];
+        if (evicted && !this._touched.has(evicted)) {
+            this._evicted.push(evicted);
         }
         slots[occ] = slot;
         this._touched.add(slot);
@@ -106,6 +119,10 @@ export class ForeachSlotCache {
      * thay bằng ref mới) → gọi onRemove(slot) để destroy elements, gỡ khỏi cache.
      */
     prunePass(onRemove: (slot: ForeachSlot) => void): void {
+        // Slot bị ghi đè: đã rời `_map` lúc store() nên chỉ cần destroy.
+        for (const slot of this._evicted) onRemove(slot);
+        this._evicted = [];
+
         for (const [key, slots] of this._map) {
             let hasRemoval = false;
             for (const slot of slots) {
@@ -133,5 +150,6 @@ export class ForeachSlotCache {
         this._map.clear();
         this._passOcc = new Map();
         this._touched = new Set();
+        this._evicted = [];
     }
 }

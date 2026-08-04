@@ -27,6 +27,16 @@ export interface RouteDefinition {
     name?: string;
     /** Route metadata (auth, roles, etc.) */
     meta?: Record<string, any>;
+    /**
+     * Route con — path nối vào path cha, `meta` kế thừa từ cha (con ghi đè khi
+     * trùng key). Chỉ là tầng CẤU HÌNH: bảng route vẫn phẳng sau khi flatten.
+     *
+     * Việc giữ nguyên view cha khi chuyển giữa các con là do chuỗi layout lo
+     * (`@extends` + `@useBlock`) — view con khai báo cha bằng `@extends`, và
+     * `ViewManager` tái dùng đúng instance layout đang active thay vì render
+     * lại. Xem docs/GAPS_AND_ROADMAP.md §2.17.
+     */
+    children?: RouteDefinition[];
 }
 export interface Route {
     path: string;
@@ -129,7 +139,28 @@ export declare class Router {
      */
     addRouteConfig(config: RouteDefinition): this;
     /**
-     * Add multiple routes at once.
+     * Nối path con vào path cha. Con bắt đầu bằng '/' là ĐƯỜNG TUYỆT ĐỐI —
+     * bỏ qua prefix cha (lối thoát cho route lệch khỏi cây, như Vue Router).
+     * Con rỗng ('') = index route, trùng đúng path cha.
+     */
+    private static joinRoutePath;
+    /**
+     * Trải cây route thành bảng phẳng — bảng phẳng là thứ `matchRoute()` duyệt,
+     * và nó khớp THEO THỨ TỰ (first match wins), nên thứ tự emit ở đây chính là
+     * độ ưu tiên: giữ nguyên thứ tự khai báo để `/users/profile` đứng trước
+     * `/users/{id}` đúng như người viết mong đợi.
+     *
+     * Cha có `children` mà KHÔNG có `component` = nhóm thuần tuý (gom prefix +
+     * meta dùng chung), không sinh route nào cho chính nó.
+     *
+     * Index child (`path: ''`) sinh ra đúng path của cha → khi đó bỏ route
+     * riêng của cha, vì khai báo con là chỉ định cụ thể hơn cho URL đó.
+     */
+    private flattenRouteTree;
+    /**
+     * Add multiple routes at once. Chấp nhận cây lồng qua `children` — mọi
+     * đường vào (`configure`, `replaceRoutes`) đều đi qua đây nên chỉ cần
+     * flatten một chỗ.
      */
     addRoutes(routes: RouteDefinition[]): this;
     /** Atomically replace the materialized route table for a new context revision. */
@@ -220,6 +251,19 @@ export declare class Router {
     /** Pop đã đổi address bar; render fail thì đưa URL về chain còn active. */
     private restoreUrlAfterFailedPop;
     private applyScroll;
+    /** Live region dùng lại giữa các lần điều hướng — tạo lười, chỉ 1 node. */
+    private liveRegion;
+    /**
+     * A11y sau khi điều hướng xong (SPA không tự làm được như full page load):
+     *   1. Đưa focus về container view — không làm thì bàn phím vẫn ở link cũ
+     *      của trang TRƯỚC, Tab tiếp tục từ vị trí không còn tồn tại.
+     *   2. Đọc tên trang mới qua live region — screen reader không hề biết
+     *      nội dung đã đổi vì document không reload.
+     *
+     * `preventScroll` để không phá `applyScroll()` vừa chạy. Bỏ qua `initial`:
+     * lần paint đầu/hydrate không được cướp focus khỏi thứ user đang thao tác.
+     */
+    private announceNavigation;
     /**
      * Handle browser back/forward.
      */

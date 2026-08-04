@@ -35,6 +35,7 @@ import type { HttpServiceInterface } from '../contracts/HttpServiceInterface';
 import type { StoreServiceInterface } from '../contracts/StoreServiceInterface';
 import type { StorageServiceInterface } from '../contracts/StorageServiceInterface';
 import type { LoggerServiceInterface } from '../contracts/LoggerServiceInterface';
+import type { HeadServiceInterface } from '../contracts/HeadServiceInterface';
 import { APIClientInterface } from '../contracts/ApiInterface';
 import { SaoObjectType } from '../types/utils';
 export declare class Application implements ApplicationInterface {
@@ -50,6 +51,7 @@ export declare class Application implements ApplicationInterface {
     Store: StoreServiceInterface;
     Storage: StorageServiceInterface;
     Logger: LoggerServiceInterface;
+    Head: HeadServiceInterface;
     /** Factory bindings — mỗi lần make() gọi factory tạo instance mới */
     private bindings;
     /** Singleton instances — tạo một lần, reuse */

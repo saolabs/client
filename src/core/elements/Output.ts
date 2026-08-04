@@ -267,6 +267,7 @@ export class Output implements OutputInterface {
     destroy(): void {
         if (this._isDestroyed) return;
         this._isDestroyed = true;
+        this.ctx.releaseElement?.(this);
         this.stop();
 
         // Remove mọi nội dung giữa markers (text node hoặc raw nodes)

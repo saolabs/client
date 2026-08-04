@@ -76,6 +76,24 @@ export declare class StateManager implements StateManagerInterface {
      * Value is optional (defaults to undefined until commitConstructorData runs).
      */
     register(key: string | number, value?: any): (newValue: any) => void;
+    /** Huỷ subscription của các computed khi destroy. */
+    private computedUnsubs;
+    /**
+     * State dẫn xuất có memo hoá (kiểu Vue `computed`).
+     *
+     * Chỉ tính lại khi 1 trong `deps` đổi, và **lazy**: đánh dấu bẩn lúc dep
+     * đổi, tính thật lúc ĐỌC. Deps đổi 5 lần trong 1 batch → tính 1 lần; đổi
+     * mà không ai đọc → không tính.
+     *
+     * Slot nằm chung `states` với state thường nên `getStateByKey(key)`,
+     * `viewState[key]` và `subscribe([key])` đều dùng được — Output/Reactive
+     * chỉ cần `stateKeys: [key]`, không cần biết đó là computed.
+     *
+     * @example
+     * states.__.computed('fullName', () => `${first} ${last}`, ['first', 'last']);
+     * this.output('o', p, true, ['fullName'], () => states.__.getStateByKey('fullName'));
+     */
+    computed(key: string, fn: () => any, deps?: string[]): () => any;
     /** Update state by key */
     updateStateByKey(key: string | number, value: any): any;
     /**
@@ -101,8 +119,64 @@ export declare class StateManager implements StateManagerInterface {
     /** Flush đồng bộ pending changes (huỷ RAF đang chờ nếu có). */
     flushNow(): void;
     private commitStateChange;
+    /** Key đã cảnh báo rồi — mỗi key tối đa 1 dòng cho cả vòng đời app. */
+    private static warnedKeys;
+    /**
+     * Reactivity ở đây là so sánh `===`, KHÔNG deep/Proxy: `list.push(x)` hay
+     * `list[0].name = 'x'` giữ nguyên reference → không có gì cập nhật, và
+     * trước đây thất bại hoàn toàn im lặng. Đây là lớp bug tốn thời gian nhất
+     * của mô hình này (Vue bắt được bằng Proxy; React có eslint + StrictMode).
+     *
+     * Hai lớp lọc để không có dương tính giả:
+     *   - chỉ object/array (set lại cùng số/chuỗi là bình thường, vô hại)
+     *   - chỉ đường `setValue` (dev tự set). Đường `updateStateByKey` —
+     *     `update$x()` lúc init và `__UPDATE_DATA_TRAIT__` khi cha truyền
+     *     props — hoàn toàn có thể re-pass đúng ref cũ một cách hợp lệ.
+     * Kèm warn-once theo view+key để không spam.
+     */
+    private warnSameReference;
+    /**
+     * Đưa key vào hàng đợi flush, KHÔNG so sánh giá trị.
+     * Tách khỏi commitStateChange để computed dùng được: so sánh sẽ phải ĐỌC
+     * `states[key].value` → kích hoạt tính lại ngay, mất tính lazy.
+     */
+    private enqueueChange;
+    /** Trần số vòng flush nối tiếp trong 1 frame — chặn computed phụ thuộc vòng. */
+    private static readonly MAX_CASCADE;
     private executeFlush;
+    /** Bản sao nông của lần flush gần nhất, theo key. */
+    private mutationSnapshots;
+    private static shallowCopy;
+    /**
+     * ponytail: chỉ so ĐỘ SÂU 1 — bắt push/splice/shift/sort/gán lại phần tử/
+     * thêm-bớt field. KHÔNG bắt `user.profile.name = 'x'`. So sâu cần deep clone
+     * mỗi flush; nếu mutate lồng thành vấn đề thật thì đó là lúc cân nhắc Proxy,
+     * không phải làm snapshot nặng thêm.
+     */
+    private static shallowDiffers;
+    /**
+     * Chạy đầu mỗi flush: mọi state kiểu object được đối chiếu rồi chụp lại.
+     * Nghĩa là mutate lặng lẽ sẽ lộ ở lần flush KẾ TIẾP do bất kỳ key nào —
+     * gần như luôn xảy ra ngay lần tương tác sau.
+     */
+    private detectExternalMutation;
+    /** Dùng CHUNG `warnedKeys` với warnSameReference — 1 key chỉ kêu 1 lần. */
+    private warnMutatedWithoutSet;
     private flushChanges;
+    /**
+     * Lỗi ném ra từ callback subscribe — đưa về error boundary thay vì nuốt.
+     *
+     * MỌI factory người dùng chạy khi state đổi đều đi qua đây: Output `{{ }}`,
+     * TextElement, Html attr/class/style/prop binding, mirror-sync của computed.
+     * Trước đây chỉ `console.error` → DOM giữ giá trị cũ và boundary KHÔNG hề
+     * biết (im lặng sai, tệ hơn nổ). Đây là 1 chỗ bao trọn tất cả các đường đó.
+     *
+     * Không có "fallback content" ở tầng này (không biết vùng DOM nào hỏng) —
+     * boundary chỉ được BÁO để log/đặt state lỗi; giá trị trả về bị bỏ qua.
+     * Muốn thay nội dung vùng lỗi thì dùng boundary ở Component/Reactive
+     * (phase 'render'/'update'), nơi có ranh giới marker rõ ràng.
+     */
+    private reportListenerError;
     destroy(): void;
     private setsEqual;
     /** Debug: get all state data as plain object */

@@ -20,6 +20,12 @@ export { BlockManagerService, BlockManager } from './src/core/services/BlockMana
 export { MarkerRegistry, MarkerRegistryService } from './src/core/services/MarkerRegistry.js';
 export { PageCache, PageCacheService, detachWrapperDOM } from './src/core/services/PageCache.js';
 export type { PageCacheEntry, PageCacheSetOptions } from './src/core/services/PageCache.js';
+export { SectionManager, SectionManagerService } from './src/core/services/SectionManager.js';
+export { HeadService } from './src/core/services/HeadService.js';
+
+// DevTools — tắt mặc định, xem docs/DEVTOOLS.md
+export { Devtools, devtools, inspector } from './src/core/devtools/index.js';
+export type { DevtoolsEvent, DevtoolsEventType, DevtoolsViewNode } from './src/core/devtools/index.js';
 
 // View System
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';

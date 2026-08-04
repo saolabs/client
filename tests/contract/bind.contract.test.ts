@@ -1,19 +1,19 @@
 /**
  * Cross-contract test — @bind two-way binding directive.
  *
- * Compiler output pattern cho input với @bind:
- *   attrs: {
- *     "type":    { type: 'static', value: "text" },
- *     "bind":    { type: 'static', value: true },     ← sentinel
- *     "newTodo": { type: 'static', value: true },     ← state key
- *   }
+ * Compiler output pattern cho input với @bind — own top-level bucket,
+ * sibling of attrs/props/events (không smuggle qua attrs bằng 2 boolean
+ * marker nữa — cách cũ có thể lẫn với 1 static boolean attr thật tình cờ
+ * đứng trước state-key marker trong object):
+ *   { attrs: { "type": { type: 'static', value: "text" } },
+ *     bind:  { key: "newTodo" } }
  *
  * Client phải:
- *   1. Phát hiện pattern bind=true + <key>=true
+ *   1. Đọc config.bind.key
  *   2. Set element.value = state hiện tại
  *   3. Listen input event → update state
  *   4. Subscribe state → update element.value
- *   5. KHÔNG set "bind" hay "newTodo" lên DOM attrs
+ *   5. KHÔNG set "bind" hay "newTodo" lên DOM attrs (chúng không còn nằm trong attrs)
  *
  * Tham chiếu: docs/COMPILER_CONTRACT.md §5.
  */
@@ -80,12 +80,10 @@ function makeInputFactory() {
                         // ── @bind input — pattern từ compiler ───────────────────────────
                         this.html('input-new', 'input', p, {
                             attrs: {
-                                'type':    { type: 'static', value: 'text' },
-                                'id':      { type: 'static', value: 'todo-input' },
-                                // ── Two-way binding sentinel ─────────────────────────────
-                                'bind':    { type: 'static', value: true },
-                                'newTodo': { type: 'static', value: true },
+                                'type': { type: 'static', value: 'text' },
+                                'id':   { type: 'static', value: 'todo-input' },
                             },
+                            bind: { key: 'newTodo' },
                         }),
                         this.html('btn-submit', 'button', p, {
                             attrs: { 'id': { type: 'static', value: 'submit-btn' } },

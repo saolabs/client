@@ -1,5 +1,6 @@
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import type { StateManagerInterface, ViewStateInterface, StateItem, StateListener, MultiKeyStateListener } from "../contracts/ViewStateInterface";
+import devtools from "../devtools/hook";
 
 /**
  * StateManager — manages reactive state for a ViewController.
@@ -107,7 +108,10 @@ export class StateManager implements StateManagerInterface {
         const setValue = (newValue: any) => {
             const oldValue = this.states[stateKey].value;
             this.states[stateKey].value = newValue;
-            this.commitStateChange(stateKey, oldValue);
+            // fromSetter: đây là đường DEV tự set (`state.x = v` / `set$x(v)`).
+            // Đường props plumbing (updateStateByKey) re-pass cùng ref là bình
+            // thường nên không cảnh báo — xem warnSameReference.
+            this.commitStateChange(stateKey, oldValue, true);
         };
 
         this.states[stateKey] = { value, setValue, key: stateKey };
@@ -145,6 +149,79 @@ export class StateManager implements StateManagerInterface {
      */
     register(key: string | number, value?: any): (newValue: any) => void {
         return this.useState(value, key)[1];
+    }
+
+    /** Huỷ subscription của các computed khi destroy. */
+    private computedUnsubs: (() => void)[] = [];
+
+    /**
+     * State dẫn xuất có memo hoá (kiểu Vue `computed`).
+     *
+     * Chỉ tính lại khi 1 trong `deps` đổi, và **lazy**: đánh dấu bẩn lúc dep
+     * đổi, tính thật lúc ĐỌC. Deps đổi 5 lần trong 1 batch → tính 1 lần; đổi
+     * mà không ai đọc → không tính.
+     *
+     * Slot nằm chung `states` với state thường nên `getStateByKey(key)`,
+     * `viewState[key]` và `subscribe([key])` đều dùng được — Output/Reactive
+     * chỉ cần `stateKeys: [key]`, không cần biết đó là computed.
+     *
+     * @example
+     * states.__.computed('fullName', () => `${first} ${last}`, ['first', 'last']);
+     * this.output('o', p, true, ['fullName'], () => states.__.getStateByKey('fullName'));
+     */
+    computed(key: string, fn: () => any, deps: string[] = []): () => any {
+        const existing = this.states[key];
+        if (existing) {
+            // Khai báo lại (re-render): cập nhật fn tại chỗ, giữ nguyên subscription.
+            if ((existing as any).__computed__) {
+                (existing as any).__setFn__(fn);
+                return () => this.getStateByKey(key);
+            }
+            console.warn(`[ViewState] computed("${key}") trùng tên với state thường — bỏ qua.`);
+            return () => this.getStateByKey(key);
+        }
+
+        let compute = fn;
+        let cache: any;
+        let dirty = true;
+
+        const slot: any = {
+            key,
+            __computed__: true,
+            __setFn__: (next: () => any) => { compute = next; dirty = true; },
+            setValue: () => {
+                console.warn(`[ViewState] computed("${key}") là read-only — bỏ qua set.`);
+            },
+        };
+        // Getter trên chính slot → MỌI đường đọc (getStateByKey, proxy,
+        // states[key].value trực tiếp) đều nhận giá trị tươi.
+        Object.defineProperty(slot, 'value', {
+            get: () => {
+                if (dirty) { cache = compute(); dirty = false; }
+                return cache;
+            },
+            enumerable: true,
+        });
+
+        this.states[key] = slot;
+        this.setters[key] = slot.setValue;
+
+        if (!this.ownProperties.includes(key)) {
+            Object.defineProperty(this.stateInstance, key, {
+                get: () => this.states[key].value,
+                configurable: false,
+                enumerable: true,
+            });
+        }
+
+        if (deps.length > 0) {
+            this.computedUnsubs.push(this.subscribe(deps, () => {
+                dirty = true;
+                this.enqueueChange(key); // báo subscriber; KHÔNG đọc value → giữ lazy
+            }));
+        }
+
+        return () => this.getStateByKey(key);
     }
 
     /** Update state by key */
@@ -222,11 +299,14 @@ export class StateManager implements StateManagerInterface {
             if (key.length === 1 && callback) return this.subscribe(key[0], callback);
             if (typeof callback !== 'function') return () => {};
 
-            const keys = new Set<string | number>();
-            for (const k of key) {
-                if (this.states[k]) keys.add(k);
-            }
-            if (keys.size === 0) return () => {};
+            // KHÔNG lọc theo `this.states[k]`: key chưa register tại thời điểm
+            // subscribe vẫn hợp lệ (computed khai báo trong render, state đăng ký
+            // muộn). Lọc ở đây làm subscription bị bỏ ÂM THẦM và mất reactivity
+            // không dấu vết — trong khi đường single-key ngay dưới chưa bao giờ
+            // lọc, nên `subscribe(['a'])` chạy mà `subscribe(['a','b'])` thì không.
+            // Key không bao giờ được register thì đơn giản không bao giờ fire:
+            // flushChanges() đã kiểm `mkl.keys.has(changedKey)`.
+            const keys = new Set<string | number>(key);
 
             const listener: MultiKeyStateListener = { keys, callback, called: false };
             this.multiKeyListeners.push(listener);
@@ -356,10 +436,53 @@ export class StateManager implements StateManagerInterface {
 
     // ─── Batch Flush System ─────────────────────────────────────
 
-    private commitStateChange(key: string | number, _oldValue: any): void {
+    private commitStateChange(key: string | number, _oldValue: any, fromSetter = false): void {
         if (this._isDestroyed) return;
         const newValue = this.states[key]?.value;
-        if (_oldValue === newValue) return;
+        if (_oldValue === newValue) {
+            if (fromSetter) this.warnSameReference(key, newValue);
+            return;
+        }
+        this.enqueueChange(key);
+    }
+
+    /** Key đã cảnh báo rồi — mỗi key tối đa 1 dòng cho cả vòng đời app. */
+    private static warnedKeys = new Set<string>();
+
+    /**
+     * Reactivity ở đây là so sánh `===`, KHÔNG deep/Proxy: `list.push(x)` hay
+     * `list[0].name = 'x'` giữ nguyên reference → không có gì cập nhật, và
+     * trước đây thất bại hoàn toàn im lặng. Đây là lớp bug tốn thời gian nhất
+     * của mô hình này (Vue bắt được bằng Proxy; React có eslint + StrictMode).
+     *
+     * Hai lớp lọc để không có dương tính giả:
+     *   - chỉ object/array (set lại cùng số/chuỗi là bình thường, vô hại)
+     *   - chỉ đường `setValue` (dev tự set). Đường `updateStateByKey` —
+     *     `update$x()` lúc init và `__UPDATE_DATA_TRAIT__` khi cha truyền
+     *     props — hoàn toàn có thể re-pass đúng ref cũ một cách hợp lệ.
+     * Kèm warn-once theo view+key để không spam.
+     */
+    private warnSameReference(key: string | number, value: any): void {
+        if (value === null || typeof value !== 'object') return;
+        const path = (this.controller as any)?.path ?? '';
+        const warnKey = `${path}::${String(key)}`;
+        if (StateManager.warnedKeys.has(warnKey)) return;
+        StateManager.warnedKeys.add(warnKey);
+        console.warn(
+            `[ViewState] "${String(key)}"${path ? ` (view "${path}")` : ''} được set bằng CHÍNH ` +
+            `reference cũ → không có gì cập nhật. Nếu vừa mutate tại chỗ ` +
+            `(push/splice/gán field), hãy tạo array/object MỚI: ` +
+            `state.${String(key)} = [...cũ] thay vì cũ.push(...).`
+        );
+    }
+
+    /**
+     * Đưa key vào hàng đợi flush, KHÔNG so sánh giá trị.
+     * Tách khỏi commitStateChange để computed dùng được: so sánh sẽ phải ĐỌC
+     * `states[key].value` → kích hoạt tính lại ngay, mất tính lazy.
+     */
+    private enqueueChange(key: string | number): void {
+        if (this._isDestroyed) return;
 
         // Paused → ghi sổ, không notify (giá trị đã được set vào states)
         if (this._isPaused) {
@@ -375,11 +498,28 @@ export class StateManager implements StateManagerInterface {
         }
     }
 
+    /** Trần số vòng flush nối tiếp trong 1 frame — chặn computed phụ thuộc vòng. */
+    private static readonly MAX_CASCADE = 20;
+
     private executeFlush(): void {
         if (this._isDestroyed || this.isFlushing) return;
         try {
             this.isFlushing = true;
-            this.flushChanges();
+            // Listener CÓ THỂ enqueue key mới ngay trong lúc flush (computed
+            // phụ thuộc computed). flushChanges() đã snapshot xong nên key mới
+            // sẽ nằm lại hàng đợi; lặp cho tới khi lắng, trong CÙNG frame —
+            // nếu không, cập nhật dẫn xuất kẹt tới lần state đổi kế tiếp.
+            let depth = 0;
+            while (this.pendingChanges.size > 0 && depth < StateManager.MAX_CASCADE) {
+                this.flushChanges();
+                depth++;
+            }
+            if (this.pendingChanges.size > 0) {
+                console.warn('[ViewState] Cascade update chưa lắng sau '
+                    + `${StateManager.MAX_CASCADE} vòng — nghi computed phụ thuộc vòng:`,
+                    Array.from(this.pendingChanges));
+                this.pendingChanges.clear();
+            }
         } finally {
             this.isFlushing = false;
             this.hasPendingFlush = false;
@@ -387,11 +527,89 @@ export class StateManager implements StateManagerInterface {
         }
     }
 
+    // ─── Phát hiện mutate tại chỗ KHÔNG kèm set ──────────────────
+    // `warnSameReference` chỉ bắt được `list.push(x); setList(list)` — có đi qua
+    // setter. Trường hợp còn lại KHÔNG đi qua đâu cả:
+    //     list.push(x);   // hết. Không cập nhật, không cảnh báo.
+    // Chỗ duy nhất còn quan sát được là lúc flush: so snapshot NÔNG của lần
+    // flush trước với giá trị hiện tại. Reference y nguyên mà nội dung đã khác
+    // ⇒ ai đó mutate ngoài luồng.
+
+    /** Bản sao nông của lần flush gần nhất, theo key. */
+    private mutationSnapshots = new Map<string | number, { ref: any; copy: any }>();
+
+    private static shallowCopy(v: any): any {
+        return Array.isArray(v) ? v.slice() : { ...v };
+    }
+
+    /**
+     * ponytail: chỉ so ĐỘ SÂU 1 — bắt push/splice/shift/sort/gán lại phần tử/
+     * thêm-bớt field. KHÔNG bắt `user.profile.name = 'x'`. So sâu cần deep clone
+     * mỗi flush; nếu mutate lồng thành vấn đề thật thì đó là lúc cân nhắc Proxy,
+     * không phải làm snapshot nặng thêm.
+     */
+    private static shallowDiffers(prev: any, cur: any): boolean {
+        if (Array.isArray(cur)) {
+            if (!Array.isArray(prev) || prev.length !== cur.length) return true;
+            for (let i = 0; i < cur.length; i++) if (prev[i] !== cur[i]) return true;
+            return false;
+        }
+        if (Array.isArray(prev)) return true;
+        const prevKeys = Object.keys(prev);
+        const curKeys = Object.keys(cur);
+        if (prevKeys.length !== curKeys.length) return true;
+        for (const k of curKeys) if (prev[k] !== cur[k]) return true;
+        return false;
+    }
+
+    /**
+     * Chạy đầu mỗi flush: mọi state kiểu object được đối chiếu rồi chụp lại.
+     * Nghĩa là mutate lặng lẽ sẽ lộ ở lần flush KẾ TIẾP do bất kỳ key nào —
+     * gần như luôn xảy ra ngay lần tương tác sau.
+     */
+    private detectExternalMutation(): void {
+        for (const key in this.states) {
+            const slot: any = this.states[key];
+            if (slot?.__computed__) continue;   // lazy — đọc `.value` sẽ ép tính lại
+            const value = slot?.value;
+            if (value === null || typeof value !== 'object') {
+                this.mutationSnapshots.delete(key);
+                continue;
+            }
+            const snap = this.mutationSnapshots.get(key);
+            if (snap && snap.ref === value && StateManager.shallowDiffers(snap.copy, value)) {
+                this.warnMutatedWithoutSet(key);
+            }
+            this.mutationSnapshots.set(key, { ref: value, copy: StateManager.shallowCopy(value) });
+        }
+    }
+
+    /** Dùng CHUNG `warnedKeys` với warnSameReference — 1 key chỉ kêu 1 lần. */
+    private warnMutatedWithoutSet(key: string | number): void {
+        const path = (this.controller as any)?.path ?? '';
+        const warnKey = `${path}::${String(key)}`;
+        if (StateManager.warnedKeys.has(warnKey)) return;
+        StateManager.warnedKeys.add(warnKey);
+        console.warn(
+            `[ViewState] "${String(key)}"${path ? ` (view "${path}")` : ''} bị thay đổi tại chỗ ` +
+            `mà KHÔNG set lại → UI không cập nhật. Thay vì mutate, hãy gán giá trị mới: ` +
+            `state.${String(key)} = [...] / { ... }.`
+        );
+    }
+
     private flushChanges(): void {
         if (this.pendingChanges.size === 0) return;
 
+        this.detectExternalMutation();
+
         const changed = Array.from(this.pendingChanges);
         this.pendingChanges.clear();
+
+        devtools.emit('state:changed', {
+            viewId: (this.controller as any)?.viewId,
+            path: (this.controller as any)?.path,
+            detail: { keys: changed.map(String) },
+        });
 
         // Reset multi-key listener flags
         for (const listener of this.multiKeyListeners) {
@@ -405,7 +623,7 @@ export class StateManager implements StateManagerInterface {
                 const currentValue = this.states[changedKey]?.value;
                 for (const listener of listeners) {
                     try { listener(currentValue); }
-                    catch (e) { console.error('[ViewState] Listener error:', e); }
+                    catch (e) { this.reportListenerError(e); }
                 }
             }
 
@@ -420,10 +638,33 @@ export class StateManager implements StateManagerInterface {
                         }
                     }
                     try { mkl.callback(values); }
-                    catch (e) { console.error('[ViewState] Multi-key listener error:', e); }
+                    catch (e) { this.reportListenerError(e); }
                 }
             }
         }
+    }
+
+    /**
+     * Lỗi ném ra từ callback subscribe — đưa về error boundary thay vì nuốt.
+     *
+     * MỌI factory người dùng chạy khi state đổi đều đi qua đây: Output `{{ }}`,
+     * TextElement, Html attr/class/style/prop binding, mirror-sync của computed.
+     * Trước đây chỉ `console.error` → DOM giữ giá trị cũ và boundary KHÔNG hề
+     * biết (im lặng sai, tệ hơn nổ). Đây là 1 chỗ bao trọn tất cả các đường đó.
+     *
+     * Không có "fallback content" ở tầng này (không biết vùng DOM nào hỏng) —
+     * boundary chỉ được BÁO để log/đặt state lỗi; giá trị trả về bị bỏ qua.
+     * Muốn thay nội dung vùng lỗi thì dùng boundary ở Component/Reactive
+     * (phase 'render'/'update'), nơi có ranh giới marker rõ ràng.
+     */
+    private reportListenerError(err: unknown): void {
+        const ctrl: any = this.controller;
+        try {
+            if (ctrl?.handleError?.(err, { phase: 'update', path: ctrl.path ?? '' })?.handled) return;
+        } catch (e) {
+            console.error('[ViewState] onError handler threw:', e);
+        }
+        console.error('[ViewState] Listener error:', err);
     }
 
     // ─── Cleanup ────────────────────────────────────────────────
@@ -434,9 +675,14 @@ export class StateManager implements StateManagerInterface {
             cancelAnimationFrame(this.flushRAF);
             this.flushRAF = null;
         }
+        for (const unsub of this.computedUnsubs) {
+            try { unsub(); } catch { /* listener đã gỡ */ }
+        }
+        this.computedUnsubs = [];
         this.listeners.clear();
         this.multiKeyListeners = [];
         this.pendingChanges.clear();
+        this.mutationSnapshots.clear();
         this.states = {};
         this.setters = {};
         this.controller = null;

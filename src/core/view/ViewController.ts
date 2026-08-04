@@ -2,11 +2,11 @@ import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from ".
 import type {
     FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput,
     SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface,
-    TextInterface, WrapperInterface, YieldInterface
+    TextInterface, WrapperInterface, YieldInterface, EventModifier
 } from "../contracts/ElementInterface";
 import type { LoopContextInterface } from "../contracts/LoopContextInterface";
 import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig } from "../contracts/ViewControllerInterface";
+import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo, ErrorBoundaryHandler } from "../contracts/ViewControllerInterface";
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface";
 import type { ViewStateInterface } from "../contracts/ViewStateInterface";
 import type { SaoObjectType } from "../types/utils";
@@ -14,6 +14,8 @@ import { ViewState } from "./ViewState";
 import { LoopContext } from "./LoopContext";
 import { Reactive } from "../elements/Reactive";
 import BlockManager, { BlockManagerService } from "../services/BlockManager";
+import SectionManager from "../services/SectionManager";
+import devtools from "../devtools/hook";
 import { Component } from "../elements/Component";
 import { generateUUID } from "../helpers/utils";
 import { Output } from "../elements/Output";
@@ -38,7 +40,8 @@ type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | Tex
  * Manages:
  *   - Reactive state (ViewState) — useState, subscribe, batch flush
  *   - DOM element tree — via Html, Reactive, TextElement, Fragment
- *   - Event delegation — addEventListener with centralized cleanup
+ *   - Events — addEventListener TRỰC TIẾP trên từng element (KHÔNG delegation),
+ *     dọn hàng loạt bằng một AbortController chung. Giống React 17+/Vue/Svelte.
  *   - Loop contexts — @foreach, @for, @while with LoopContext stack
  *   - Block management — for layout views with @useBlock
  *   - Lifecycle — setup, render, destroy
@@ -149,6 +152,8 @@ export class ViewController implements ViewControllerInterface {
     public blocks: Map<string, BlockInterface> = new Map();
 
     public elements: Map<string, ElementChild> = new Map();
+    /** element → key của nó trong `elements` (xem registerElement/releaseElement) */
+    private elementKeys: WeakMap<object, string> = new WeakMap();
 
     public preloadElement: WrapperInterface | null = null; // For pre-rendering elements before the main render
     public mainElement: WrapperInterface | null = null; // The main rendered element tree
@@ -227,6 +232,44 @@ export class ViewController implements ViewControllerInterface {
     /** Set static view config shared by all instances of a compiled view class. */
     setStaticConfig(config: ViewConfig): void {
         this.config = config || {};
+    }
+
+    /** Đang chạy onError của chính controller này — chặn đệ quy nếu handler tự throw. */
+    private _handlingError = false;
+
+    /**
+     * Error boundary: tìm handler gần nhất theo chuỗi `parent`, gọi nó, trả fallback.
+     *
+     * Bất biến:
+     *   - handler trả undefined → coi như KHÔNG xử lý, bubble tiếp lên cha
+     *     (cho phép chỉ log mà không đổi UI).
+     *   - handler tự throw → bỏ qua boundary đó, bubble tiếp (không lặp vô hạn).
+     *   - không boundary nào xử lý → { handled:false }, caller giữ hành vi cũ.
+     */
+    handleError(err: unknown, info: ErrorInfo): { handled: boolean; fallback?: any } {
+        devtools.emit('error', {
+            viewId: this.viewId,
+            path: info.path,
+            detail: { phase: info.phase, message: err instanceof Error ? err.message : String(err) },
+        });
+        let ctrl: ViewControllerInterface | null = this;
+        while (ctrl) {
+            const handler = ctrl.getConfig('onError') as ErrorBoundaryHandler | undefined;
+            const self = ctrl as ViewController;
+            if (typeof handler === 'function' && !self._handlingError) {
+                self._handlingError = true;
+                try {
+                    const fallback = handler.call(ctrl.view, err, info);
+                    if (fallback !== undefined) return { handled: true, fallback };
+                } catch (e) {
+                    console.error(`[ViewController] onError of "${ctrl.path}" threw:`, e);
+                } finally {
+                    self._handlingError = false;
+                }
+            }
+            ctrl = ctrl.parent;
+        }
+        return { handled: false };
     }
 
     /** Set user-defined properties/methods on the View instance */
@@ -367,7 +410,10 @@ export class ViewController implements ViewControllerInterface {
 
         this._isMounted = true;
         this.acquireAssets();
-        if (firstMount) this.callHook('mounted');
+        if (firstMount) {
+            this.callHook('mounted');
+            devtools.emit('view:mounted', { viewId: this.viewId, path: this.path });
+        }
     }
 
     /** Unmount — gỡ instance khỏi real DOM (fire hook + release asset). */
@@ -629,6 +675,10 @@ export class ViewController implements ViewControllerInterface {
         BlockManager.unmountView(this.viewId);
         BlockManager.removeOutletsOfView(this.viewId);
 
+        // Gỡ sections + yields của view này khỏi SectionManager (tránh leak qua navigation)
+        SectionManager.unmountView(this.viewId);
+        SectionManager.removeYieldsOfView(this.viewId);
+
         // Clear element registry — tránh giữ reference corpse elements (memory leak)
         this.elements.clear();
         this.sections.clear();
@@ -645,6 +695,7 @@ export class ViewController implements ViewControllerInterface {
         this._isMounted = false;
 
         this.callHook('destroyed');
+        devtools.emit('view:destroyed', { viewId: this.viewId, path: this.path });
     }
 
     active(): void {
@@ -785,11 +836,37 @@ export class ViewController implements ViewControllerInterface {
      *   - Object with handler + params: { handler: fn, params: [...] }
      *   - Object with string handler (method name on view): { handler: 'handleClick' }
      */
-    addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler): void {
+    /**
+     * Bọc handler theo modifier của `@click.prevent.stop(...)`.
+     * `self` kiểm TRƯỚC: event từ element con thì coi như không xảy ra, nên
+     * cũng không được preventDefault/stopPropagation (giống Vue).
+     * `once` KHÔNG xử lý ở đây — nó là option của addEventListener.
+     */
+    private wrapEventModifiers(fn: EventListener, modifiers: EventModifier[]): EventListener {
+        const checkSelf = modifiers.includes('self');
+        const prevent = modifiers.includes('prevent');
+        const stop = modifiers.includes('stop');
+        if (!checkSelf && !prevent && !stop) return fn;
+
+        return function (this: any, event: Event) {
+            if (checkSelf && event.target !== event.currentTarget) return;
+            if (prevent) event.preventDefault();
+            if (stop) event.stopPropagation();
+            return (fn as any).call(this, event);
+        } as EventListener;
+    }
+
+    addEventListener(
+        element: HTMLElement,
+        event: string,
+        handlers: SaoElementEventHandler,
+        modifiers: EventModifier[] = [],
+    ): void {
         // Compiled Html supplies the complete handler list for one event. Replacing
         // the previous set makes render/hydrate initialization idempotent.
         this.removeEventListener(element, event);
         const registered: EventListener[] = [];
+        const once = modifiers.includes('once');
         for (const h of handlers) {
             let fn: EventListener;
 
@@ -832,7 +909,8 @@ export class ViewController implements ViewControllerInterface {
                 continue;
             }
 
-            element.addEventListener(event, fn, { signal: this.eventAbortController.signal });
+            if (modifiers.length) fn = this.wrapEventModifiers(fn, modifiers);
+            element.addEventListener(event, fn, { signal: this.eventAbortController.signal, once });
             registered.push(fn);
         }
 
@@ -899,25 +977,33 @@ export class ViewController implements ViewControllerInterface {
     }
 
     /**
-     * 
-     * @param name 
-     * @param config 
-     * @param contentRenderFactory 
-     * @returns 
+     * @section(name, ...) — registers content for a matching @yield(name) to
+     * consume (possibly in a different controller — page declares, layout
+     * yields, same cross-controller relationship as @block/@useBlock).
      */
     section(name: string, config: { type: SectionItemType; contentType?: SectionContentType; stateKeys?: string[], [key: string]: any }, contentRenderFactory: SectionContentRenderer): SectionInterface {
-        if (this.sections.has(name)) {
-            const section = this.sections.get(name);
-            if (section) {
-                return section;
-            }
+        const existing = this.sections.get(name);
+        if (existing) {
+            // Re-render với closure mới (state/props đổi) — cập nhật factory tại chỗ,
+            // SectionManager giữ nguyên đăng ký/subscription.
+            existing.renderFactory = contentRenderFactory;
+            existing.type = config.type;
+            if (config.contentType) existing.contentType = config.contentType;
+            existing.stateKeys = config.stateKeys ?? existing.stateKeys;
+            return existing;
         }
         config.ctx = this;
         config.name = name;
         config.renderFactory = contentRenderFactory;
         const section = new Section(config as SectionConstruvtorArgs);
         this.sections.set(name, section);
+        SectionManager.add(section);
         return section;
+    }
+
+    /** `this.yieldContent(name, default)` — synchronous resolve, used inside attribute/prop binding factories. */
+    yieldContent(name: string, defaultValue: any = null): any {
+        return SectionManager.resolve(name, defaultValue);
     }
 
 
@@ -959,7 +1045,7 @@ export class ViewController implements ViewControllerInterface {
             return existing;
         }
         const outlet = new BlockOutlet({ ctx: this, name, id, parentElement, initMode });
-        this.elements.set(id, outlet);
+        this.registerElement(id, outlet);
         BlockManager.addOutlet(id, outlet); // đăng ký để mountAll tìm được outlet theo name
         return outlet;
     }
@@ -988,12 +1074,11 @@ export class ViewController implements ViewControllerInterface {
         }
         const yieldEl = new YieldElement({ ctx: this, name, initMode: this.initMode, id, defaultValue });
         yieldEl.setParentElement(parentElement);
-        this.elements.set(id, yieldEl);
+        this.registerElement(id, yieldEl);
+        // yieldEl.id đã prefix viewId (globally unique) — dùng làm key trong SectionManager,
+        // đăng ký để SectionManager.mountViewSections() tìm được outlet theo name.
+        SectionManager.addYield(yieldEl.id, yieldEl);
         return yieldEl;
-    }
-
-    yieldContent(name: string, defaultValue: any = null): any {
-        return this.App.View?.yieldContent?.(name, defaultValue) ?? defaultValue;
     }
 
     wrapper(factory: SaoChildrenFactory): WrapperInterface {
@@ -1024,7 +1109,7 @@ export class ViewController implements ViewControllerInterface {
         }
         const initMode = this.initMode;
         const fragment = new Fragment({ ctx: this, id, initMode, parentElement, childrenFactory });
-        this.elements.set(id, fragment);
+        this.registerElement(id, fragment);
         return fragment;
     }
 
@@ -1047,7 +1132,7 @@ export class ViewController implements ViewControllerInterface {
             return existing;
         }
         const element = new Html({ ctx: this, tagName, id, parentElement, initMode: this.initMode, config, childrenFactory });
-        this.elements.set(id, element);
+        this.registerElement(id, element);
         return element;
     }
 
@@ -1077,7 +1162,7 @@ export class ViewController implements ViewControllerInterface {
             childrenFactory,
             initMode: this.initMode,
         });
-        this.elements.set(id, reactive);
+        this.registerElement(id, reactive);
         return reactive;
     }
 
@@ -1100,7 +1185,7 @@ export class ViewController implements ViewControllerInterface {
             contentFactory,
             initMode: this.initMode,
         });
-        this.elements.set(id, output);
+        this.registerElement(id, output);
         return output;
     }
 
@@ -1110,6 +1195,34 @@ export class ViewController implements ViewControllerInterface {
      */
     text(text: string): TextInterface {
         return new TextElement({ ctx: this, stateKeys: [], generateText: () => text });
+    }
+
+    /**
+     * Ghi element vào registry + nhớ key để destroy() gỡ lại được.
+     * Key là id THÔ; `element.id` phần lớn đã prefix viewId (`${viewId}-${id}`)
+     * nên element KHÔNG tự suy ra key được — WeakMap giữ ánh xạ, không giữ
+     * element sống.
+     */
+    private registerElement<T extends object>(id: string, el: T): T {
+        this.elements.set(id, el as any);
+        this.elementKeys.set(el, id);
+        return el;
+    }
+
+    /**
+     * Element tự gỡ khỏi registry trong destroy() — nếu không, `elements` chỉ
+     * co lại lúc destroy view, còn id sinh theo item (`{hash}-${item.id}`) thì
+     * mỗi trang/mỗi lần refresh lại thêm một corpse vĩnh viễn (đo được:
+     * 32 → 182 entry sau 6 trang trong khi DOM vẫn 10 item).
+     *
+     * Guard `=== el` là bắt buộc: pass mới đã ghi element MỚI vào cùng id TRƯỚC
+     * khi prunePass destroy element cũ — xoá vô điều kiện sẽ gỡ nhầm bản mới.
+     */
+    releaseElement(el: object): void {
+        const id = this.elementKeys.get(el);
+        if (id === undefined) return;
+        this.elementKeys.delete(el);
+        if (this.elements.get(id) === el) this.elements.delete(id);
     }
 
     /**
@@ -1178,7 +1291,7 @@ export class ViewController implements ViewControllerInterface {
             type: 'default',
             initMode: this.initMode,
         });
-        this.elements.set(id, component);
+        this.registerElement(id, component);
 
         return component;
     }
@@ -1203,7 +1316,7 @@ export class ViewController implements ViewControllerInterface {
             type: 'if',
             initMode: this.initMode,
         });
-        this.elements.set(id, component);
+        this.registerElement(id, component);
         return component;
     }
 
@@ -1229,13 +1342,14 @@ export class ViewController implements ViewControllerInterface {
             condition,
             initMode: this.initMode,
         });
-        this.elements.set(id, component);
+        this.registerElement(id, component);
         return component;
     }
 
     extendView(path: string, data: Record<string, any> = {}): ViewInterface | null {
         this.superViewPath = path;
-        const superView: ViewInterface = this.App.View?.view(path, data, true);
+        // Sync: render() trả superView ngay (xem ViewManager.resolveViewSync).
+        const superView: ViewInterface = this.App.View?.resolveViewSync(path, data, true);
         if (superView) {
             this.setSuperView(superView?.__ctrl__);
             return superView;
@@ -1348,9 +1462,27 @@ export class ViewController implements ViewControllerInterface {
                     }
 
                     // ── Cache MISS hoặc không dùng cache ─────────────────────
-                    if (cache) this._foreachSkipRegistry = true;
-                    const output = callback(item, String(index), index, loopCtx);
-                    if (cache) this._foreachSkipRegistry = false;
+                    // Đóng cửa sổ cache quanh callback: @foreach lồng chạy NGAY
+                    // trong loop body (không bọc thẻ → compiler emit `__foreach`
+                    // trần) sẽ thấy cache=null thay vì mượn cache của loop ngoài.
+                    // Mượn nhầm thì slot của loop trong bị prunePass loop ngoài
+                    // destroy oan mỗi khi item ngoài là cache HIT.
+                    // Khôi phục giá trị TRƯỚC ĐÓ (không gán cứng false) — loop
+                    // lồng phải trả lại cờ cho loop ngoài đang dở dang.
+                    const prevSkip = this._foreachSkipRegistry;
+                    if (cache) {
+                        this._foreachSkipRegistry = true;
+                        this._currentForeachCache = null;
+                    }
+                    let output: any;
+                    try {
+                        output = callback(item, String(index), index, loopCtx);
+                    } finally {
+                        if (cache) {
+                            this._foreachSkipRegistry = prevSkip;
+                            this._currentForeachCache = cache;
+                        }
+                    }
                     if (output !== undefined && output !== null) {
                         const elements = Array.isArray(output) ? output : [output];
                         result.push(...elements);

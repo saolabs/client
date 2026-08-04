@@ -5,6 +5,8 @@ import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
 import { mountElementList, hydrateElementList } from "../helpers/view";
 import type { SaoObjectType } from "../types/utils";
 import { TextElement } from "./TextElement";
+import SectionManager from "../services/SectionManager";
+import { runEnter, runLeave } from "../helpers/transition";
 
 /**
  * Escape một chuỗi để dùng làm CSS class/id selector. Class hydrate dạng
@@ -156,6 +158,7 @@ export class Html implements HtmlInterface {
             events: newConfig.events,
             classes: newConfig.classes,
             styles: newConfig.styles,
+            bind: newConfig.bind,
         };
         this.initialize();
     }
@@ -247,10 +250,7 @@ export class Html implements HtmlInterface {
     /**
      * Thiết lập two-way data binding (v-model-like) theo compiler pattern:
      *
-     *   attrs: { "bind": { type: 'static', value: true }, "<stateKey>": { type: 'static', value: true } }
-     *
-     *   - "bind": true          → bật two-way binding
-     *   - "<stateKey>": true    → tên state key cần bind (e.g. "newTodo")
+     *   config.bind = { key: "<stateKey>" }  — own bucket, sibling of attrs/props/events.
      *
      * Hành vi:
      *   1. Khởi tạo: set element.value = state hiện tại
@@ -333,31 +333,17 @@ export class Html implements HtmlInterface {
         const attrs = this.config.attrs;
 
         if (attrs) {
-            // ─── Detect @bind directive (two-way binding) ─────────────
-            // Pattern từ compiler: { "bind": {type:'static', value:true}, "<stateKey>": {type:'static', value:true} }
-            // Tham chiếu: COMPILER_CONTRACT.md §5.
-            let bindStateKey: string | undefined;
-            const bindAttr = attrs['bind'];
-            if (bindAttr?.type === 'static' && bindAttr?.value === true) {
-                bindStateKey = Object.keys(attrs).find(k => {
-                    if (k === 'bind') return false;
-                    const v = attrs[k];
-                    // State key marker: { type: 'static', value: true }
-                    return v.type === 'static' && v.value === true;
-                });
-            }
-
-            // Apply attrs TRƯỚC binding — setupTwoWayBinding cần el.type ('checkbox',
-            // 'radio', 'number'...) đã có mặt. Khi có bind: skip "bind=true" và
-            // "<stateKey>=true" để không set marker lên DOM.
             for (const [attrName, attrConfig] of Object.entries(attrs)) {
-                if (bindStateKey && (attrName === 'bind' || (attrConfig.type === 'static' && attrConfig.value === true))) continue;
                 this._applyAttr(attrName, attrConfig);
             }
+        }
 
-            if (bindStateKey) {
-                this.setupTwoWayBinding(bindStateKey);
-            }
+        // @bind/@val — own top-level config bucket (sibling of attrs/props/events,
+        // same shape/spirit as events — see ElementInterface.ts). Applied AFTER
+        // attrs: setupTwoWayBinding needs el.type ('checkbox', 'radio', 'number'...)
+        // already in place.
+        if (this.config.bind?.key) {
+            this.setupTwoWayBinding(this.config.bind.key);
         }
 
         // props độc lập với attrs/bind — element chỉ có props vẫn phải chạy
@@ -417,25 +403,30 @@ export class Html implements HtmlInterface {
             }
         } else if (attrConfig.type === 'binding') {
             const generation = this.bindingGeneration;
-            const value = attrConfig.factory ? attrConfig.factory() : '';
-            if (value !== undefined && value !== null && value !== false) {
-                this.element.setAttribute(normalizedName, String(value));
-            } else {
-                this.element.removeAttribute(normalizedName);
-            }
+            const applyValue = () => {
+                const newValue = attrConfig.factory ? attrConfig.factory() : '';
+                if (newValue !== undefined && newValue !== null && newValue !== false) {
+                    this.element.setAttribute(normalizedName, String(newValue));
+                } else {
+                    this.element.removeAttribute(normalizedName);
+                }
+            };
+            applyValue();
 
             if (attrConfig.stateKeys?.length) {
                 const unsubscribe = this.ctx.states.__.subscribe(
                     attrConfig.stateKeys,
-                    () => {
-                        if (!this.isBindingCurrent(generation)) return;
-                        const newValue = attrConfig.factory ? attrConfig.factory() : '';
-                        if (newValue !== undefined && newValue !== null && newValue !== false) {
-                            this.element.setAttribute(normalizedName, String(newValue));
-                        } else {
-                            this.element.removeAttribute(normalizedName);
-                        }
-                    }
+                    () => { if (this.isBindingCurrent(generation)) applyValue(); }
+                );
+                this.bindingUnsubscribes.push(unsubscribe);
+            }
+            // `@yield(name, ...)` — no static stateKeys (the section it resolves to is
+            // only known at runtime); subscribe to SectionManager by name instead, fires
+            // both when a different section becomes active and when its value changes.
+            if (attrConfig.yieldName) {
+                const unsubscribe = SectionManager.subscribe(
+                    attrConfig.yieldName,
+                    () => { if (this.isBindingCurrent(generation)) applyValue(); }
                 );
                 this.bindingUnsubscribes.push(unsubscribe);
             }
@@ -542,7 +533,10 @@ export class Html implements HtmlInterface {
     addEventListeners() {
         if (this.config.events) {
             for (const [eventName, handlers] of Object.entries(this.config.events)) {
-                this.ctx.addEventListener(this.element, eventName, handlers);
+                this.ctx.addEventListener(
+                    this.element, eventName, handlers,
+                    this.config.eventModifiers?.[eventName],
+                );
                 this.registeredEventNames.add(eventName);
             }
         }
@@ -617,7 +611,26 @@ export class Html implements HtmlInterface {
         if (children && children.length > 0) {
             mountElementList(this, children);
         }
+        this.maybeRunEnter();
         return this.element;
+    }
+
+    /** Đã chạy enter rồi — re-render không được chạy lại. */
+    private _entered = false;
+
+    /**
+     * Enter chạy MỘT lần, khi element vừa được tạo và đã nằm trong DOM.
+     * Bỏ qua ở HYDRATE: DOM đó do server render, animate lại là nháy vô cớ
+     * (tương đương `appear = false` mặc định của Vue).
+     */
+    private maybeRunEnter(): void {
+        if (this._entered) return;
+        const name = this.config.transition?.name;
+        if (!name) return;
+        if (this.initMode === InitModes.HYDRATE) { this._entered = true; return; }
+        if (!this.element.isConnected) return;   // caller chưa chèn — thử lại lần render sau
+        this._entered = true;
+        void runEnter(this.element, name);
     }
 
     appendElement(element: HTMLElement | Comment | Text) {
@@ -658,13 +671,30 @@ export class Html implements HtmlInterface {
     destroy() {
         if (this.__destroyed__) return;
         this.__destroyed__ = true;
+        this.ctx.releaseElement?.(this);
 
         this.removeEventListeners();
 
         // Abort @bind listeners and unsubscribe every reactive attr/prop/class/style.
         this.cleanupBindingResources(false);
 
-        // Destroy children recursively
+        const transitionName = this.config.transition?.name;
+        if (transitionName && this.element.isConnected) {
+            // HOÃN teardown cây con: destroy() của child Html gỡ luôn DOM của nó,
+            // nên dọn ngay sẽ làm element bay ra trong trạng thái RỖNG. Element
+            // đã inert (listener gỡ, binding huỷ) nên giữ lại chỉ là phần nhìn.
+            // runLeave() tự gỡ node khi xong — không remove() ở đây.
+            void runLeave(this.element, transitionName).then(() => this.teardownSubtree());
+            return;
+        }
+
+        this.teardownSubtree();
+        // Gỡ element khỏi DOM — destroy là vĩnh viễn
+        this.element.remove();
+    }
+
+    /** Destroy children + dọn nội dung. Tách riêng để leave hoãn được. */
+    private teardownSubtree(): void {
         this.children.forEach(child => {
             if ('destroy' in child && typeof child.destroy === 'function') {
                 child.destroy();
@@ -674,8 +704,6 @@ export class Html implements HtmlInterface {
         if (this.element.children.length > 0) {
             this.element.innerHTML = '';
         }
-        // Gỡ element khỏi DOM — destroy là vĩnh viễn
-        this.element.remove();
     }
 
     get isSaoElement(): boolean {

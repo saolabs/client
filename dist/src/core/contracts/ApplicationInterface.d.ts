@@ -5,6 +5,7 @@ import type { HttpServiceInterface } from "./HttpServiceInterface";
 import type { StoreServiceInterface } from "./StoreServiceInterface";
 import type { StorageServiceInterface } from "./StorageServiceInterface";
 import type { LoggerServiceInterface } from "./LoggerServiceInterface";
+import type { HeadServiceInterface } from "./HeadServiceInterface";
 import { APIClientInterface } from "./ApiInterface";
 import type { ServiceProviderInterface } from "./ServiceProviderInterface";
 import { SaoObjectType } from "../types/utils";
@@ -38,6 +39,7 @@ export interface ApplicationInterface {
     Store: StoreServiceInterface;
     Storage: StorageServiceInterface;
     Logger: LoggerServiceInterface;
+    Head: HeadServiceInterface;
 }
 /** Type cho helper function app() — callable + có methods */
 export interface AppFactory {

@@ -1,0 +1,15 @@
+@props(title: string, theme?: 'dark' | 'light')
+
+<template>
+    <div class="a">
+        <h1>{{ title }}</h1>
+    </div>
+</template>
+
+<script setup>
+    export default {
+        init(){
+            //
+        }
+    }
+</script>

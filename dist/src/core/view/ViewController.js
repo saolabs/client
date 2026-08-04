@@ -2,6 +2,8 @@ import { ViewState } from "./ViewState";
 import { LoopContext } from "./LoopContext";
 import { Reactive } from "../elements/Reactive";
 import BlockManager from "../services/BlockManager";
+import SectionManager from "../services/SectionManager";
+import devtools from "../devtools/hook";
 import { Component } from "../elements/Component";
 import { generateUUID } from "../helpers/utils";
 import { Output } from "../elements/Output";
@@ -17,7 +19,8 @@ import AssetManager from "../services/AssetManager";
  * Manages:
  *   - Reactive state (ViewState) — useState, subscribe, batch flush
  *   - DOM element tree — via Html, Reactive, TextElement, Fragment
- *   - Event delegation — addEventListener with centralized cleanup
+ *   - Events — addEventListener TRỰC TIẾP trên từng element (KHÔNG delegation),
+ *     dọn hàng loạt bằng một AbortController chung. Giống React 17+/Vue/Svelte.
  *   - Loop contexts — @foreach, @for, @while with LoopContext stack
  *   - Block management — for layout views with @useBlock
  *   - Lifecycle — setup, render, destroy
@@ -103,6 +106,8 @@ export class ViewController {
         /** Block slots in layout views */
         this.blocks = new Map();
         this.elements = new Map();
+        /** element → key của nó trong `elements` (xem registerElement/releaseElement) */
+        this.elementKeys = new WeakMap();
         this.preloadElement = null; // For pre-rendering elements before the main render
         this.mainElement = null; // The main rendered element tree
         /** Wrapper instance RIÊNG cho render/prerender — dùng chung sẽ làm
@@ -127,6 +132,8 @@ export class ViewController {
         // --- Route params for reference in blocks and sections (set by ViewManager on navigate) ---
         this.urlPath = null;
         this.callingMethod = null; // For debugging: track which method is currently executing
+        /** Đang chạy onError của chính controller này — chặn đệ quy nếu handler tự throw. */
+        this._handlingError = false;
         // ─── Pause / Resume (PageCache lifecycle) ───────────────────
         // State machine: created → active ⇄ paused → destroyed
         // Thiết kế: ROUTE_RENDER_FLOW.md §7. pause/resume là API công khai;
@@ -178,6 +185,43 @@ export class ViewController {
     /** Set static view config shared by all instances of a compiled view class. */
     setStaticConfig(config) {
         this.config = config || {};
+    }
+    /**
+     * Error boundary: tìm handler gần nhất theo chuỗi `parent`, gọi nó, trả fallback.
+     *
+     * Bất biến:
+     *   - handler trả undefined → coi như KHÔNG xử lý, bubble tiếp lên cha
+     *     (cho phép chỉ log mà không đổi UI).
+     *   - handler tự throw → bỏ qua boundary đó, bubble tiếp (không lặp vô hạn).
+     *   - không boundary nào xử lý → { handled:false }, caller giữ hành vi cũ.
+     */
+    handleError(err, info) {
+        devtools.emit('error', {
+            viewId: this.viewId,
+            path: info.path,
+            detail: { phase: info.phase, message: err instanceof Error ? err.message : String(err) },
+        });
+        let ctrl = this;
+        while (ctrl) {
+            const handler = ctrl.getConfig('onError');
+            const self = ctrl;
+            if (typeof handler === 'function' && !self._handlingError) {
+                self._handlingError = true;
+                try {
+                    const fallback = handler.call(ctrl.view, err, info);
+                    if (fallback !== undefined)
+                        return { handled: true, fallback };
+                }
+                catch (e) {
+                    console.error(`[ViewController] onError of "${ctrl.path}" threw:`, e);
+                }
+                finally {
+                    self._handlingError = false;
+                }
+            }
+            ctrl = ctrl.parent;
+        }
+        return { handled: false };
     }
     /** Set user-defined properties/methods on the View instance */
     setUserDefinedConfig(userConfig) {
@@ -309,8 +353,10 @@ export class ViewController {
         }
         this._isMounted = true;
         this.acquireAssets();
-        if (firstMount)
+        if (firstMount) {
             this.callHook('mounted');
+            devtools.emit('view:mounted', { viewId: this.viewId, path: this.path });
+        }
     }
     /** Unmount — gỡ instance khỏi real DOM (fire hook + release asset). */
     unmount() {
@@ -525,6 +571,9 @@ export class ViewController {
         // Gỡ block content + outlets của view này khỏi BlockManager (tránh leak qua navigation)
         BlockManager.unmountView(this.viewId);
         BlockManager.removeOutletsOfView(this.viewId);
+        // Gỡ sections + yields của view này khỏi SectionManager (tránh leak qua navigation)
+        SectionManager.unmountView(this.viewId);
+        SectionManager.removeYieldsOfView(this.viewId);
         // Clear element registry — tránh giữ reference corpse elements (memory leak)
         this.elements.clear();
         this.sections.clear();
@@ -538,6 +587,7 @@ export class ViewController {
         this.prerenderFactory = null;
         this._isMounted = false;
         this.callHook('destroyed');
+        devtools.emit('view:destroyed', { viewId: this.viewId, path: this.path });
     }
     active() {
         this.isActive = true;
@@ -678,11 +728,34 @@ export class ViewController {
      *   - Object with handler + params: { handler: fn, params: [...] }
      *   - Object with string handler (method name on view): { handler: 'handleClick' }
      */
-    addEventListener(element, event, handlers) {
+    /**
+     * Bọc handler theo modifier của `@click.prevent.stop(...)`.
+     * `self` kiểm TRƯỚC: event từ element con thì coi như không xảy ra, nên
+     * cũng không được preventDefault/stopPropagation (giống Vue).
+     * `once` KHÔNG xử lý ở đây — nó là option của addEventListener.
+     */
+    wrapEventModifiers(fn, modifiers) {
+        const checkSelf = modifiers.includes('self');
+        const prevent = modifiers.includes('prevent');
+        const stop = modifiers.includes('stop');
+        if (!checkSelf && !prevent && !stop)
+            return fn;
+        return function (event) {
+            if (checkSelf && event.target !== event.currentTarget)
+                return;
+            if (prevent)
+                event.preventDefault();
+            if (stop)
+                event.stopPropagation();
+            return fn.call(this, event);
+        };
+    }
+    addEventListener(element, event, handlers, modifiers = []) {
         // Compiled Html supplies the complete handler list for one event. Replacing
         // the previous set makes render/hydrate initialization idempotent.
         this.removeEventListener(element, event);
         const registered = [];
+        const once = modifiers.includes('once');
         for (const h of handlers) {
             let fn;
             if (typeof h === 'function') {
@@ -730,7 +803,9 @@ export class ViewController {
             else {
                 continue;
             }
-            element.addEventListener(event, fn, { signal: this.eventAbortController.signal });
+            if (modifiers.length)
+                fn = this.wrapEventModifiers(fn, modifiers);
+            element.addEventListener(event, fn, { signal: this.eventAbortController.signal, once });
             registered.push(fn);
         }
         if (registered.length > 0) {
@@ -786,25 +861,33 @@ export class ViewController {
         // This method is called by compiled output after rendering blocks and sections, to ensure they are registered in the manager before any child views try to access them.
     }
     /**
-     *
-     * @param name
-     * @param config
-     * @param contentRenderFactory
-     * @returns
+     * @section(name, ...) — registers content for a matching @yield(name) to
+     * consume (possibly in a different controller — page declares, layout
+     * yields, same cross-controller relationship as @block/@useBlock).
      */
     section(name, config, contentRenderFactory) {
-        if (this.sections.has(name)) {
-            const section = this.sections.get(name);
-            if (section) {
-                return section;
-            }
+        const existing = this.sections.get(name);
+        if (existing) {
+            // Re-render với closure mới (state/props đổi) — cập nhật factory tại chỗ,
+            // SectionManager giữ nguyên đăng ký/subscription.
+            existing.renderFactory = contentRenderFactory;
+            existing.type = config.type;
+            if (config.contentType)
+                existing.contentType = config.contentType;
+            existing.stateKeys = config.stateKeys ?? existing.stateKeys;
+            return existing;
         }
         config.ctx = this;
         config.name = name;
         config.renderFactory = contentRenderFactory;
         const section = new Section(config);
         this.sections.set(name, section);
+        SectionManager.add(section);
         return section;
+    }
+    /** `this.yieldContent(name, default)` — synchronous resolve, used inside attribute/prop binding factories. */
+    yieldContent(name, defaultValue = null) {
+        return SectionManager.resolve(name, defaultValue);
     }
     // template methods called by compiled output — these build the element tree directly
     block(id, name, contentRenderFactory) {
@@ -841,7 +924,7 @@ export class ViewController {
             return existing;
         }
         const outlet = new BlockOutlet({ ctx: this, name, id, parentElement, initMode });
-        this.elements.set(id, outlet);
+        this.registerElement(id, outlet);
         BlockManager.addOutlet(id, outlet); // đăng ký để mountAll tìm được outlet theo name
         return outlet;
     }
@@ -865,11 +948,11 @@ export class ViewController {
         }
         const yieldEl = new YieldElement({ ctx: this, name, initMode: this.initMode, id, defaultValue });
         yieldEl.setParentElement(parentElement);
-        this.elements.set(id, yieldEl);
+        this.registerElement(id, yieldEl);
+        // yieldEl.id đã prefix viewId (globally unique) — dùng làm key trong SectionManager,
+        // đăng ký để SectionManager.mountViewSections() tìm được outlet theo name.
+        SectionManager.addYield(yieldEl.id, yieldEl);
         return yieldEl;
-    }
-    yieldContent(name, defaultValue = null) {
-        return this.App.View?.yieldContent?.(name, defaultValue) ?? defaultValue;
     }
     wrapper(factory) {
         const which = this.callingMethod === 'prerender' ? 'prerender' : 'render';
@@ -898,7 +981,7 @@ export class ViewController {
         }
         const initMode = this.initMode;
         const fragment = new Fragment({ ctx: this, id, initMode, parentElement, childrenFactory });
-        this.elements.set(id, fragment);
+        this.registerElement(id, fragment);
         return fragment;
     }
     /**
@@ -918,7 +1001,7 @@ export class ViewController {
             return existing;
         }
         const element = new Html({ ctx: this, tagName, id, parentElement, initMode: this.initMode, config, childrenFactory });
-        this.elements.set(id, element);
+        this.registerElement(id, element);
         return element;
     }
     reactive(id, type, parentReactive, parentElement, stateKeys, childrenFactory) {
@@ -946,7 +1029,7 @@ export class ViewController {
             childrenFactory,
             initMode: this.initMode,
         });
-        this.elements.set(id, reactive);
+        this.registerElement(id, reactive);
         return reactive;
     }
     output(id, parent, isEscapeHTML = true, stateKeys = [], contentFactory = () => '') {
@@ -968,7 +1051,7 @@ export class ViewController {
             contentFactory,
             initMode: this.initMode,
         });
-        this.elements.set(id, output);
+        this.registerElement(id, output);
         return output;
     }
     /**
@@ -977,6 +1060,34 @@ export class ViewController {
      */
     text(text) {
         return new TextElement({ ctx: this, stateKeys: [], generateText: () => text });
+    }
+    /**
+     * Ghi element vào registry + nhớ key để destroy() gỡ lại được.
+     * Key là id THÔ; `element.id` phần lớn đã prefix viewId (`${viewId}-${id}`)
+     * nên element KHÔNG tự suy ra key được — WeakMap giữ ánh xạ, không giữ
+     * element sống.
+     */
+    registerElement(id, el) {
+        this.elements.set(id, el);
+        this.elementKeys.set(el, id);
+        return el;
+    }
+    /**
+     * Element tự gỡ khỏi registry trong destroy() — nếu không, `elements` chỉ
+     * co lại lúc destroy view, còn id sinh theo item (`{hash}-${item.id}`) thì
+     * mỗi trang/mỗi lần refresh lại thêm một corpse vĩnh viễn (đo được:
+     * 32 → 182 entry sau 6 trang trong khi DOM vẫn 10 item).
+     *
+     * Guard `=== el` là bắt buộc: pass mới đã ghi element MỚI vào cùng id TRƯỚC
+     * khi prunePass destroy element cũ — xoá vô điều kiện sẽ gỡ nhầm bản mới.
+     */
+    releaseElement(el) {
+        const id = this.elementKeys.get(el);
+        if (id === undefined)
+            return;
+        this.elementKeys.delete(el);
+        if (this.elements.get(id) === el)
+            this.elements.delete(id);
     }
     /**
      * Registry guard: element đã destroy không được reuse — trả về corpse
@@ -1033,7 +1144,7 @@ export class ViewController {
             type: 'default',
             initMode: this.initMode,
         });
-        this.elements.set(id, component);
+        this.registerElement(id, component);
         return component;
     }
     includeIf(id = null, path, parentElement, stateKeys, dataFactory) {
@@ -1056,7 +1167,7 @@ export class ViewController {
             type: 'if',
             initMode: this.initMode,
         });
-        this.elements.set(id, component);
+        this.registerElement(id, component);
         return component;
     }
     includeWhen(id, condition, path, parentElement, stateKeys, dataFactory) {
@@ -1081,12 +1192,13 @@ export class ViewController {
             condition,
             initMode: this.initMode,
         });
-        this.elements.set(id, component);
+        this.registerElement(id, component);
         return component;
     }
     extendView(path, data = {}) {
         this.superViewPath = path;
-        const superView = this.App.View?.view(path, data, true);
+        // Sync: render() trả superView ngay (xem ViewManager.resolveViewSync).
+        const superView = this.App.View?.resolveViewSync(path, data, true);
         if (superView) {
             this.setSuperView(superView?.__ctrl__);
             return superView;
@@ -1187,11 +1299,28 @@ export class ViewController {
                         }
                     }
                     // ── Cache MISS hoặc không dùng cache ─────────────────────
-                    if (cache)
+                    // Đóng cửa sổ cache quanh callback: @foreach lồng chạy NGAY
+                    // trong loop body (không bọc thẻ → compiler emit `__foreach`
+                    // trần) sẽ thấy cache=null thay vì mượn cache của loop ngoài.
+                    // Mượn nhầm thì slot của loop trong bị prunePass loop ngoài
+                    // destroy oan mỗi khi item ngoài là cache HIT.
+                    // Khôi phục giá trị TRƯỚC ĐÓ (không gán cứng false) — loop
+                    // lồng phải trả lại cờ cho loop ngoài đang dở dang.
+                    const prevSkip = this._foreachSkipRegistry;
+                    if (cache) {
                         this._foreachSkipRegistry = true;
-                    const output = callback(item, String(index), index, loopCtx);
-                    if (cache)
-                        this._foreachSkipRegistry = false;
+                        this._currentForeachCache = null;
+                    }
+                    let output;
+                    try {
+                        output = callback(item, String(index), index, loopCtx);
+                    }
+                    finally {
+                        if (cache) {
+                            this._foreachSkipRegistry = prevSkip;
+                            this._currentForeachCache = cache;
+                        }
+                    }
                     if (output !== undefined && output !== null) {
                         const elements = Array.isArray(output) ? output : [output];
                         result.push(...elements);

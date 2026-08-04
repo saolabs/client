@@ -1,7 +1,7 @@
 import type { SaoObjectType } from "../types/utils";
 import type { ViewInterface, ViewRenderFactory } from "./ViewInterface";
 import type { ViewStateInterface } from "./ViewStateInterface";
-import type { HtmlInterface, FragmentInterface, SaoElementEventHandler, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, WrapperInterface } from "./ElementInterface";
+import type { HtmlInterface, FragmentInterface, SaoElementEventHandler, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, WrapperInterface, EventModifier } from "./ElementInterface";
 import type { ReactiveInterface } from "./ReactiveInterface";
 import type { BlockInterface } from "./BlockInterface";
 import type { LoopContextInterface } from "./LoopContextInterface";
@@ -29,6 +29,8 @@ export interface ViewControllerInterface {
      * null = không có cache active (render bình thường).
      */
     _currentForeachCache: ForeachSlotCache | null;
+    /** Element gọi trong destroy() để tự gỡ khỏi registry (no-op nếu key đã trỏ bản mới) */
+    releaseElement(el: object): void;
     /** Path to super view (layout) */
     superViewPath: string | null;
     /** Main element (Wrapper) for this view */
@@ -41,7 +43,7 @@ export interface ViewControllerInterface {
     childrenFactory: SaoChildrenFactory | null;
     wrapper: (factory: SaoChildrenFactory) => WrapperInterface;
     removeEventListener(element: HTMLElement, event: string): void;
-    addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler): void;
+    addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler, modifiers?: EventModifier[]): void;
     /** Called by reactive system to schedule an update */
     scheduleUpdate(reactive: ReactiveInterface): void;
     /** Flush đồng bộ các reactive update đang chờ (sau mount/hydrate). */
@@ -116,6 +118,15 @@ export interface ViewControllerInterface {
     /** Get config value with optional default */
     getConfig(key?: string, defaultValue?: any): any;
     getConfig(): ViewControllerConfig;
+    /**
+     * Đưa lỗi cho error boundary gần nhất (chính controller này hoặc tổ tiên
+     * qua `parent`). Trả `{ handled: true, fallback }` nếu có boundary xử lý;
+     * `{ handled: false }` → caller giữ nguyên hành vi cũ (bubble lên trên).
+     */
+    handleError(err: unknown, info: ErrorInfo): {
+        handled: boolean;
+        fallback?: any;
+    };
 }
 export type ViewConfig = {
     hasSuperView?: boolean;
@@ -152,7 +163,20 @@ export type ViewRuntimeConfig = {
     updateVariableItemData?: (key: string, value: any) => void;
     prerender?: ViewRenderFactory | null;
     render?: ViewRenderFactory | null;
+    /**
+     * Error boundary. Trả children → dùng làm fallback cho vùng lỗi;
+     * trả void → chỉ ghi nhận, lỗi tiếp tục bubble lên boundary cha.
+     */
+    onError?: ErrorBoundaryHandler;
     [key: string]: any;
 };
+/** Giai đoạn phát sinh lỗi — giúp handler phân biệt lỗi render lần đầu với lỗi sau tương tác. */
+export type ErrorPhase = 'render' | 'update' | 'async';
+export type ErrorInfo = {
+    phase: ErrorPhase;
+    /** path của view NƠI lỗi xảy ra (có thể là view con, khác với view chứa boundary) */
+    path: string;
+};
+export type ErrorBoundaryHandler = (err: unknown, info: ErrorInfo) => any;
 export type ViewControllerConfig = ViewConfig & ViewRuntimeConfig;
 //# sourceMappingURL=ViewControllerInterface.d.ts.map

@@ -28,6 +28,8 @@ export declare class Block implements BlockInterface {
     name: string;
     ctx: ViewControllerInterface;
     viewId: string | null;
+    /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
+    private markerKey;
     fragment: FragmentInterface | null;
     contentRenderFactory: BlockRenderFactory | null;
     openTag: Comment;

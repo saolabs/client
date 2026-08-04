@@ -314,6 +314,12 @@ export class BlockManagerService {
         }
         for (const [key, block] of this.blocks) {
             if (block.viewId === viewId) {
+                // destroy TRƯỚC khi rời Map. Block KHÔNG nằm trong ctrl.elements
+                // nên teardown cây element không bao giờ chạm tới nó — đây là chỗ
+                // DUY NHẤT gỡ được record marker toàn cục của nó. Thiếu dòng này
+                // thì MarkerRegistry (singleton, sống qua navigate) tăng đúng 1
+                // record mỗi lần điều hướng, vĩnh viễn.
+                block.destroy?.();
                 this.blocks.delete(key);
             }
         }
@@ -331,11 +337,18 @@ export class BlockManagerService {
             }
         }
     }
-    /** Gỡ outlets của một layout bị destroy */
+    /**
+     * Gỡ outlets của một layout bị destroy — XOÁ THẬT, khác hẳn
+     * `detachOutletsOfView` ở ngay trên (layout chỉ pause vào PageCache và sẽ
+     * được re-register, nên KHÔNG được destroy ở đó).
+     * `destroy()` idempotent nên gọi ở đây an toàn kể cả khi teardown cây
+     * element đã destroy outlet trước đó.
+     */
     removeOutletsOfView(viewId) {
         for (const [key, outlet] of this.blockOutlets) {
             if (outlet.ctx?.viewId === viewId) {
                 this.mountedChildren.delete(this.outletKey(outlet));
+                outlet.destroy?.();
                 this.blockOutlets.delete(key);
             }
         }

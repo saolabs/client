@@ -10,6 +10,12 @@ export interface ViewStateInterface {
 export interface StateManagerInterface {
     /** Create reactive state — returns [value, setter, key] */
     useState(value: any, key?: string | number): [any, (newValue: any) => void, string | number];
+    /**
+     * State dẫn xuất có memo hoá — chỉ tính lại khi `deps` đổi, và lazy
+     * (đánh dấu bẩn lúc dep đổi, tính lúc đọc). Đọc qua `getStateByKey(key)`
+     * hoặc `subscribe([key])` như state thường.
+     */
+    computed(key: string, fn: () => any, deps?: string[]): () => any;
     /** Update state by key */
     updateStateByKey(key: string | number, value: any): any;
     /** Get state value by key (supports nested paths: 'user.name') */

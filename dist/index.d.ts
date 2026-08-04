@@ -16,6 +16,10 @@ export { BlockManagerService, BlockManager } from './src/core/services/BlockMana
 export { MarkerRegistry, MarkerRegistryService } from './src/core/services/MarkerRegistry.js';
 export { PageCache, PageCacheService, detachWrapperDOM } from './src/core/services/PageCache.js';
 export type { PageCacheEntry, PageCacheSetOptions } from './src/core/services/PageCache.js';
+export { SectionManager, SectionManagerService } from './src/core/services/SectionManager.js';
+export { HeadService } from './src/core/services/HeadService.js';
+export { Devtools, devtools, inspector } from './src/core/devtools/index.js';
+export type { DevtoolsEvent, DevtoolsEventType, DevtoolsViewNode } from './src/core/devtools/index.js';
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';
 export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
 export { Reactive } from './src/core/elements/Reactive.js';

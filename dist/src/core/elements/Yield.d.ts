@@ -1,5 +1,5 @@
 import { InitMode } from "../contracts/common";
-import { HtmlInterface, SaoChildrenFactoryOutput, YieldInterface } from "../contracts/ElementInterface";
+import { HtmlInterface, YieldInterface } from "../contracts/ElementInterface";
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
 import { SaoObjectType } from "../types/utils";
 export declare class YieldElement implements YieldInterface {
@@ -7,13 +7,14 @@ export declare class YieldElement implements YieldInterface {
     ctx: ViewControllerInterface;
     name: string;
     id: string;
-    contentFactory: () => SaoChildrenFactoryOutput;
     openTag: Comment;
     closeTag: Comment;
     initMode: InitMode;
     domChildren: Node[];
     parent: HtmlInterface | null;
     defaultValue: string;
+    /** Registry guard — thiếu field này thì aliveFromRegistry tái dùng Yield đã destroy */
+    __destroyed__: boolean;
     constructor({ ctx, name, initMode, id, defaultValue }: {
         ctx: ViewControllerInterface;
         name: string;
@@ -23,7 +24,7 @@ export declare class YieldElement implements YieldInterface {
     });
     private createMarkers;
     setParentElement(parent: HtmlInterface | null): void;
-    setContentFactory(factory: () => SaoChildrenFactoryOutput): void;
+    /** Idempotent: markers already in DOM (hydrate claim, or same-layout reuse) → keep as-is. */
     render(): void;
     destroy(): void;
     get isSaoElement(): boolean;

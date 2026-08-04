@@ -37,13 +37,13 @@ export class BlockOutlet implements BlockOutletInterface {
             } else {
                 this.openTag = markerRegistry.createMarkerStart('blockoutlet', this.id);
                 this.closeTag = markerRegistry.createMarkerEnd('blockoutlet', this.id);
-                markerRegistry.register('blockoutlet', this.id, { name, viewId: ctx.viewId });
+                this.markerKey = markerRegistry.register('blockoutlet', this.id, { name, viewId: ctx.viewId });
             }
         }
         else {
             this.openTag = markerRegistry.createMarkerStart('blockoutlet', this.id);
             this.closeTag = markerRegistry.createMarkerEnd('blockoutlet', this.id);
-            markerRegistry.register('blockoutlet', this.id, { name, viewId: ctx.viewId }); // Register this outlet in the MarkerRegistry
+            this.markerKey = markerRegistry.register('blockoutlet', this.id, { name, viewId: ctx.viewId }); // Register this outlet in the MarkerRegistry
             this.marker = new MarkerModel({
                 tagName: "s:bo",
                 name: "blockoutlet",
@@ -90,6 +90,8 @@ export class BlockOutlet implements BlockOutletInterface {
 
     /** Registry guard */
     public __destroyed__: boolean = false;
+    /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
+    private markerKey: string | null = null;
 
     /** Render — idempotent: markers đã trong DOM thì giữ nguyên (same-layout reuse) */
     render(): void {
@@ -104,6 +106,11 @@ export class BlockOutlet implements BlockOutletInterface {
 
     destroy(): void {
         this.__destroyed__ = true;
+        this.ctx.releaseElement?.(this);
+        if (this.markerKey) {
+            markerRegistry.remove(this.markerKey);
+            this.markerKey = null;
+        }
         // Clear nội dung giữa markers (block content nếu còn)
         let current: Node | null = this.openTag.nextSibling;
         while (current && current !== this.closeTag) {

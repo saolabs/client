@@ -75,6 +75,16 @@ export declare class Component implements ComponentInterface {
      */
     render(): void;
     /**
+     * Error boundary cho subtree con (@include). Boundary được tìm từ ctx —
+     * controller CHỨA @include này, không phải view con — nên onError của một
+     * view không bắt lỗi render của chính nó (giống React ErrorBoundary).
+     * Không boundary nào xử lý → rethrow, giữ nguyên hành vi cũ (bubble lên
+     * try/catch của renderPageView).
+     */
+    private guardChildMount;
+    /** Dọn DOM dở dang của lần render lỗi rồi chèn fallback giữa cặp marker. */
+    private mountFallback;
+    /**
      * Discover viewId server đã dùng cho child view: quét comment giữa cặp
      * marker component, tìm marker view mở đầu tiên <!--s:v:{id}-s-->.
      */

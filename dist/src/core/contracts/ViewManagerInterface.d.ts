@@ -47,7 +47,6 @@ export interface ViewManagerInterface {
     /** Unmount all active views */
     unmountAll(): void;
     /** Unmount a specific view by path */
-    unmountView(path: string): void;
     /** Get currently active page view */
     getCurrentView(): ViewInterface | null;
     /** Get current layout view */
@@ -73,6 +72,11 @@ export interface ViewManagerInterface {
     /**
      * view — lấy view instance từ registry, có thể cache.
      */
-    view(name: string, data: Record<string, any>, cache: boolean): any;
+    /** Tạo View instance; hỗ trợ registry lazy (`() => import(...)`) — dùng cho view cấp route. */
+    view(name: string, data: Record<string, any>, cache: boolean): Promise<any>;
+    /** Bản đồng bộ cho `@include`/`@extends`; view lazy chưa preload → null. */
+    resolveViewSync(name: string, data: Record<string, any>, cache: boolean): any;
+    /** Nạp trước view lazy để dùng được đồng bộ sau đó. */
+    preloadView(name: string): Promise<boolean>;
 }
 //# sourceMappingURL=ViewManagerInterface.d.ts.map

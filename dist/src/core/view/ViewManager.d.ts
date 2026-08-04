@@ -22,6 +22,7 @@ import { HtmlInterface } from "../contracts/utils";
 import type { ViewInterface } from "../contracts/ViewInterface";
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
 import { BlockManagerService } from "../services/BlockManager";
+import { SectionManagerService } from "../services/SectionManager";
 import { PageCacheService } from "../services/PageCache";
 import { StoreService } from "../services/StoreService";
 import { InitMode } from "../contracts/common";
@@ -76,7 +77,6 @@ export declare class ViewManager implements ViewManagerInterface {
     /** View module registry: name → factory or async loader */
     private viewRegistry;
     /** Currently mounted views (keyed by path) */
-    private activeViews;
     /** The outermost active view (layout or page) */
     private currentView;
     /** Current layout path — for layout reuse detection */
@@ -96,7 +96,6 @@ export declare class ViewManager implements ViewManagerInterface {
     private ssrViewData;
     /** Current layout view info — reused if same layout */
     private currentLayout;
-    private cachedLayouts;
     /** All views in the current mount chain (outermost → innermost) */
     private viewStack;
     /** Whether the manager has been initialized */
@@ -107,6 +106,7 @@ export declare class ViewManager implements ViewManagerInterface {
     private navigationGeneration;
     store: StoreService;
     blockManager: BlockManagerService;
+    sectionManager: SectionManagerService;
     constructor(app?: ApplicationInterface);
     /**
      * Kiểm tra một view có đang mount (active) không.
@@ -159,6 +159,11 @@ export declare class ViewManager implements ViewManagerInterface {
         revision?: string;
         contextViews?: string;
     }): void;
+    /**
+     * Phương án CUỐI khi không error boundary nào xử lý (xem ViewController.onError):
+     * ghi đè cả container. Dựng bằng DOM API + textContent — message/details có thể
+     * mang nội dung từ server/URL, nội suy vào innerHTML là đường tiêm HTML.
+     */
     showError(message: string, details?: any): void;
     hasView(name: string): boolean;
     exists(name: string): boolean;
@@ -172,7 +177,37 @@ export declare class ViewManager implements ViewManagerInterface {
      * (tránh hai instance cùng view path dùng chung ID gây clobber registry).
      */
     generateViewId(): string;
-    view(name: string, data: Record<string, any>, cache: boolean): any;
+    /** Factory đã unwrap của các view lazy — tránh await + unwrap lại mỗi lần navigate. */
+    private resolvedFactories;
+    /**
+     * Tạo View instance. Hỗ trợ registry lazy (`() => import('./x.js')`) — dùng
+     * cho view cấp ROUTE (mountView/hydrateView). `@include`/`@extends` chạy
+     * trong render tree đồng bộ nên dùng `resolveViewSync()`.
+     */
+    view(name: string, data: Record<string, any>, cache: boolean): Promise<any>;
+    /**
+     * Bản đồng bộ cho `@include`/`@extends` — render tree không await được.
+     * View lazy CHƯA preload → null + hướng dẫn, thay vì trả Promise làm vỡ
+     * ngầm ở `view.__ctrl__` phía sau.
+     */
+    resolveViewSync(name: string, data: Record<string, any>, cache: boolean): any;
+    /** Nạp trước một view lazy để `@include`/`@extends` dùng được đồng bộ sau đó. */
+    preloadView(name: string): Promise<boolean>;
+    private viewFromStore;
+    /**
+     * Truyền data PHẲNG cho factory: compiled factory nhận __data__ là chính
+     * object data (đọc __data__.__SSR_VIEW_ID__, setup({data:__data__})).
+     * Trước đây bọc { data } → __data__.__SSR_VIEW_ID__ = undefined và ctrl.data
+     * bị lồng (vỡ route-param). Xem docs/HYDRATION.md §9.2.
+     */
+    private buildSystemData;
+    private finalizeView;
+    /**
+     * Chuẩn hoá kết quả resolve của registry lazy về factory `(data, sys) => View`.
+     * Chấp nhận: module namespace (`{ default: factory }`), factory trần, hoặc
+     * View instance — người viết registry không phải tự `.then(m => m.default)`.
+     */
+    private unwrapLazyFactory;
     private createRenderPageViewError;
     private createRenderPageViewCancelled;
     private isNavigationCurrent;
@@ -281,7 +316,6 @@ export declare class ViewManager implements ViewManagerInterface {
     applyViewContext(state: Record<string, any>): boolean;
     getContextRevision(): string | null;
     private extractAsyncData;
-    unmountView(path: string): void;
     /**
      * hydrateView — Hydrate một view đã được server-side render.
      *
@@ -324,6 +358,8 @@ export declare class ViewManager implements ViewManagerInterface {
     }, route?: ActiveRouteInterface): Promise<any>;
     getCurrentLayout(): ViewInterface | null;
     getCurrentView(): ViewInterface | null;
+    /** Layout chain đang mount, ngoài → trong (devtools/debug). */
+    getLayoutChain(): ViewInterface[];
     /** Còn SSR boot chưa consume? (route đầu tiên nên hydrate thay vì mount) */
     hasSSRBoot(): boolean;
     /**

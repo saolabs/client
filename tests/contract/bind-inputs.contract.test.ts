@@ -38,11 +38,8 @@ const frame = () => new Promise<void>(r => requestAnimationFrame(() => requestAn
 const microtask = () => Promise.resolve();
 
 const bindAttrs = (stateKey: string, extra: Record<string, any> = {}) => ({
-    attrs: {
-        ...extra,
-        bind: { type: 'static', value: true },
-        [stateKey]: { type: 'static', value: true },
-    },
+    attrs: { ...extra },
+    bind: { key: stateKey },
 });
 
 afterEach(() => { document.body.innerHTML = ''; });

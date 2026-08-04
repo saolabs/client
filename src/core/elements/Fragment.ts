@@ -163,6 +163,7 @@ export class Fragment implements FragmentInterface {
 
     destroy(): void {
         this.__destroyed__ = true;
+        this.ctx.releaseElement?.(this);
         this.clear();
         this.openTag.remove();
         this.closeTag.remove();

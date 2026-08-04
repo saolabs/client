@@ -34,6 +34,8 @@ export class Block implements BlockInterface {
     name: string;
     ctx: ViewControllerInterface;
     viewId: string | null = null;
+    /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
+    private markerKey: string | null = null;
     fragment: FragmentInterface | null = null;
     contentRenderFactory: BlockRenderFactory | null = null;
     openTag: Comment;
@@ -76,7 +78,7 @@ export class Block implements BlockInterface {
             } else {
                 this.openTag = markerRegistry.createMarkerStart('block', this.id);
                 this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
-                markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
+                this.markerKey = markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
                 this.marker = new MarkerModel({
                     tagName: "s:b",
                     name: "block",
@@ -90,7 +92,7 @@ export class Block implements BlockInterface {
         } else {
             this.openTag = markerRegistry.createMarkerStart('block', this.id);
             this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
-            markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
+            this.markerKey = markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
             this.marker = new MarkerModel({
                 tagName: "s:b",
                 name: "block",
@@ -133,7 +135,11 @@ export class Block implements BlockInterface {
         // Unmount logic (e.g. hide or remove DOM nodes, stop reactions)
     }
     destroy(): void {
-        // Cleanup logic (e.g. remove DOM nodes, clear caches)
+        // MarkerRegistry là singleton toàn cục — không gỡ thì record sống qua navigate.
+        if (this.markerKey) {
+            markerRegistry.remove(this.markerKey);
+            this.markerKey = null;
+        }
     }
     update(): void {
         // Update logic (e.g. re-render content on state change)

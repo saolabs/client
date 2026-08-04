@@ -37,6 +37,8 @@ export declare class Reactive implements ReactiveInterface {
     private _isStarted;
     /** Marker model (hydration) — gán bởi BlockManager/SSR khi cần; mặc định null. */
     marker: MarkerModelInterface | null;
+    /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
+    private markerKey;
     domChildren: Node[];
     initMode: InitMode;
     /**
@@ -78,6 +80,7 @@ export declare class Reactive implements ReactiveInterface {
      * Children sinh ra khi đang active được start() ngay — FIX(baseline#7).
      */
     render(): void;
+    private _render;
     /**
      * Phần render nội bộ: chạy childrenFactory, insert children vào DOM.
      * Dùng cho initial render (mọi type) và re-render non-foreach.
@@ -143,10 +146,6 @@ export declare class Reactive implements ReactiveInterface {
     start(): void;
     /** Stop — unsubscribe and recursively stop children. */
     stop(): void;
-    /** Remove content but keep markers (for hide/show scenarios) */
-    hide(): void;
-    /** Re-render content (for show after hide) */
-    show(): void;
     destroy(): void;
     get isOneReactive(): boolean;
     set isOneReactive(value: boolean);

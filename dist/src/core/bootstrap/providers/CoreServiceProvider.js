@@ -4,6 +4,8 @@ import { EventService } from "../../services/EventService";
 import { HttpService } from "../../services/HttpService";
 import { MarkerService } from "../../services/MarkerService";
 import { StoreService } from "../../services/StoreService";
+import HeadService from "../../services/HeadService";
+import { Devtools } from "../../devtools";
 import { PROVIDER_NAMES } from "./provider-order";
 import { ServiceProvider } from "./ServiceProvider";
 export class CoreServiceProvider extends ServiceProvider {
@@ -18,6 +20,8 @@ export class CoreServiceProvider extends ServiceProvider {
         this.app.set("Event", EventService.instance(), true);
         this.app.set("Http", HttpService.instance(), true);
         this.app.set("Registry", MarkerRegistry, true);
+        this.app.set("Head", HeadService, true);
+        this.app.set("Devtools", Devtools, true);
     }
 }
 //# sourceMappingURL=CoreServiceProvider.js.map

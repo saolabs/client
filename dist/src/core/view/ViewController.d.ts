@@ -1,7 +1,7 @@
 import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface } from "../contracts/ElementInterface";
+import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface, EventModifier } from "../contracts/ElementInterface";
 import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig } from "../contracts/ViewControllerInterface";
+import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo } from "../contracts/ViewControllerInterface";
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface";
 import type { SaoObjectType } from "../types/utils";
 import { ViewState } from "./ViewState";
@@ -19,7 +19,8 @@ type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | Tex
  * Manages:
  *   - Reactive state (ViewState) — useState, subscribe, batch flush
  *   - DOM element tree — via Html, Reactive, TextElement, Fragment
- *   - Event delegation — addEventListener with centralized cleanup
+ *   - Events — addEventListener TRỰC TIẾP trên từng element (KHÔNG delegation),
+ *     dọn hàng loạt bằng một AbortController chung. Giống React 17+/Vue/Svelte.
  *   - Loop contexts — @foreach, @for, @while with LoopContext stack
  *   - Block management — for layout views with @useBlock
  *   - Lifecycle — setup, render, destroy
@@ -105,6 +106,8 @@ export declare class ViewController implements ViewControllerInterface {
     /** Block slots in layout views */
     blocks: Map<string, BlockInterface>;
     elements: Map<string, ElementChild>;
+    /** element → key của nó trong `elements` (xem registerElement/releaseElement) */
+    private elementKeys;
     preloadElement: WrapperInterface | null;
     mainElement: WrapperInterface | null;
     /** Wrapper instance RIÊNG cho render/prerender — dùng chung sẽ làm
@@ -138,6 +141,21 @@ export declare class ViewController implements ViewControllerInterface {
     getConfig(key?: string, defaultValue?: any): ViewControllerConfig | any;
     /** Set static view config shared by all instances of a compiled view class. */
     setStaticConfig(config: ViewConfig): void;
+    /** Đang chạy onError của chính controller này — chặn đệ quy nếu handler tự throw. */
+    private _handlingError;
+    /**
+     * Error boundary: tìm handler gần nhất theo chuỗi `parent`, gọi nó, trả fallback.
+     *
+     * Bất biến:
+     *   - handler trả undefined → coi như KHÔNG xử lý, bubble tiếp lên cha
+     *     (cho phép chỉ log mà không đổi UI).
+     *   - handler tự throw → bỏ qua boundary đó, bubble tiếp (không lặp vô hạn).
+     *   - không boundary nào xử lý → { handled:false }, caller giữ hành vi cũ.
+     */
+    handleError(err: unknown, info: ErrorInfo): {
+        handled: boolean;
+        fallback?: any;
+    };
     /** Set user-defined properties/methods on the View instance */
     setUserDefinedConfig(userConfig: Record<string, any>): void;
     /** Set the compiled render factory */
@@ -260,7 +278,14 @@ export declare class ViewController implements ViewControllerInterface {
      *   - Object with handler + params: { handler: fn, params: [...] }
      *   - Object with string handler (method name on view): { handler: 'handleClick' }
      */
-    addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler): void;
+    /**
+     * Bọc handler theo modifier của `@click.prevent.stop(...)`.
+     * `self` kiểm TRƯỚC: event từ element con thì coi như không xảy ra, nên
+     * cũng không được preventDefault/stopPropagation (giống Vue).
+     * `once` KHÔNG xử lý ở đây — nó là option của addEventListener.
+     */
+    private wrapEventModifiers;
+    addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler, modifiers?: EventModifier[]): void;
     removeEventListener(element: HTMLElement, event: string): void;
     /**
      * Schedule a reactive region for re-render.
@@ -270,11 +295,9 @@ export declare class ViewController implements ViewControllerInterface {
     private flushReactiveUpdates;
     pushBlockAndSections(): void;
     /**
-     *
-     * @param name
-     * @param config
-     * @param contentRenderFactory
-     * @returns
+     * @section(name, ...) — registers content for a matching @yield(name) to
+     * consume (possibly in a different controller — page declares, layout
+     * yields, same cross-controller relationship as @block/@useBlock).
      */
     section(name: string, config: {
         type: SectionItemType;
@@ -282,6 +305,8 @@ export declare class ViewController implements ViewControllerInterface {
         stateKeys?: string[];
         [key: string]: any;
     }, contentRenderFactory: SectionContentRenderer): SectionInterface;
+    /** `this.yieldContent(name, default)` — synchronous resolve, used inside attribute/prop binding factories. */
+    yieldContent(name: string, defaultValue?: any): any;
     block(id: string | null, name: string, contentRenderFactory: BlockRenderFactory): BlockInterface;
     blockOutlet(id: string | null | undefined, name: string, parentElement: HtmlInterface | null): BlockOutletInterface;
     mountBlock(id: string | null | undefined, name: string, parent: HtmlInterface | null): BlockOutletInterface;
@@ -292,7 +317,6 @@ export declare class ViewController implements ViewControllerInterface {
      */
     useBlock(id: string | null | undefined, name: string, parent: HtmlInterface): BlockOutletInterface;
     yield(id: string, name: string, defaultValue?: any, parentElement?: HtmlInterface | null): YieldInterface;
-    yieldContent(name: string, defaultValue?: any): any;
     wrapper(factory: SaoChildrenFactory): WrapperInterface;
     fragment(id: string | null | undefined, parentElement: HtmlInterface | null, childrenFactory: SaoChildrenFactory): FragmentInterface;
     /**
@@ -307,6 +331,23 @@ export declare class ViewController implements ViewControllerInterface {
      * Raw Text node bị mountElementList/Reactive.render bỏ qua → text tĩnh biến mất.
      */
     text(text: string): TextInterface;
+    /**
+     * Ghi element vào registry + nhớ key để destroy() gỡ lại được.
+     * Key là id THÔ; `element.id` phần lớn đã prefix viewId (`${viewId}-${id}`)
+     * nên element KHÔNG tự suy ra key được — WeakMap giữ ánh xạ, không giữ
+     * element sống.
+     */
+    private registerElement;
+    /**
+     * Element tự gỡ khỏi registry trong destroy() — nếu không, `elements` chỉ
+     * co lại lúc destroy view, còn id sinh theo item (`{hash}-${item.id}`) thì
+     * mỗi trang/mỗi lần refresh lại thêm một corpse vĩnh viễn (đo được:
+     * 32 → 182 entry sau 6 trang trong khi DOM vẫn 10 item).
+     *
+     * Guard `=== el` là bắt buộc: pass mới đã ghi element MỚI vào cùng id TRƯỚC
+     * khi prunePass destroy element cũ — xoá vô điều kiện sẽ gỡ nhầm bản mới.
+     */
+    releaseElement(el: object): void;
     /**
      * Registry guard: element đã destroy không được reuse — trả về corpse
      * (events đã abort, markers đã gỡ) gây render rỗng / stale closure.

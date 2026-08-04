@@ -58,23 +58,23 @@ function setup() {
 }
 
 describe('ViewManager.view() — data shape phẳng', () => {
-    it('factory nhận __data__ PHẲNG (không bọc { data })', () => {
+    it('factory nhận __data__ PHẲNG (không bọc { data })', async () => {
         setup();
-        const view = vm.view('web.compiled', { foo: 'bar', n: 1 }, false);
+        const view = await vm.view('web.compiled', { foo: 'bar', n: 1 }, false);
         // ctrl.data phải = chính object data, KHÔNG lồng dưới key "data"
         expect(view.__ctrl__.data).toEqual({ foo: 'bar', n: 1 });
         expect((view.__ctrl__.data as any).data).toBeUndefined();
     });
 
-    it('factory đọc được __data__.__SSR_VIEW_ID__ → set viewId', () => {
+    it('factory đọc được __data__.__SSR_VIEW_ID__ → set viewId', async () => {
         setup();
-        const view = vm.view('web.compiled', { __SSR_VIEW_ID__: 'vx-123' }, false);
+        const view = await vm.view('web.compiled', { __SSR_VIEW_ID__: 'vx-123' }, false);
         expect(view.__ctrl__.viewId).toBe('vx-123');
     });
 
-    it('không data → factory nhận {} (không lỗi)', () => {
+    it('không data → factory nhận {} (không lỗi)', async () => {
         setup();
-        const view = vm.view('web.compiled', {} as any, false);
+        const view = await vm.view('web.compiled', {} as any, false);
         expect(view).not.toBeNull();
         expect(view.__ctrl__.data).toEqual({});
     });

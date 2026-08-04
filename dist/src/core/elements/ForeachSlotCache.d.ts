@@ -23,6 +23,11 @@
  *   3. `prunePass(onRemove)` — slot KHÔNG được touch trong pass = item đã rời
  *      list → callback destroy + gỡ khỏi cache. (Trước đây bước này là dead
  *      code — cache không bao giờ gỡ entry → element của item bị xoá leak.)
+ *      Slot bị `store()` GHI ĐÈ (cùng key, ref mới) cũng đi qua đây: nó rơi khỏi
+ *      `_map` ngay lúc ghi đè nên prunePass không còn thấy → phải giữ tạm trong
+ *      `_evicted`. Thiếu bước này thì refresh list từ server (`@key` giữ nguyên,
+ *      ref đổi) KHÔNG destroy elements cũ → view con của @include bị tái dùng
+ *      trong DOM đã detach và biến mất khỏi trang.
  *
  * # Quan hệ với Reactive
  * Reactive type 'foreach' giữ một instance; cửa sổ `_currentForeachCache`
@@ -51,6 +56,8 @@ export declare class ForeachSlotCache {
     private _passOcc;
     /** Slots được claim-hit hoặc store trong pass hiện tại */
     private _touched;
+    /** Slots bị store() ghi đè trong pass hiện tại — prunePass destroy rồi clear */
+    private _evicted;
     /** Tổng số slot đang cache (mọi occurrence). */
     get size(): number;
     /** Bắt đầu một chu kỳ render — reset counters + touched set. */
@@ -62,8 +69,9 @@ export declare class ForeachSlotCache {
      */
     claim(key: any, item: any): ForeachClaim;
     /**
-     * Lưu slot mới tại (key, occ) — ghi đè slot cũ nếu ref đã đổi
-     * (slot cũ không được touch → prunePass sẽ destroy).
+     * Lưu slot mới tại (key, occ) — ghi đè slot cũ nếu ref đã đổi.
+     * Slot bị ghi đè KHÔNG còn nằm trong `_map` nên prunePass duyệt `_map` sẽ
+     * không thấy nó nữa → phải chuyển sang `_evicted` để vẫn được destroy.
      */
     store(key: any, occ: number, item: any, elements: any[]): ForeachSlot;
     /**

@@ -43,8 +43,7 @@ export interface YieldInterface extends SaoNodeInterface {
     ctx: ViewControllerInterface;
     parent: HtmlInterface | null;
     name: string;
-    contentFactory: () => SaoChildrenFactoryOutput;
-    setContentFactory(factory: () => SaoChildrenFactoryOutput): void;
+    defaultValue: string;
     openTag: Comment;
     closeTag: Comment;
     domChildren: Node[];
@@ -83,6 +82,10 @@ export type SaoElementConfig = {
             value?: any;
             stateKeys?: string[];
             factory?: () => any;
+            /** `@yield(name, ...)` used as the whole attribute value — no static stateKeys
+             *  (the section it resolves to is only known at runtime), so Html subscribes to
+             *  SectionManager by name instead. */
+            yieldName?: string;
         };
     };
     props?: {
@@ -95,6 +98,25 @@ export type SaoElementConfig = {
     };
     events?: {
         [key: string]: SaoElementEventHandler;
+    };
+    /**
+     * `@click.prevent.stop(...)` — bucket RIÊNG cạnh `events` để shape
+     * `events: {click: [...]}` (contract sẵn có) không đổi; view compile trước
+     * khi có modifier không có key này và chạy y nguyên.
+     */
+    eventModifiers?: {
+        [key: string]: EventModifier[];
+    };
+    /** `@bind(key)`/`@val(key)` — two-way binding, own bucket (sibling of attrs/props/events). */
+    bind?: {
+        key: string;
+    };
+    /**
+     * `@transition('fade')` — tiền tố class enter/leave (`fade-enter-from`, ...).
+     * Bucket riêng như `bind`/`eventModifiers`; vắng mặt = hành vi cũ y nguyên.
+     */
+    transition?: {
+        name: string;
     };
     classes?: {
         [className: string]: {
@@ -124,6 +146,11 @@ export type HtmlElementConfig = SaoElementConfig & {
     parentElement?: HtmlInterface | null;
     parent?: HtmlInterface | null;
 };
+/**
+ * Modifier của `@click.prevent.stop(...)`. Phải khớp `EVENT_MODIFIERS` trong
+ * `compiler/src/sao2js/template_ast.py` — compiler chỉ emit tên trong tập đó.
+ */
+export type EventModifier = 'prevent' | 'stop' | 'self' | 'once';
 export type SaoElementEventHandler = Array<{
     handler: string | ((event: Event) => any);
     params?: (any | ((event: Event) => any[]))[];

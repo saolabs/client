@@ -126,7 +126,7 @@ export class Component {
                         return;
                     }
                 }
-                this.hydrateChild();
+                this.guardChildMount(() => this.hydrateChild());
                 this.initMode = InitModes.CREATE; // re-render sau này dùng CSR flow
                 return;
             }
@@ -155,7 +155,37 @@ export class Component {
                 return; // @includeIf: view không tồn tại → bỏ qua, không lỗi
             }
         }
-        this.mountChild();
+        this.guardChildMount(() => this.mountChild());
+    }
+    /**
+     * Error boundary cho subtree con (@include). Boundary được tìm từ ctx —
+     * controller CHỨA @include này, không phải view con — nên onError của một
+     * view không bắt lỗi render của chính nó (giống React ErrorBoundary).
+     * Không boundary nào xử lý → rethrow, giữ nguyên hành vi cũ (bubble lên
+     * try/catch của renderPageView).
+     */
+    guardChildMount(mount) {
+        try {
+            mount();
+        }
+        catch (err) {
+            const result = this.ctx.handleError(err, { phase: 'render', path: this.path ?? '' });
+            if (!result.handled)
+                throw err;
+            this.mountFallback(result.fallback);
+        }
+    }
+    /** Dọn DOM dở dang của lần render lỗi rồi chèn fallback giữa cặp marker. */
+    mountFallback(fallback) {
+        let current = this.openTag.nextSibling;
+        while (current && current !== this.closeTag) {
+            const next = current.nextSibling;
+            current.parentNode?.removeChild(current);
+            current = next;
+        }
+        if (fallback === null || fallback === undefined)
+            return;
+        mountChildrenBeforeAnchor(this.closeTag, Array.isArray(fallback) ? fallback : [fallback], this.parent);
     }
     /**
      * Discover viewId server đã dùng cho child view: quét comment giữa cặp
@@ -243,7 +273,8 @@ export class Component {
             return null;
         }
         const data = this.dataFactory ? this.dataFactory(this.parent) : this.data;
-        const childView = viewManager.view(this.path, data ?? {}, false);
+        // Sync: render tree không await được (xem ViewManager.resolveViewSync).
+        const childView = viewManager.resolveViewSync(this.path, data ?? {}, false);
         if (!childView) {
             console.error(`[Component] View "${this.path}" không tồn tại trong registry.`);
             return null;
@@ -324,6 +355,7 @@ export class Component {
             return;
         this.stop();
         this.__destroyed__ = true;
+        this.ctx.releaseElement?.(this);
         this.unmountChild();
         this.openTag.remove();
         this.closeTag.remove();

@@ -187,9 +187,8 @@ describe('Html.updateConfig reconciliation', () => {
         const bindConfig = (key: string) => ({
             attrs: {
                 type: { type: 'static' as const, value: 'text' },
-                bind: { type: 'static' as const, value: true },
-                [key]: { type: 'static' as const, value: true },
             },
+            bind: { key },
         });
         const html = new Html({
             ctx: controller,

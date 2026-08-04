@@ -356,3 +356,92 @@ describe('mountView — standalone', () => {
         expect(vm.pageCache.has('web.a::/a')).toBe(false);
     });
 });
+
+describe('hydrateView — @await/@fetch views skip the fetch, not prerender()', () => {
+    afterEach(() => { document.body.innerHTML = ''; });
+
+    // Hydrate mode never inserts DOM (SSR content is assumed already there —
+    // see docs/HYDRATION.md §2), so with no matching SSR markers in this
+    // harness's empty container there's nothing to assert on via textContent.
+    // What matters here is *which* factory ran and whether Http.get() fired.
+    //
+    // prerender() still HAS to run: for an @extends+@block page the compiler
+    // puts every block/section that does NOT depend on the awaited data
+    // (e.g. a static footer, a sidebar section) ONLY in prerender() — render()
+    // re-declares just the block(s) that depend on the fetch (see
+    // compiler/examples/sao/await.sao's compiled output). Skipping prerender()
+    // outright during hydrate would silently drop those static blocks.
+
+    it('hasPrerender: prerender() runs (registers static content) then render() overwrites it, no fetch', async () => {
+        const application = app() as any;
+        const previousHttp = application.get('Http');
+        let fetchCalled = false;
+        application.set('Http', { get: () => { fetchCalled = true; return Promise.resolve({ data: {} }); } });
+
+        let prerenderCalled = false;
+        let renderCalled = false;
+        try {
+            const { vm } = createManager();
+            vm.registerView('web.slow', () => {
+                const view = new View('web.slow', 'view');
+                view.__ctrl__.setup({
+                    superView: null,
+                    data: {},
+                    hasAwaitData: true,
+                    hasPrerender: true,
+                    fetch: { url: '/slow' },
+                    prerender: function (this: any) {
+                        prerenderCalled = true;
+                        return this.wrapper((parent: any) => [this.html('sk', 'section', parent, {}, () => [this.text('LOADING')])]);
+                    },
+                    render: function (this: any) {
+                        renderCalled = true;
+                        return this.wrapper((parent: any) => [this.html('mn', 'main', parent, {}, () => [this.text('MAIN')])]);
+                    },
+                } as any);
+                return view;
+            });
+
+            await vm.hydrateView('web.slow', { __SSR_VIEW_ID__: 'vssr-slow' }, route('/slow'));
+
+            expect(fetchCalled).toBe(false);
+            expect(prerenderCalled).toBe(true); // still runs — registers static blocks/sections
+            expect(renderCalled).toBe(true); // runs right after, no fetch in between — overwrites the async block(s)
+        } finally {
+            application.set('Http', previousHttp);
+        }
+    });
+
+    it('hasFetchData without prerender: render() runs directly, no fetch', async () => {
+        const application = app() as any;
+        const previousHttp = application.get('Http');
+        let fetchCalled = false;
+        application.set('Http', { get: () => { fetchCalled = true; return Promise.resolve({ data: {} }); } });
+
+        let renderCalled = false;
+        try {
+            const { vm } = createManager();
+            vm.registerView('web.await', () => {
+                const view = new View('web.await', 'view');
+                view.__ctrl__.setup({
+                    superView: null,
+                    data: {},
+                    hasAwaitData: true,
+                    fetch: { url: '/await' },
+                    render: function (this: any) {
+                        renderCalled = true;
+                        return this.wrapper((parent: any) => [this.html('mn', 'main', parent, {}, () => [this.text('MAIN')])]);
+                    },
+                } as any);
+                return view;
+            });
+
+            await vm.hydrateView('web.await', { __SSR_VIEW_ID__: 'vssr-await' }, route('/await'));
+
+            expect(fetchCalled).toBe(false);
+            expect(renderCalled).toBe(true);
+        } finally {
+            application.set('Http', previousHttp);
+        }
+    });
+});

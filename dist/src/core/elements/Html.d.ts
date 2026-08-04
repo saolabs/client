@@ -55,10 +55,7 @@ export declare class Html implements HtmlInterface {
     /**
      * Thiết lập two-way data binding (v-model-like) theo compiler pattern:
      *
-     *   attrs: { "bind": { type: 'static', value: true }, "<stateKey>": { type: 'static', value: true } }
-     *
-     *   - "bind": true          → bật two-way binding
-     *   - "<stateKey>": true    → tên state key cần bind (e.g. "newTodo")
+     *   config.bind = { key: "<stateKey>" }  — own bucket, sibling of attrs/props/events.
      *
      * Hành vi:
      *   1. Khởi tạo: set element.value = state hiện tại
@@ -87,6 +84,14 @@ export declare class Html implements HtmlInterface {
     getElement(): HTMLElement;
     renderChildren(): SaoElementChildren;
     render(): HTMLElement;
+    /** Đã chạy enter rồi — re-render không được chạy lại. */
+    private _entered;
+    /**
+     * Enter chạy MỘT lần, khi element vừa được tạo và đã nằm trong DOM.
+     * Bỏ qua ở HYDRATE: DOM đó do server render, animate lại là nháy vô cớ
+     * (tương đương `appear = false` mặc định của Vue).
+     */
+    private maybeRunEnter;
     appendElement(element: HTMLElement | Comment | Text): void;
     /** Start reactive bindings + children (Phase 2 lifecycle) */
     start(): void;
@@ -97,6 +102,8 @@ export declare class Html implements HtmlInterface {
     /** Registry guard — element đã destroy không được reuse (xem RUNTIME_CONTRACT.md §2) */
     __destroyed__: boolean;
     destroy(): void;
+    /** Destroy children + dọn nội dung. Tách riêng để leave hoãn được. */
+    private teardownSubtree;
     get isSaoElement(): boolean;
     set isSaoElement(value: boolean);
     get isOneHtml(): boolean;

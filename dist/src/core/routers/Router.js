@@ -95,6 +95,8 @@ export class Router {
         // ─── Internal: Route Handling ────────────────────────────────
         /** Kiểu navigation nội bộ — quyết định thao tác history + nav type xuống ViewManager */
         this.pendingNavigation = null;
+        /** Live region dùng lại giữa các lần điều hướng — tạo lười, chỉ 1 node. */
+        this.liveRegion = null;
         this.App = app || null;
         this.currentUri = typeof window !== 'undefined'
             ? window.location.pathname + window.location.search
@@ -166,10 +168,55 @@ export class Router {
         return this;
     }
     /**
-     * Add multiple routes at once.
+     * Nối path con vào path cha. Con bắt đầu bằng '/' là ĐƯỜNG TUYỆT ĐỐI —
+     * bỏ qua prefix cha (lối thoát cho route lệch khỏi cây, như Vue Router).
+     * Con rỗng ('') = index route, trùng đúng path cha.
+     */
+    static joinRoutePath(parent, child) {
+        if (child.startsWith('/'))
+            return child;
+        const base = parent.replace(/\/+$/, '');
+        if (!child)
+            return base || '/';
+        return `${base}/${child}`.replace(/\/{2,}/g, '/');
+    }
+    /**
+     * Trải cây route thành bảng phẳng — bảng phẳng là thứ `matchRoute()` duyệt,
+     * và nó khớp THEO THỨ TỰ (first match wins), nên thứ tự emit ở đây chính là
+     * độ ưu tiên: giữ nguyên thứ tự khai báo để `/users/profile` đứng trước
+     * `/users/{id}` đúng như người viết mong đợi.
+     *
+     * Cha có `children` mà KHÔNG có `component` = nhóm thuần tuý (gom prefix +
+     * meta dùng chung), không sinh route nào cho chính nó.
+     *
+     * Index child (`path: ''`) sinh ra đúng path của cha → khi đó bỏ route
+     * riêng của cha, vì khai báo con là chỉ định cụ thể hơn cho URL đó.
+     */
+    flattenRouteTree(routes, parentPath = '', parentMeta = {}) {
+        const flat = [];
+        for (const route of routes) {
+            const { children, ...own } = route;
+            const path = Router.joinRoutePath(parentPath, route.path ?? '');
+            const meta = { ...parentMeta, ...(route.meta ?? {}) };
+            const flatChildren = children && children.length
+                ? this.flattenRouteTree(children, path, meta)
+                : [];
+            const component = route.component || route.view || '';
+            const coveredByIndexChild = flatChildren.some(c => c.path === path);
+            if (component && !coveredByIndexChild) {
+                flat.push({ ...own, path, meta });
+            }
+            flat.push(...flatChildren);
+        }
+        return flat;
+    }
+    /**
+     * Add multiple routes at once. Chấp nhận cây lồng qua `children` — mọi
+     * đường vào (`configure`, `replaceRoutes`) đều đi qua đây nên chỉ cần
+     * flatten một chỗ.
      */
     addRoutes(routes) {
-        for (const route of routes) {
+        for (const route of this.flattenRouteTree(routes)) {
             const component = route.component || route.view || '';
             this.addRoute(route.path, component, route.meta || {});
             if (route.name) {
@@ -404,6 +451,8 @@ export class Router {
         this._beforeEach = null;
         this._afterEach = null;
         this.currentRoute = null;
+        this.liveRegion?.remove();
+        this.liveRegion = null;
         Router.activeRoute = null;
     }
     // ─── Helper ────────────────────────────────
@@ -533,6 +582,7 @@ export class Router {
             this.currentRoute = activeRoute;
             this.currentUri = uri;
             this.applyScroll(type, fragment);
+            this.announceNavigation(type);
             // After hook
             if (this._afterEach) {
                 this._afterEach({ ...route, path: normalizedPath }, from);
@@ -580,6 +630,49 @@ export class Router {
             }
             catch { /* non-browser/test runtime */ }
         }
+    }
+    /**
+     * A11y sau khi điều hướng xong (SPA không tự làm được như full page load):
+     *   1. Đưa focus về container view — không làm thì bàn phím vẫn ở link cũ
+     *      của trang TRƯỚC, Tab tiếp tục từ vị trí không còn tồn tại.
+     *   2. Đọc tên trang mới qua live region — screen reader không hề biết
+     *      nội dung đã đổi vì document không reload.
+     *
+     * `preventScroll` để không phá `applyScroll()` vừa chạy. Bỏ qua `initial`:
+     * lần paint đầu/hydrate không được cướp focus khỏi thứ user đang thao tác.
+     */
+    announceNavigation(type) {
+        if (typeof document === 'undefined' || type === 'initial')
+            return;
+        const container = (this.viewManager ?? this.App?.View)?.getContainer?.();
+        if (container instanceof HTMLElement) {
+            // tabindex=-1: focus được bằng script nhưng KHÔNG chen vào thứ tự Tab.
+            if (!container.hasAttribute('tabindex'))
+                container.setAttribute('tabindex', '-1');
+            try {
+                container.focus({ preventScroll: true });
+            }
+            catch { /* jsdom/older browsers */ }
+        }
+        if (!this.liveRegion || !this.liveRegion.isConnected) {
+            const region = document.createElement('div');
+            region.setAttribute('aria-live', 'polite');
+            region.setAttribute('aria-atomic', 'true');
+            // Ẩn khỏi mắt nhưng KHÔNG display:none / visibility:hidden —
+            // hai cái đó làm screen reader bỏ qua luôn.
+            region.style.cssText =
+                'position:absolute;width:1px;height:1px;margin:-1px;padding:0;'
+                    + 'overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0';
+            document.body.appendChild(region);
+            this.liveRegion = region;
+        }
+        // Ghi ở frame sau: nội dung mới phải khác nội dung cũ thì AT mới đọc lại.
+        const label = document.title || this.currentUri || '';
+        this.liveRegion.textContent = '';
+        requestAnimationFrame(() => {
+            if (this.liveRegion)
+                this.liveRegion.textContent = label;
+        });
     }
     /**
      * Handle browser back/forward.

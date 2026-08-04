@@ -15,10 +15,10 @@
       "import": "./dist/plugins.js",
       "require": "./dist/plugins.js"
     },
-    "./core": {
-      "types": "./dist/core/index.d.ts",
-      "import": "./dist/core/index.js",
-      "require": "./dist/core/index.js"
+    "./testing": {
+      "types": "./dist/src/testing/index.d.ts",
+      "import": "./dist/src/testing/index.js",
+      "require": "./dist/src/testing/index.js"
     }
   },
   "files": [
@@ -31,7 +31,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run clean && npm run build",
+    "check-exports": "node scripts/check-exports.js",
+    "prepublishOnly": "npm run clean && npm run build && npm run check-exports",
     "publish-dry-run": "npm publish --dry-run",
     "test": "vitest run",
     "test:watch": "vitest"

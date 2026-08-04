@@ -25,6 +25,8 @@ export class Block {
     constructor({ ctx, name, viewId = null, contentRenderFactory = (parentElement) => [], id = null, initMode = 'create' }) {
         this.saoType = 'Block';
         this.viewId = null;
+        /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
+        this.markerKey = null;
         this.fragment = null;
         this.contentRenderFactory = null;
         this.marker = null;
@@ -48,7 +50,7 @@ export class Block {
             else {
                 this.openTag = markerRegistry.createMarkerStart('block', this.id);
                 this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
-                markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
+                this.markerKey = markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
                 this.marker = new MarkerModel({
                     tagName: "s:b",
                     name: "block",
@@ -63,7 +65,7 @@ export class Block {
         else {
             this.openTag = markerRegistry.createMarkerStart('block', this.id);
             this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
-            markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
+            this.markerKey = markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
             this.marker = new MarkerModel({
                 tagName: "s:b",
                 name: "block",
@@ -101,7 +103,11 @@ export class Block {
         // Unmount logic (e.g. hide or remove DOM nodes, stop reactions)
     }
     destroy() {
-        // Cleanup logic (e.g. remove DOM nodes, clear caches)
+        // MarkerRegistry là singleton toàn cục — không gỡ thì record sống qua navigate.
+        if (this.markerKey) {
+            markerRegistry.remove(this.markerKey);
+            this.markerKey = null;
+        }
     }
     update() {
         // Update logic (e.g. re-render content on state change)

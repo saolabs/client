@@ -21,6 +21,13 @@ Thư mục này chứa tất cả tài liệu kỹ thuật liên quan đến **S
 - **[BOOTSTRAP_PROVIDER_GUIDE.md](BOOTSTRAP_PROVIDER_GUIDE.md)** - Hướng dẫn bootstrap providers
 - **[NEW_LOGIC_GUIDE.md](NEW_LOGIC_GUIDE.md)** - Hướng dẫn logic mới
 
+### 🧪 Testing & Debug
+- **[TESTING.md](TESTING.md)** - Test component `.sao` bằng `@saolabs/client/testing`
+- **[DEVTOOLS.md](DEVTOOLS.md)** - Xem cây view, state, sự kiện; highlight vùng DOM
+
+### 🐛 Tiến độ & Lỗ hổng
+- **[GAPS_AND_ROADMAP.md](GAPS_AND_ROADMAP.md)** - Lỗi đã phát hiện, phương án khắc phục, tiến độ vá (living doc)
+
 ## 🚀 Bắt Đầu
 
 1. **Đọc RUNTIME_ARCHITECTURE.md** để hiểu kiến trúc tổng thể

@@ -105,7 +105,13 @@ export declare class BlockManagerService implements BlockManagerInterface {
      * addOutlet (ViewManager.reregisterLayoutOutlets).
      */
     detachOutletsOfView(viewId: string): void;
-    /** Gỡ outlets của một layout bị destroy */
+    /**
+     * Gỡ outlets của một layout bị destroy — XOÁ THẬT, khác hẳn
+     * `detachOutletsOfView` ở ngay trên (layout chỉ pause vào PageCache và sẽ
+     * được re-register, nên KHÔNG được destroy ở đó).
+     * `destroy()` idempotent nên gọi ở đây an toàn kể cả khi teardown cây
+     * element đã destroy outlet trước đó.
+     */
     removeOutletsOfView(viewId: string): void;
     /**
      * Clear content from a specific outlet (for page swap).

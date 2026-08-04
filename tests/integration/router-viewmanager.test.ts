@@ -188,15 +188,19 @@ describe('Router ↔ ViewManager integration', () => {
         expect(match?.params?.id).toBe('42');
     });
 
-    it('isViewMounted() sau mountView', async () => {
+    it('isViewMounted() phản ánh ĐÚNG view đang mount', async () => {
         setup();
-        expect(vm.isViewMounted('web.home')).toBeFalsy();
+        expect(vm.isViewMounted('web.home')).toBe(false);
+
         await vm.mountView('web.home', {}, { $urlPath: '/' } as any);
-        // isViewMounted kiểm tra activeViews — sau mountView standalone, view chưa có trong activeViews?
-        // mountView standalone không thêm vào activeViews trong impl hiện tại
-        // Ta test getCurrentView() thay thế
-        expect(vm.getCurrentView()).not.toBeNull();
-        expect(vm.getCurrentView()!.__ctrl__.path).toBe('web.home');
+        // Trước đây hàm này đọc `activeViews` — một Map CHƯA BAO GIỜ được ghi —
+        // nên luôn trả false; test cũ phải né bằng getCurrentView().
+        expect(vm.isViewMounted('web.home')).toBe(true);
+        expect(vm.isViewMounted('web.about')).toBe(false);
+
+        await vm.mountView('web.about', {}, { $urlPath: '/about' } as any);
+        expect(vm.isViewMounted('web.about')).toBe(true);
+        expect(vm.isViewMounted('web.home')).toBe(false);
     });
 
     it('ViewManager.destroy() → container trống, isInitialized false', async () => {

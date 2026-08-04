@@ -1,7 +1,9 @@
 import { InitModes } from "../contracts/common";
 import { generateUUID } from "../helpers/utils";
+import { mountChildrenBeforeAnchor } from "../helpers/view";
 import markerRegistry from "../services/MarkerRegistry";
 import { ForeachSlotCache } from "./ForeachSlotCache";
+import { isLeaving } from "../helpers/transition";
 /**
  * Reactive — a region in the DOM bounded by comment markers that
  * can re-render its content when reactive dependencies change.
@@ -26,6 +28,8 @@ export class Reactive {
         this._isStarted = false;
         /** Marker model (hydration) — gán bởi BlockManager/SSR khi cần; mặc định null. */
         this.marker = null;
+        /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
+        this.markerKey = null;
         this.domChildren = []; // For compatibility with HtmlInterface; Reactive itself doesn't have a single root element
         this.initMode = InitModes.CREATE;
         /**
@@ -50,7 +54,7 @@ export class Reactive {
             this._foreachCache = new ForeachSlotCache();
         }
         if (this.initMode === InitModes.CREATE) {
-            markerRegistry.register('reactive', this.id, {
+            this.markerKey = markerRegistry.register('reactive', this.id, {
                 type: this.type,
                 stateKeys: this.stateKeys,
                 viewID: this.ctx.viewId,
@@ -122,6 +126,24 @@ export class Reactive {
      * Children sinh ra khi đang active được start() ngay — FIX(baseline#7).
      */
     render() {
+        try {
+            this._render();
+        }
+        catch (err) {
+            // Lỗi ở vùng reactive thường xảy ra SAU khi trang đã sống (state đổi do
+            // user tương tác) — ngoài mọi try/catch của renderPageView. 'render' cho
+            // lần đầu, 'update' cho re-render.
+            const phase = this.mounted ? 'update' : 'render';
+            const result = this.ctx.handleError(err, { phase, path: this.ctx.path });
+            if (!result.handled)
+                throw err;
+            this.clearContent();
+            if (result.fallback !== null && result.fallback !== undefined) {
+                mountChildrenBeforeAnchor(this.closeTag, Array.isArray(result.fallback) ? result.fallback : [result.fallback], this.parentElement);
+            }
+        }
+    }
+    _render() {
         if (this.__destroyed__)
             return;
         // ── Hydrate mode: markers đã trong DOM từ SSR ────────────────
@@ -399,11 +421,12 @@ export class Reactive {
                     validNodes.add(node); // closeTag
             }
         }
-        // Scan từ openTag → closeTag, remove nodes không hợp lệ
+        // Scan từ openTag → closeTag, remove nodes không hợp lệ.
+        // Node đang chạy leave PHẢI nằm lại tới khi animation xong — nó tự gỡ.
         let current = this.openTag.nextSibling;
         while (current && current !== this.closeTag) {
             const next = current.nextSibling;
-            if (!validNodes.has(current)) {
+            if (!validNodes.has(current) && !isLeaving(current)) {
                 current.remove();
             }
             current = next;
@@ -422,11 +445,13 @@ export class Reactive {
             }
         }
         this.children = [];
-        // Remove DOM nodes between markers
+        // Remove DOM nodes between markers — trừ node đang leave (child.destroy()
+        // phía trên vừa khởi động animation cho chúng; tự gỡ khi xong).
         let current = this.openTag.nextSibling;
         while (current && current !== this.closeTag) {
             const next = current.nextSibling;
-            current.remove();
+            if (!isLeaving(current))
+                current.remove();
             current = next;
         }
     }
@@ -474,16 +499,16 @@ export class Reactive {
             }
         }
     }
-    /** Remove content but keep markers (for hide/show scenarios) */
-    hide() {
-        this.clearContent();
-    }
-    /** Re-render content (for show after hide) */
-    show() {
-        this.render();
-    }
     destroy() {
         this.__destroyed__ = true;
+        this.ctx.releaseElement?.(this);
+        // MarkerRegistry là singleton TOÀN CỤC (sống qua navigate). Reactive trong
+        // loop có id kèm item (`{viewId}-{hash}-${item.id}`) → không gỡ thì mỗi
+        // trang/mỗi lần refresh để lại một record vĩnh viễn.
+        if (this.markerKey) {
+            markerRegistry.remove(this.markerKey);
+            this.markerKey = null;
+        }
         this.stop();
         this.clearContent();
         // Giải phóng cache — clearContent() đã destroy các elements

@@ -31,6 +31,8 @@ export declare class BlockOutlet implements BlockOutletInterface {
     hydrate(): void;
     /** Registry guard */
     __destroyed__: boolean;
+    /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
+    private markerKey;
     /** Render — idempotent: markers đã trong DOM thì giữ nguyên (same-layout reuse) */
     render(): void;
     destroy(): void;
