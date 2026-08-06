@@ -684,6 +684,15 @@ export class Html implements HtmlInterface {
             // nên dọn ngay sẽ làm element bay ra trong trạng thái RỖNG. Element
             // đã inert (listener gỡ, binding huỷ) nên giữ lại chỉ là phần nhìn.
             // runLeave() tự gỡ node khi xong — không remove() ở đây.
+            //
+            // NHƯNG phải nhả id của CẢ CÂY CON khỏi registry NGAY. Một element
+            // đang leave là element đã chết về mặt logic; nếu id của nó còn
+            // trong `ctx.elements` thì pass render kế tiếp sẽ `aliveFromRegistry`
+            // trúng nó (chưa `__destroyed__` vì teardown bị hoãn) và tái dùng —
+            // Component thì `_childMounted` vẫn true nên `mountChild()` return
+            // ngay ⇒ vùng @include/@if của hàng mới RỖNG. Đây đúng là lớp lỗi
+            // §2.10, quay lại qua đường transition.
+            this.releaseSubtreeFromRegistry();
             void runLeave(this.element, transitionName).then(() => this.teardownSubtree());
             return;
         }
@@ -691,6 +700,21 @@ export class Html implements HtmlInterface {
         this.teardownSubtree();
         // Gỡ element khỏi DOM — destroy là vĩnh viễn
         this.element.remove();
+    }
+
+    /**
+     * Nhả id của element này và toàn bộ cây con khỏi `ctx.elements`, KHÔNG
+     * destroy. Dùng khi leave transition giữ DOM lại: registry phải sạch ngay
+     * để pass sau tạo element mới thay vì tái dùng xác sắp chết.
+     */
+    private releaseSubtreeFromRegistry(): void {
+        const release = (node: any): void => {
+            if (!node || typeof node !== 'object') return;
+            this.ctx.releaseElement?.(node);
+            const kids = node.children;
+            if (Array.isArray(kids)) for (const k of kids) release(k);
+        };
+        for (const child of this.children) release(child);
     }
 
     /** Destroy children + dọn nội dung. Tách riêng để leave hoãn được. */

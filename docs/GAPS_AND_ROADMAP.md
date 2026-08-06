@@ -12,9 +12,12 @@
 (event modifier, §2.14), **N2** (transition primitive, §2.15), **GAP-16**
 (mutate không kèm set + `subscribe` nuốt key, §2.16), **N3** (nested route, §2.17), **GAP-17** (registry không co khi view bị xoá thật, §2.18), **GAP-18**
 (lệch-1 id marker loop không `@key` — hydration sai, §2.19), **GAP-19**
-(trường chết + `isViewMounted()` luôn trả false, §2.20). Mở mục mới **§1c** cho các thiếu sót phát hiện khi
+(trường chết + `isViewMounted()` luôn trả false, §2.20), **GAP-20**
+(sao2blade không nhận diện state key của `.sao` → `{{ state }}` ngoài loop
+nhân đôi khi hydrate, §2.21), **GAP-21/22/23** (3 lỗi lộ ra khi chạy view phức
+tạp thật, §2.23). Khôi phục `templates/view.js` (§2.22 đã đóng). Mở mục mới **§1c** cho các thiếu sót phát hiện khi
 đối chiếu với Vue/React/Svelte/Solid nhưng CHƯA làm.
-Trạng thái test: client **44 file / 366 test**, compiler **10 file** — pass, `tsc` sạch.
+Trạng thái test: client **45 file / 375 test**, compiler **13 file** — pass, `tsc` sạch.
 
 > ⚠️ Bài học lớn nhất của phiên #2, xem §5: mục §2.1 dưới đây từng ghi
 > "SSR / Hydration / Reactive core — ✅ Đã verify đúng", verify bằng *đọc code +
@@ -86,6 +89,10 @@ Trạng thái test: client **35 file / 307 test**, compiler **73 test** — pass
 | `MarkerRegistry` phình 1 record mỗi lần điều hướng | ✅ Xong (2026-08-04) — destroy trước khi rời Map | GAP-17, §2.18 |
 | Lệch-1 id marker loop không `@key` (SSR 0-based ↔ CSR 1-based) | ✅ Xong (2026-08-04) — bỏ `+ 1` phía sao2js | GAP-18, §2.19 |
 | Trường chết `cachedLayouts`/`activeViews`, `isViewMounted()` nói dối | ✅ Xong (2026-08-04) — xoá + đọc dữ liệu sống | GAP-19, §2.20 |
+| sao2blade bỏ sót state key `.sao` → `{{ state }}` ngoài loop nhân đôi | ✅ Xong (2026-08-04) — regex `$` tuỳ chọn + gom `props`/`vars`/`computed` | GAP-20, §2.21 |
+| `@states` seed `null` → `{{ state.x }}` ném lỗi lúc mount CSR | ✅ Xong (2026-08-04) — seed closure bằng giá trị khởi tạo | GAP-21, §2.23 |
+| `@foreach` lồng thiếu spread → item biến mất im lặng | ✅ Xong (2026-08-04) — emit `...this.__foreach(...)` | GAP-22, §2.23 |
+| `@transition` giữ id trong registry → `@include` hàng mới rỗng | ✅ Xong (2026-08-04) — nhả cây con khỏi registry ngay | GAP-23, §2.23 |
 
 **Danh sách GAP đã đóng hết.** Còn lại: 7 việc hoãn có chủ ý (§1b) và
 3 thiếu sót đã nhận diện nhưng chưa làm (§1c — N2, N3 đã xong; N6 là chủ ý).
@@ -975,6 +982,143 @@ kiểm, đó là báo cáo lỗi chứ không phải chú thích.** Test giờ k
 
 ---
 
+### 2.21. sao2blade bỏ sót state key của `.sao` (GAP-20) — 2026-08-04
+
+Tìm ra khi dựng view phức tạp thật trong app (`modules/stress/`) rồi so id
+marker hai compiler — **không phải bằng đọc code**.
+
+**Gốc:** `hydrate_processor.py::_get_state_keys` dùng regex BẮT BUỘC `$`:
+
+```python
+sao2js   (đã sửa từ trước):  r'\$?([a-zA-Z_]\w*)'          ← $ tuỳ chọn
+sao2blade(còn lỗi):          r'\$([a-zA-Z_][a-zA-Z0-9_]*)'  ← $ BẮT BUỘC
+```
+
+`.sao` viết kiểu JS (`{{ count }}`, không phải `{{ $count }}`) nên phía blade
+**không bao giờ** khớp state key → `skeys` luôn rỗng → **không emit marker cho
+bất kỳ `{{ state }}` nào NGOÀI loop**, trong khi sao2js luôn compile nó thành
+`this.output()` cần marker ⇒ hydrate không claim được ⇒ nhân đôi nội dung.
+
+Đây đúng là bug đã được vá ở sao2js (kèm comment giải thích y hệt) nhưng
+**chưa bao giờ áp sang sao2blade** — hai hàm song sinh, sửa một bên.
+
+**Hai lỗ hổng cùng họ, phát hiện cùng lúc:** `_extract_state_variables` chỉ gom
+`useState`/`states`, bỏ sót:
+- `computed` — slot nằm chung `states` ở runtime, sao2js đưa vào stateKeys;
+- `props`/`vars` — data var CŨNG là reactive key (`__UPDATE_DATA_TRAIT__` gọi
+  `updateStateByKey` khi cha truyền props mới). Thiếu cái này thì **mọi
+  `{{ prop }}` trong component đều nhân đôi** — `featurecard.sao` đang chạy
+  trong app dính đúng lỗi này.
+
+**Vì sao guard cũ không bắt:** `test_loop_output_marker_sync.py` chỉ dựng
+fixture có `{{ }}` BÊN TRONG `@foreach`, mà nhánh đó vẫn chạy nhờ mệnh đề
+`or loop_scopes` thêm ở lần vá trước — chính nó che mất nửa còn lại của lỗi.
+
+**Đo trước/sau** (số marker output blade ↔ js, view thật trong app):
+
+| view | trước | sau |
+|---|---|---|
+| `home/todo` | 2 ↔ 8 | 8 ↔ 8 |
+| `demo/featurecard` | 0 ↔ 3 | 3 ↔ 3 |
+| `stress/index` | 2 ↔ 7 | 7 ↔ 7 |
+| `posts/list` | — | 2 ↔ 2 |
+
+Đã so tới mức **id**, không chỉ số lượng, cho cả `output`/`reactive`/`component`.
+
+**Bất đối xứng CÒN LẠI (chưa vá, có chủ ý):** sao2js compile MỌI `{{ }}` thành
+`this.output()` kể cả biểu thức HẰNG (`{{ 'chuỗi' }}`), blade thì không emit
+marker. Cần quyết định sửa bên nào; hằng trong `{{ }}` hiếm gặp nên hoãn. Guard
+ghi nhận con số hiện tại để nếu đổi thì lộ ra.
+
+**Test:** `compiler/tests/test_state_output_marker_sync.py` (8 check). Revert
+regex → 6/8 fail.
+
+---
+
+### 2.22. ✅ ĐÃ ĐÓNG: `src/templates/view.js` là stub
+
+Commit `df8740d` thay `compiler/src/templates/view.js` (66 dòng) bằng mock 9
+dòng. Hệ quả: compiler sinh ra file **không chạy được** — thiếu `import`, thiếu
+class `ViewController`, thiếu `export function`/`export default`, và
+`__VIEW_ID__` / `__VIEW_PATH__` / `__UPDATE_DATA_TRAIT__` cùng mọi biến `@states`
+đều là identifier chưa khai báo (`[COMPONENT_DECLARE_VARIABLES_AND_STATES]` bị
+mất) → `ReferenceError` ngay khi import.
+
+Kèm theo: `tests/test_children_slot.py` FAIL, và `tests/test_props_interface.py`
+(guard của §2.13) đã bị xoá khỏi đĩa.
+
+**Đã khôi phục 2026-08-04** từ `git show df8740d~1:src/templates/view.js`, áp lại
+phần §2.13 (`[COMPONENT_PROPS_INTERFACE]` + `[TYPE:[COMPONENT_NAME]Props]` ở
+constructor và factory) và dựng lại `tests/test_props_interface.py`. Sau khôi
+phục `test_children_slot.py` tự pass trở lại.
+
+Mọi thứ ở §2.21 verify được vì sao2blade KHÔNG dùng template này, và phía sao2js
+việc parse/sinh `render()` diễn ra TRƯỚC bước ráp template.
+
+---
+
+### 2.23. Ba lỗi lộ ra khi CHẠY view phức tạp thật (GAP-21/22/23) — 2026-08-04
+
+Dựng `saola/resources/saola/web/views/modules/stress/` (index + usercard) dùng
+đủ `@extends`/`@block`, `@foreach`+`@key`+`@include` mỗi hàng, `@foreach` lồng,
+`@foreach` không key, `@if` trong loop, `@transition`, `@computed`, `@bind`, cả
+4 event modifier — rồi **compile thật và chạy output đó** trong vitest
+(`tests/integration/stress-view.test.ts`, fixtures là file compiler sinh ra).
+
+Mọi test khác trong repo đều dựng cây element BẰNG TAY, nên không cái nào chạm
+tới khâu sinh code. Ba lỗi dưới đây chỉ lộ ra ở đây.
+
+**GAP-21 — `@states` seed `null`, `{{ state.x }}` ném lỗi lúc mount CSR.**
+Compiler emit `let items = null;` và chỉ gán trong `commitConstructorData`.
+Nhưng luồng CSR là `render()` → `mount()` → `commitView()`, tức contentFactory
+`() => items.length` chạy TRƯỚC khi có giá trị ⇒ `TypeError` và error boundary
+nuốt trọn trang. Tái hiện với view đơn giản nhất có thể:
+
+```
+@states({ items: [1,2,3] })   →   {{ items.length }}   →   TypeError
+```
+
+Đường hydrate KHÔNG lộ vì nó commit TRƯỚC render — nên lỗi chỉ xuất hiện khi
+điều hướng client-side, và đó là lý do nó sống sót lâu trong một app SSR-first.
+Vá: seed closure var bằng chính giá trị khởi tạo (`initial_value` vốn ĐÃ được
+truyền vào `_generate_state_registration_lines` nhưng không dùng).
+
+**GAP-22 — `@foreach` lồng thiếu spread, item biến mất im lặng.**
+`__foreach()` trả về MẢNG. Trong children list của một element, compiler emit
+`this.__foreach(...)` không có `...` ⇒ mảng lồng ⇒ `mountElementList` không
+nhận ra kiểu đó nên bỏ qua. Element cha vẫn render, chỉ **rỗng ruột**.
+Chỉ nhánh không-state-key dính: có state key thì loop đã bọc trong
+`this.reactive(...)`, bản thân nó là element hợp lệ. Đó cũng là lý do trong view
+stress các chip `tags` (state) hiện còn chip `roles` (biến loop) thì không.
+
+**GAP-23 — `@transition` giữ id trong registry ⇒ `@include` của hàng mới rỗng.**
+`Html.destroy()` hoãn `teardownSubtree()` để element bay ra không bị xoá trắng
+(§2.15). Nhưng như thế Component con CHƯA destroy, id của nó vẫn nằm trong
+`ctx.elements` ⇒ pass render kế tiếp `aliveFromRegistry` trúng nó (chưa
+`__destroyed__`) và tái dùng ⇒ `_childMounted` vẫn true ⇒ `mountChild()` return
+ngay ⇒ vùng `@include`/`@if` của hàng MỚI rỗng. Đây đúng là lớp lỗi §2.10, quay
+lại qua đường transition. Vá: nhả id của CẢ CÂY CON khỏi registry ngay khi bắt
+đầu leave, chỉ hoãn phần DOM.
+
+Đo được (view stress, sau khi transition lắng): `ucards 0 → 3`,
+`roleChips 0 → 2`.
+
+**Ghi chú cho người viết `.sao`:** attribute của custom tag (`<usercard user="{{ user }}">`)
+là CHUỖI TĨNH, không nội suy biểu thức. Truyền dữ liệu động phải dùng
+`@include('path', ['user' => user])`. View stress ban đầu viết sai chỗ này.
+
+**Test:** `compiler/tests/test_state_seed.py` (9 check),
+`compiler/tests/test_nested_foreach_spread.py` (4 check),
+[`tests/integration/stress-view.test.ts`](../tests/integration/stress-view.test.ts)
+(9 test, chạy trên output compiler thật).
+
+> Bài học: **mọi test dựng cây element bằng tay đều mù với khâu sinh code.**
+> Repo có 44 file test và không file nào bắt được ba lỗi này, vì tất cả đều
+> viết `this.html(...)`/`this.output(...)` bằng tay thay vì để compiler sinh.
+> Một fixture là output compiler thật đáng giá hơn nhiều harness thủ công.
+
+---
+
 ## 3. Lỗ hổng cần vá — chi tiết + phương án
 
 ### ~~GAP-08~~ — Export `./core` trỏ file không tồn tại · ✅ xong, xem §2.6b
@@ -1425,3 +1569,24 @@ trạng thái ngay trong file này.
   kế tiếp. Test đo "DOM có đúng không" pass cả khi có bug; phải đo **element mồ
   côi** (`registry có, chưa gắn DOM`) mới phân biệt được. Với hydration, hãy
   kiểm bất biến CẤU TRÚC chứ đừng chỉ kiểm ảnh chụp DOM.
+
+### Bổ sung sau phiên rà soát #4 (2026-08-04)
+
+- **Test dựng cây element bằng tay thì mù với khâu sinh code.** 44 file test,
+  không file nào bắt được GAP-21/22/23 — vì tất cả đều tự viết `this.html(...)`
+  thay vì để compiler sinh. Giữ ít nhất MỘT fixture là output compiler thật
+  (`tests/fixtures/**` + alias `@saolabs/client` → `index.ts` trong
+  `vitest.config.ts`) là cách rẻ nhất để đóng khoảng mù đó.
+- **Lỗi chỉ xuất hiện trên MỘT đường vào sẽ sống rất lâu.** GAP-21 làm mọi
+  `{{ state.x }}` ném lỗi khi mount CSR, nhưng app SSR-first luôn vào bằng
+  hydrate (commit TRƯỚC render) nên không ai thấy. Khi hai đường có thứ tự
+  lifecycle khác nhau, phải test CẢ HAI — không suy ra từ đường kia.
+- **"Render nhưng rỗng" nguy hiểm hơn "ném lỗi".** GAP-22 làm cả loop biến mất
+  mà không log gì: `mountElementList` gặp kiểu lạ thì bỏ qua im lặng. Nếu vòng
+  mount bỏ qua một child, ít nhất nên `console.warn` ở dev — im lặng biến lỗi
+  sinh-code thành "chắc dữ liệu rỗng".
+- **Một vá đúng có thể mở lại lớp lỗi vừa vá ở chỗ khác.** GAP-23 chính là
+  §2.10 quay lại: §2.15 hoãn teardown để transition đẹp, và cái hoãn đó lại giữ
+  id sống trong registry. Sau khi thêm bất kỳ cơ chế HOÃN nào, hãy hỏi lại:
+  trong cửa sổ hoãn, có ai còn nhìn thấy thứ đáng lẽ đã chết không?
+
