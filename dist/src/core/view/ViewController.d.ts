@@ -1,5 +1,6 @@
 import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
 import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface, EventModifier } from "../contracts/ElementInterface";
+import type { LoopContextInterface } from "../contracts/LoopContextInterface";
 import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
 import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo } from "../contracts/ViewControllerInterface";
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface";
@@ -417,9 +418,9 @@ export declare class ViewController implements ViewControllerInterface {
      *   - string — SSR data hoặc default '' → render text tĩnh (rỗng → []).
      */
     __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput;
-    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContext) => any, keyFn?: (item: T, index: number) => any): any[];
-    __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContext) => any, emptyCallback?: () => any): any[];
-    __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContext) => any): any[];
+    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, keyFn?: (item: T, index: number) => any): any[];
+    __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, emptyCallback?: () => any): any[];
+    __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any): any[];
     /**
      * @for directive
      */

@@ -11,9 +11,11 @@
  * bất kỳ runner nào miễn là môi trường có DOM.
  */
 import { View } from '../core/view/View';
+import { ViewManager } from '../core/view/ViewManager';
 import { Html } from '../core/elements/Html';
 import { app } from '../core/helpers/app';
 import MarkerRegistry from '../core/services/MarkerRegistry';
+import { HelperService } from '../core/services/HelperService';
 // ── RAF polyfill (một số môi trường DOM giả lập không có) ─────
 if (typeof globalThis.requestAnimationFrame !== 'function') {
     globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 0);
@@ -31,9 +33,20 @@ export function nextFrame() {
         });
     });
 }
+/**
+ * Bootstrap các service bắt buộc để mount một view ĐÃ COMPILE:
+ *   - Registry: MarkerRegistry (hydration/foreach id bookkeeping)
+ *   - Helper:   App.Helper.xxx() — compiler prefix mọi PHP-helper call vào đây
+ *   - View:     App.View.generateViewId() — compiled constructor luôn gọi hàm này
+ *     dù không navigate qua Router; thiếu nó `mount()` ném ngay ở dòng đầu view.
+ */
 function ensureRegistry() {
     if (!app.has('Registry'))
         app.instance('Registry', MarkerRegistry);
+    if (!app.has('Helper'))
+        app.instance('Helper', new HelperService(app()));
+    if (!app.has('View'))
+        app.instance('View', new ViewManager(app()));
 }
 function createContainer() {
     const container = document.createElement('div');

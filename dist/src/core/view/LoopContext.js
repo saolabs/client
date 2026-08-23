@@ -65,6 +65,42 @@ export class LoopContext {
             this.decrement();
         }
     }
+    /**
+     * Bản chụp BẤT BIẾN của trạng thái hiện tại — dùng cho `loop` mà template
+     * nhìn thấy trong `@foreach`.
+     *
+     * Vì sao cần: LoopContext là MỘT object dùng chung, bị mutate qua từng vòng
+     * (`setCurrentTimes`). Trong khi đó element con được tạo bởi
+     * `childrenFactory` — closure chạy MUỘN (lúc Html.renderChildren), SAU khi
+     * vòng lặp đã kết thúc. Closure bắt `loop` theo THAM CHIẾU nên mọi hàng đọc
+     * ra cùng một giá trị: trạng thái CUỐI cùng.
+     * Đo được: list 6 phần tử, `@click(remove(loop.index))` ở mọi hàng đều nhận
+     * index = 5 → bấm hàng nào cũng xoá phần tử cuối, rồi tắc hẳn.
+     * `__loopIndex` không dính vì nó là tham số theo từng lần gọi callback (mỗi
+     * closure một binding riêng), không phải object chia sẻ.
+     *
+     * `parent` cũng chụp đệ quy: loop lồng nhau có cùng vấn đề ở mức ngoài.
+     * Trả về plain object đã freeze — chỉ đọc, không có `next()` (không ai gọi
+     * `next()` trên `loop` của `@foreach`; `@for`/`@while` vẫn nhận context
+     * MUTABLE vì codegen của chúng cần `setCurrentTimes`/`next`).
+     */
+    snapshot() {
+        return Object.freeze({
+            index: this.index,
+            iteration: this.iteration,
+            count: this.count,
+            remaining: this.remaining,
+            first: this.first,
+            last: this.last,
+            odd: this.odd,
+            even: this.even,
+            depth: this.depth,
+            parent: this.parent ? this.parent.snapshot() : null,
+            next() {
+                console.warn('[LoopContext] `loop` trong @foreach là bản chụp chỉ đọc — next() không có tác dụng.');
+            },
+        });
+    }
     reset() {
         this.iteration = 0;
         this.index = 0;

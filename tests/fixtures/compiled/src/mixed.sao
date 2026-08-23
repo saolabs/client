@@ -1,0 +1,12 @@
+@states({ count: 0, items: [1, 2] })
+@let(label = 'Total', unit = 'cái')
+<div>
+  <p id="line">{{ label }}: {{ count }} {{ unit }}</p>
+  <p id="nullish">[{{ nothing }}]</p>
+  <ul id="list">
+  @foreach(items as x)
+    <li>{{ label }}{{ x }}</li>
+  @endforeach
+  </ul>
+  <button id="inc" @click(setCount(count + 1))>+</button>
+</div>

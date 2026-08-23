@@ -79,7 +79,7 @@ Trạng thái test: client **35 file / 307 test**, compiler **73 test** — pass
 | DevTools | ✅ Xong (2026-08-04) — hook + inspector overlay | GAP-05, §2.9 |
 | `@foreach` refresh list → view con `@include` biến mất | ✅ Xong (2026-08-04) — `ForeachSlotCache._evicted` | GAP-10, §2.10 |
 | Registry `elements` + `MarkerRegistry` chỉ phình, không co | ✅ Xong (2026-08-04) — `releaseElement` + `markerRegistry.remove` | GAP-11, §2.10 |
-| Mutate tại chỗ (`push`/gán field) thất bại IM LẶNG | ✅ Xong (2026-08-04) — cảnh báo warn-once ở đường setter | GAP-12, §2.11 |
+| Mutate tại chỗ (mảng `push`/`splice`…, object `a.b='c'`, lồng sâu `a.b.c=x`) không cập nhật UI | ✅ Xong (2026-08-14) — (a) mutate RỒI set: so NỘI DUNG thay vì `===`; (b) mutate KHÔNG set: quan sát ĐỆ QUY — vá method mảng + accessor cho object (kiểu Vue 2, không Proxy) ⇒ **mọi cách viết đều HOẠT ĐỘNG**. Cảnh báo thu hẹp còn: thêm key mới + gán index/length | GAP-12, §2.11 |
 | A11y sau điều hướng: focus + aria-live | ✅ Xong (2026-08-04) — `Router.announceNavigation` | GAP-13, §2.12 |
 | Props không có kiểu (`__data__: any`) | ✅ Xong (2026-08-04) — emit `interface {Name}Props` ở TS mode | GAP-14, §2.13 |
 | Event modifier `.prevent/.stop/.self/.once` | ✅ Xong (2026-08-04) — compiler + runtime + extension | GAP-15, §2.14 |
@@ -93,6 +93,13 @@ Trạng thái test: client **35 file / 307 test**, compiler **73 test** — pass
 | `@states` seed `null` → `{{ state.x }}` ném lỗi lúc mount CSR | ✅ Xong (2026-08-04) — seed closure bằng giá trị khởi tạo | GAP-21, §2.23 |
 | `@foreach` lồng thiếu spread → item biến mất im lặng | ✅ Xong (2026-08-04) — emit `...this.__foreach(...)` | GAP-22, §2.23 |
 | `@transition` giữ id trong registry → `@include` hàng mới rỗng | ✅ Xong (2026-08-04) — nhả cây con khỏi registry ngay | GAP-23, §2.23 |
+| `.` → `+` trong biểu thức `@click(...)` (`remove(item.id)` → `remove(item+id)`) | ✅ Xong (2026-08-14) — event path dùng chung converter guarded với `{{ }}` | F1, `docs/FIX_PLAN_2026-08-14.md` |
+| Arrow function viết tay trong `@click(() => f(x))` bị bọc thêm 1 lớp | ✅ Xong (2026-08-14) — phát hiện top-level arrow, không wrap lại | F2, `docs/FIX_PLAN_2026-08-14.md` |
+| `{{ method() }}` của component compile thành `App.Helper.method()` → TypeError lúc mount | ✅ Xong (2026-08-14) — trích tên method từ `<script setup>`, resolve `this.view.method()` | F3, `docs/FIX_PLAN_2026-08-14.md` |
+| Marker output HẰNG/`@let` không-reactive tiêu id → lệch id, HOÁN ĐỔI nội dung khi hydrate | ✅ Xong (2026-08-14) — mở rộng phạm vi GAP-20, xem §2.21 | F4, `docs/FIX_PLAN_2026-08-14.md` |
+| Cập nhật cấu trúc (`@foreach`/`@if`) trễ 1 frame so với `{{ }}` trong cùng tương tác | ✅ Xong (2026-08-14) — flush reactive updates ngay sau khi state cascade lắng, cùng frame | F6, `docs/FIX_PLAN_2026-08-14.md` |
+| `@let(x = expr)` phụ thuộc state — đứng im vĩnh viễn, không cảnh báo | ✅ Xong (2026-08-14) — cảnh báo lúc compile + docs so sánh `@let` vs `@computed` | F7, `docs/FIX_PLAN_2026-08-14.md` |
+| `@click(() => componentMethod(x))` — method component gọi qua arrow viết tay KHÔNG resolve (`ReferenceError`) | ✅ Xong (2026-08-14) — dùng chung tập method của F3, resolve `this.view.method()` cho cả biểu thức event, không chỉ `{{ }}` | N7, `docs/FIX_PLAN_2026-08-14.md` |
 
 **Danh sách GAP đã đóng hết.** Còn lại: 7 việc hoãn có chủ ý (§1b) và
 3 thiếu sót đã nhận diện nhưng chưa làm (§1c — N2, N3 đã xong; N6 là chủ ý).
@@ -123,9 +130,10 @@ Từ phiên rà soát #2. Không phải bug — là tính năng chưa có. Xếp
 | N1 | `@foreach` không patch tại chỗ theo `@key` — ref đổi là destroy+recreate | React/Vue/Svelte đều patch | Cao | Dòng có DOM state thật (input đang gõ, focus) |
 | ~~N2~~ | ~~Không có primitive transition/animation~~ | — | — | ✅ **Xong 2026-08-04**, xem §2.15 |
 | ~~N3~~ | ~~Không có nested route~~ | — | — | ✅ **Xong 2026-08-04**, xem §2.17 |
-| N4 | Reactivity nông — không deep/Proxy | Vue 3 Proxy bắt được | Cao (thay LÕI) | **Có thể không bao giờ** — xem lập luận §2.16b; GAP-12 + GAP-16 đã lấp phần dùng thật |
+| N4 | Reactivity nông — không deep/Proxy | Vue 3 Proxy bắt được | Cao (thay LÕI) | **Có thể không bao giờ** — xem §2.16b. GAP-12 (2026-08-14) nay LÀM CHẠY được mutate nông rồi set; còn lại đúng phần mutate LỒNG SÂU, có cảnh báo |
 | N5 | Không có memo primitive cho list lớn | `v-memo`, `React.memo` | Trung bình | Đo được vấn đề hiệu năng thật. YAGNI tới lúc đó |
 | N6 | `@include` props không reactive khi data từ biến loop | React/Vue: truyền `user={user}` là con re-render | — (CHỦ Ý) | Không sửa — cần **ghi tài liệu to**, vì ngược trực giác |
+| ~~N7~~ | ~~`@click(() => componentMethod(x))` — method của component gọi qua arrow function viết tay trong event KHÔNG resolve~~ | — | — | ✅ **Xong 2026-08-14**, xem `docs/FIX_PLAN_2026-08-14.md` §F1 phần "Sửa nốt" |
 
 **Ghi chú N6:** compiler emit `stateKeys=[]` cho `@include` trong `@foreach`
 (biến loop không nằm trong `state_variables`) → `Component.start()` không
@@ -608,7 +616,115 @@ Hai lớp lọc để KHÔNG có dương tính giả:
 Bản đầu đặt ở `commitStateChange` cho MỌI đường và lộ ngay 1 dương tính giả
 khi chạy suite — xem bài học §5.
 
-**Test:** [`tests/view/mutate-in-place-warning.test.ts`](../tests/view/mutate-in-place-warning.test.ts) (5 test).
+#### Cập nhật 2026-08-14 — không chỉ cảnh báo nữa, mà LÀM CHO CHẠY
+
+Cảnh báo là đúng nhưng chưa đủ: cách viết TỰ NHIÊN NHẤT vẫn hỏng.
+
+```js
+listContent.splice(index, 1);
+setListContent(listContent);   // cùng ref → im lặng không cập nhật
+```
+
+Đo được (`@foreach` 6 phần tử, bấm Xóa): state đổi thành `[1,2,5,6,8]` nhưng
+**DOM đứng im**, chờ thêm bao nhiêu frame cũng vậy — state và UI lệch vĩnh viễn.
+
+`commitStateChange` nay xử lý nhánh cùng-reference như sau: khi dev **gọi
+setter** (tức đã tuyên bố "giá trị vừa đổi"), đối chiếu NỘI DUNG ở độ sâu 1 với
+`mutationSnapshots` — bộ máy vốn đã có sẵn cho phần cảnh báo. Khác nội dung ⇒
+`enqueueChange(key)` bình thường.
+
+Đây **KHÔNG phải** deep reactivity/Proxy; quyết định §2.16b giữ nguyên: không có
+dep tracking runtime, không đổi granularity, vẫn đúng một `enqueueChange` ở tầng
+key. Kết quả y hệt như dev tự viết `state.x = [...state.x]` — chỉ khác là không
+bắt họ phải nhớ. `stateKeys`/contract SSR không đụng tới.
+
+Bản chụp được gieo ngay lúc `useState()` (không đợi flush đầu tiên) để hành vi
+tất định — thiếu baseline thì lần set-cùng-ref đầu luôn bị tính là "đã đổi".
+
+Phạm vi cảnh báo thu hẹp còn đúng ca `shallowDiffers` không thấy: **mutate LỒNG
+SÂU** (`user.profile.name = 'x'` rồi `setUser(user)`). Nội dung cảnh báo đã sửa
+lại cho đúng ca đó.
+
+#### Cập nhật 2026-08-14 (2) — mutate tại chỗ tự emit, KHÔNG cần set
+
+Bước trên mới lo được "mutate RỒI set". Còn cách viết tự nhiên nhất vẫn hỏng:
+
+```js
+listContent.splice(i, 1);      // hết. Không set gì.
+```
+
+`StateManager.observe()` cài bộ bắt mutate ĐỆ QUY lên cả cây dữ liệu của state —
+kỹ thuật **Vue 2**, KHÔNG phải Proxy:
+
+- **mảng**: vá 9 method mutate ngay trên mảng đó (`push`, `pop`, `shift`,
+  `unshift`, `splice`, `sort`, `reverse`, `fill`, `copyWithin`);
+- **object thuần**: thay từng own-property bằng cặp getter/setter.
+
+Gọi/gán xong tự `enqueueChange(key)` — luôn ở **key GỐC**, dù mutate sâu tới đâu:
+
+- reference mảng KHÔNG đổi ⇒ `ForeachSlotCache` (so `slot.item === item`),
+  `Array.isArray`, `===` của người dùng đều nguyên vẹn;
+- method vá là own-property **không enumerable** ⇒ spread / `JSON.stringify` /
+  `Object.keys` / `for…in` không thấy gì khác;
+- vẫn đúng MỘT `enqueueChange` ở tầng key ⇒ granularity không đổi, không cần dep
+  tracking runtime (§2.16b giữ nguyên), `stateKeys`/contract SSR không đụng tới.
+
+Hook được gỡ khi giá trị bị thay bằng mảng khác và khi `destroy()` — mảng cũ
+thôi notify, mảng mới được theo dõi.
+
+Notify làm mới `mutationSnapshots` TRƯỚC khi enqueue, nếu không
+`detectExternalMutation` ở đầu flush sẽ kêu "mutate mà KHÔNG set lại" ngay sau
+khi ta vừa xử lý xong. Và `commitStateChange` bỏ qua cảnh báo khi key đã có
+cập nhật đang chờ — nếu không thì `splice(...)` + `setList(list)` (vừa mutate
+vừa set) bị báo nhầm là "mutate lồng sâu".
+
+Chỉ quan sát **object thuần + mảng** — `Date`/`Map`/`Set`/instance class được
+để yên. Tham chiếu vòng có `seen` chặn.
+
+**Vì sao `defineProperty` chứ không Proxy — ở kiến trúc TRUYỀN THAM CHIẾU TRỰC TIẾP.**
+Dữ liệu ở đây đi thẳng bằng reference: item của `@foreach` vào view con qua props,
+`ForeachSlotCache.claim()` tái dùng element theo `slot.item === item`, và
+`__foreach` lấy CHÍNH reference item làm cache key khi không có `@key`.
+`reactive(obj) !== obj` của Proxy phá cả hai chỗ đó (Vue phải giữ WeakMap
+raw↔proxy + `toRaw()` chính vì lý do này). `defineProperty` giữ nguyên identity —
+đã khoá bằng test.
+
+**Hai vấn đề lộ ra khi rà lại theo góc "tham chiếu dùng chung" — đã vá:**
+
+1. **Rò hook.** Cùng một object sống qua nhiều lần mount/destroy (store, props).
+   `channel.notify = null` chỉ vô hiệu hoá chứ không gỡ ⇒ đo được **50 channel
+   chết** trên cùng mảng sau 50 lần mount/destroy. Nay `untrackKey()` duyệt lại
+   từ gốc và gỡ hẳn channel khỏi từng node. Không nhớ sẵn danh sách node vì làm
+   vậy sẽ giữ sống cả những item đã bị xoá khỏi list — đổi rò rỉ này lấy rò rỉ khác.
+
+2. **Đường nóng O(n).** `notify` từng gọi `shallowCopy(value)` tại chỗ ⇒ mỗi lần
+   gán một thuộc tính lại copy CẢ mảng: 1000 lần gán trên list 10k mất **~28ms**.
+   Nay chỉ đánh dấu key vào `hookHandledKeys` (O(1)); `detectExternalMutation` ở
+   đầu flush vốn đã chụp lại mọi key, chỉ cần biết key nào hook đã lo để đừng
+   cảnh báo nhầm. Đo lại: **0.7µs/lần gán** (nhanh hơn ~40×).
+
+**Chi phí còn lại (trần đã biết, giống Vue 2).** Quan sát là ĐỆ QUY NGAY lúc
+đăng ký/thay giá trị — không lười như Vue 3 (Vue 3 chỉ bọc lúc `get` chạm tới).
+Đo trên máy dev: 100 item → 0.4ms · 1.000 → 3.6ms · 10.000 (có object lồng) →
+~17ms. Dưới ~1.000 dòng thì không đáng kể; list rất lớn thì đây là một frame.
+Nếu sau này đo được là vấn đề thật, hướng đi là quan sát lười theo `get` — và
+khi đó mới cần cân lại Proxy cùng effect tracking, không phải chỉ thêm Proxy.
+
+**GIỚI HẠN (giống hệt Vue 2, cần Proxy mới vượt được):**
+- **thêm KEY MỚI** chưa có lúc quan sát: `user.extra = 1` (Vue 2 phải có `Vue.set`);
+- gán qua index/length của mảng: `list[0] = x`, `list.length = 0`.
+
+Cả hai vẫn do `detectExternalMutation` cảnh báo ở lần flush kế tiếp. Cách vòng:
+`splice(i, 1, giá_trị)` cho mảng, hoặc gán lại object cấp ngoài.
+
+**Đo được, view thật** (`{{ user.name }}`, `{{ user.profile.city }}`,
+`{{ todos[0].done }}`): `user.name = 'Binh'` / `user.profile.city = 'SG'` /
+`todos[0].done = true` — cả ba đều cập nhật DOM, không gọi setter nào.
+
+**Test:** [`tests/view/mutate-in-place-warning.test.ts`](../tests/view/mutate-in-place-warning.test.ts)
+(15 test) + [`tests/view/array-mutation-tracking.test.ts`](../tests/view/array-mutation-tracking.test.ts)
+(14 test — đủ 9 method mutate, gộp batch, giữ identity, gỡ hook khi thay mảng/destroy,
+và ca gán index vẫn chỉ cảnh báo).
 
 ---
 
@@ -1025,13 +1141,22 @@ fixture có `{{ }}` BÊN TRONG `@foreach`, mà nhánh đó vẫn chạy nhờ m�
 
 Đã so tới mức **id**, không chỉ số lượng, cho cả `output`/`reactive`/`component`.
 
-**Bất đối xứng CÒN LẠI (chưa vá, có chủ ý):** sao2js compile MỌI `{{ }}` thành
-`this.output()` kể cả biểu thức HẰNG (`{{ 'chuỗi' }}`), blade thì không emit
-marker. Cần quyết định sửa bên nào; hằng trong `{{ }}` hiếm gặp nên hoãn. Guard
-ghi nhận con số hiện tại để nếu đổi thì lộ ra.
+**Bất đối xứng CÒN LẠI — ✅ ĐÃ VÁ 2026-08-14 (F4, `docs/FIX_PLAN_2026-08-14.md`
+§F4).** Ghi nhận cũ ở đây khoanh vùng "chỉ biểu thức HẰNG, hiếm gặp" — RÀ LẠI
+lộ ra phạm vi rộng hơn nhiều và hậu quả nặng hơn nhân đôi: `next_output()` cấp
+id TUẦN TỰ THEO SCOPE, nên bỏ marker ở MỘT `{{ }}` không-reactive làm LỆCH id
+của MỌI `{{ }}` reactive đứng SAU nó cùng scope → output sau claim NHẦM marker
+của output khác lúc hydrate → **HOÁN ĐỔI + nhân bản nội dung**, không chỉ dư
+chữ. Điều kiện: `<p>{{ nhãn_tĩnh }}: {{ giá_trị_reactive }}</p>` — bố cục cực
+kỳ phổ biến, không phải edge case. Sửa ở `sao2js/render_generator.py::_gen_echo`:
+echo ESCAPED không-reactive/không-trong-loop giờ emit `this.text(...)`
+(khớp đúng luật `skeys or loop_scopes` của blade), không tiêu marker id.
+Echo RAW (`{!! !!}`) tĩnh vẫn còn lệch hẹp (không có primitive `this.text()`
+tương đương cho HTML thô) — ghi nhận có chủ ý, xem chi tiết trong plan §F4.
 
-**Test:** `compiler/tests/test_state_output_marker_sync.py` (8 check). Revert
-regex → 6/8 fail.
+**Test:** `compiler/tests/test_state_output_marker_sync.py` (12 check, so cả
+DÃY ID chứ không chỉ số lượng) + `client/tests/hydration/mixed-reactive-echo-hydration.test.ts`
+(hydrate DOM thật, verify không hoán đổi/nhân đôi ở runtime).
 
 ---
 

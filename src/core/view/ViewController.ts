@@ -1430,7 +1430,7 @@ export class ViewController implements ViewControllerInterface {
 
     __foreach<T>(
         list: T[] | Record<string, T>,
-        callback: (item: T, key: string, index: number, loop: LoopContext) => any,
+        callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any,
         keyFn?: (item: T, index: number) => any
     ): any[] {
         if (!list || typeof list !== 'object') return [];
@@ -1476,7 +1476,10 @@ export class ViewController implements ViewControllerInterface {
                     }
                     let output: any;
                     try {
-                        output = callback(item, String(index), index, loopCtx);
+                        // Snapshot BẤT BIẾN: childrenFactory chạy muộn (sau khi
+                        // loop kết thúc) nên bắt loopCtx theo tham chiếu sẽ cho
+                        // mọi hàng cùng một giá trị cuối. Xem LoopContext.snapshot().
+                        output = callback(item, String(index), index, loopCtx.snapshot());
                     } finally {
                         if (cache) {
                             this._foreachSkipRegistry = prevSkip;
@@ -1499,7 +1502,8 @@ export class ViewController implements ViewControllerInterface {
                 loopCtx.setType('increment');
                 keys.forEach((key, index) => {
                     loopCtx.setCurrentTimes(index);
-                    const output = callback((list as Record<string, T>)[key], key, index, loopCtx);
+                    // Xem chú thích nhánh array phía trên — cùng lý do.
+                    const output = callback((list as Record<string, T>)[key], key, index, loopCtx.snapshot());
                     if (output !== undefined && output !== null) {
                         if (Array.isArray(output)) result.push(...output);
                         else result.push(output);
@@ -1514,14 +1518,14 @@ export class ViewController implements ViewControllerInterface {
         return result;
     }
 
-    __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContext) => any, emptyCallback: () => any = () => []): any[] {
+    __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, emptyCallback: () => any = () => []): any[] {
         if (this.App.Helper.count(list) === 0) {
             return emptyCallback();
         }
         return this.__foreach(list, callback);
     }
 
-    __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContext) => any): any[] {
+    __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any): any[] {
         return this.__foreach(list, callback);
     }
 

@@ -1,0 +1,14 @@
+@states({ n: 0, items: [1, 2, 3] })
+<div>
+  <span id="raw">{{ n }}</span>
+  <span id="label">{{ label() }}</span>
+  <span id="counted">{{ count(items) }}</span>
+  <button id="inc" @click(setN(n + 1))>+</button>
+</div>
+<script setup>
+export default {
+  label() {
+    return 'n=' + n;
+  }
+}
+</script>

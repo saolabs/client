@@ -102,6 +102,12 @@ export declare class Html implements HtmlInterface {
     /** Registry guard — element đã destroy không được reuse (xem RUNTIME_CONTRACT.md §2) */
     __destroyed__: boolean;
     destroy(): void;
+    /**
+     * Nhả id của element này và toàn bộ cây con khỏi `ctx.elements`, KHÔNG
+     * destroy. Dùng khi leave transition giữ DOM lại: registry phải sạch ngay
+     * để pass sau tạo element mới thay vì tái dùng xác sắp chết.
+     */
+    private releaseSubtreeFromRegistry;
     /** Destroy children + dọn nội dung. Tách riêng để leave hoãn được. */
     private teardownSubtree;
     get isSaoElement(): boolean;

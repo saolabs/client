@@ -12,9 +12,11 @@
  */
 import { View } from '../core/view/View';
 import { ViewController } from '../core/view/ViewController';
+import { ViewManager } from '../core/view/ViewManager';
 import { Html } from '../core/elements/Html';
 import { app } from '../core/helpers/app';
 import MarkerRegistry from '../core/services/MarkerRegistry';
+import { HelperService } from '../core/services/HelperService';
 
 // ── RAF polyfill (một số môi trường DOM giả lập không có) ─────
 if (typeof globalThis.requestAnimationFrame !== 'function') {
@@ -64,8 +66,17 @@ export interface MountOptions {
     scripts?: any[];
 }
 
+/**
+ * Bootstrap các service bắt buộc để mount một view ĐÃ COMPILE:
+ *   - Registry: MarkerRegistry (hydration/foreach id bookkeeping)
+ *   - Helper:   App.Helper.xxx() — compiler prefix mọi PHP-helper call vào đây
+ *   - View:     App.View.generateViewId() — compiled constructor luôn gọi hàm này
+ *     dù không navigate qua Router; thiếu nó `mount()` ném ngay ở dòng đầu view.
+ */
 function ensureRegistry(): void {
     if (!app.has('Registry')) app.instance('Registry', MarkerRegistry);
+    if (!app.has('Helper')) app.instance('Helper', new HelperService(app() as any));
+    if (!app.has('View')) app.instance('View', new ViewManager(app() as any));
 }
 
 function createContainer(): HTMLElement {

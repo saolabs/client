@@ -11,5 +11,8 @@ export default defineConfig({
         environment: 'jsdom',
         include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
         globals: true,
+        // Compile tests/fixtures/compiled/src/*.sao bằng CLI Python thật của
+        // compiler/ TRƯỚC khi chạy bất kỳ test nào — xem docs/FIX_PLAN_2026-08-14.md §F5.
+        globalSetup: ['./tests/fixtures/compiled/globalSetup.ts'],
     },
 });

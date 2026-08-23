@@ -1,0 +1,24 @@
+@states({ items: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }], picked: '' })
+<div>
+  <ul id="list">
+  @foreach(items as item)
+    <li data-id="{{ item.id }}">
+      {{ item.name }}
+      <button class="del" @click(removeItem(item.id))>x</button>
+      <button class="pick" @click(() => pickItem(item.name))>pick</button>
+    </li>
+  @endforeach
+  </ul>
+  <span id="len">{{ items.length }}</span>
+  <span id="picked">{{ picked }}</span>
+</div>
+<script setup>
+export default {
+  removeItem(id) {
+    setItems(items.filter(i => i.id !== id));
+  },
+  pickItem(name) {
+    setPicked(name);
+  }
+}
+</script>

@@ -119,13 +119,25 @@ export declare class StateManager implements StateManagerInterface {
     /** Flush đồng bộ pending changes (huỷ RAF đang chờ nếu có). */
     flushNow(): void;
     private commitStateChange;
+    /**
+     * Cùng reference nhưng NỘI DUNG (độ sâu 1) đã khác bản chụp gần nhất?
+     *
+     * Chưa có bản chụp (state chưa qua flush nào) → trả true: thà render thừa
+     * một lần còn hơn nuốt mất cập nhật.
+     * Cập nhật lại bản chụp NGAY để hai lần mutate liên tiếp trong cùng một tick
+     * đều được nhận, không phải đợi flush làm mới.
+     */
+    private mutatedInPlace;
     /** Key đã cảnh báo rồi — mỗi key tối đa 1 dòng cho cả vòng đời app. */
     private static warnedKeys;
     /**
-     * Reactivity ở đây là so sánh `===`, KHÔNG deep/Proxy: `list.push(x)` hay
-     * `list[0].name = 'x'` giữ nguyên reference → không có gì cập nhật, và
-     * trước đây thất bại hoàn toàn im lặng. Đây là lớp bug tốn thời gian nhất
-     * của mô hình này (Vue bắt được bằng Proxy; React có eslint + StrictMode).
+     * Đến được đây nghĩa là: dev gọi setter, cùng reference, VÀ nội dung ở độ
+     * sâu 1 KHÔNG khác gì (`mutatedInPlace` đã trả false). Còn đúng hai khả năng:
+     *   - no-op thật (set lại y nguyên) — vô hại;
+     *   - mutate LỒNG SÂU (`user.profile.name = 'x'`) — `shallowDiffers` chỉ so
+     *     độ sâu 1 nên không thấy. Đây mới là ca cần cảnh báo.
+     * Mutate nông (`push`/`splice`/gán phần tử) rồi set KHÔNG còn tới đây nữa —
+     * nó đã được `mutatedInPlace` nhận và cập nhật bình thường.
      *
      * Hai lớp lọc để không có dương tính giả:
      *   - chỉ object/array (set lại cùng số/chuỗi là bình thường, vô hại)
@@ -146,6 +158,51 @@ export declare class StateManager implements StateManagerInterface {
     private executeFlush;
     /** Bản sao nông của lần flush gần nhất, theo key. */
     private mutationSnapshots;
+    private static readonly ARRAY_MUTATORS;
+    /** Tập "kênh" gắn trên một node — nhiều view/key có thể dùng chung dữ liệu. */
+    private static readonly HOOKS;
+    /**
+     * Một kênh cho MỘT key. Mọi node trong cây đều giữ CÙNG object này, nên gỡ
+     * theo dõi chỉ là `notify = null` — O(1), không phải duyệt lại cả cây.
+     */
+    private trackedChannels;
+    /**
+     * Key vừa được hook mutate xử lý trong chu kỳ hiện tại — `detectExternalMutation`
+     * dựa vào đây để chụp lại mà KHÔNG cảnh báo. Xoá sau mỗi lần quét.
+     */
+    private hookHandledKeys;
+    /** Chỉ quan sát object THUẦN và mảng — tránh phá Date/Map/Set/instance class. */
+    private static isObservable;
+    /**
+     * Gắn (hoặc gỡ) bộ bắt mutate cho giá trị mới của `key`.
+     * Gọi ở MỌI chỗ gán `states[key].value`.
+     */
+    private trackArray;
+    /**
+     * Ngừng theo dõi một key: GỠ HẲN channel khỏi tập hook của từng node.
+     *
+     * Chỉ `notify = null` là KHÔNG đủ. Dữ liệu ở đây được truyền bằng THAM CHIẾU
+     * TRỰC TIẾP (item của `@foreach` đi thẳng vào view con qua props, mảng có thể
+     * nằm trong store dùng chung), nên cùng một object sống qua nhiều lần
+     * mount/destroy. Channel chết mà nằm lại thì tập hook phình vô hạn — đo được:
+     * 50 lần mount/destroy trên cùng mảng để lại 50 channel. Đúng lớp lỗi mà
+     * `tests/view/registry-cleanup.test.ts` canh ("mọi registry phải có trần").
+     *
+     * Duyệt LẠI TỪ GỐC thay vì nhớ sẵn danh sách node: nhớ danh sách sẽ giữ sống
+     * cả những node đã bị gỡ khỏi cây (item xoá khỏi list) cho tới lúc destroy —
+     * đổi một rò rỉ này lấy một rò rỉ khác. Node đã rời cây thì không ai còn tham
+     * chiếu, GC dọn cùng tập hook của nó.
+     */
+    private untrackKey;
+    /** Gỡ mọi channel của manager này (destroy view). */
+    private untrackAllArrays;
+    /** Gỡ `channel` khỏi tập hook của `node` và toàn bộ cây con. */
+    private static unobserve;
+    /**
+     * Cài bộ bắt mutate lên `node` và toàn bộ cây con, rồi ghi `channel` vào
+     * tập hook của mỗi node. `seen` chặn vòng lặp tham chiếu.
+     */
+    private static observe;
     private static shallowCopy;
     /**
      * ponytail: chỉ so ĐỘ SÂU 1 — bắt push/splice/shift/sort/gán lại phần tử/

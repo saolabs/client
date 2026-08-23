@@ -83,6 +83,7 @@ export class StateManager implements StateManagerInterface {
         for (const key in stateMap) {
             if (stateMap.hasOwnProperty(key) && this.states[key]) {
                 this.states[key].value = stateMap[key];
+                this.trackArray(key, stateMap[key]);
             }
         }
     }
@@ -108,6 +109,7 @@ export class StateManager implements StateManagerInterface {
         const setValue = (newValue: any) => {
             const oldValue = this.states[stateKey].value;
             this.states[stateKey].value = newValue;
+            this.trackArray(stateKey, newValue);
             // fromSetter: đây là đường DEV tự set (`state.x = v` / `set$x(v)`).
             // Đường props plumbing (updateStateByKey) re-pass cùng ref là bình
             // thường nên không cảnh báo — xem warnSameReference.
@@ -115,6 +117,18 @@ export class StateManager implements StateManagerInterface {
         };
 
         this.states[stateKey] = { value, setValue, key: stateKey };
+
+        // Gieo bản chụp NGAY khi khai báo, không đợi flush đầu tiên. `mutatedInPlace`
+        // coi "chưa có bản chụp" là ĐÃ ĐỔI (an toàn: thà render thừa còn hơn nuốt
+        // cập nhật) — thiếu baseline thì lần set-cùng-ref đầu tiên luôn bị tính là
+        // thay đổi, kể cả khi thật ra không đổi gì.
+        if (value !== null && typeof value === 'object') {
+            this.mutationSnapshots.set(stateKey, {
+                ref: value,
+                copy: StateManager.shallowCopy(value),
+            });
+        }
+        this.trackArray(stateKey, value);
         this.setters[stateKey] = setValue;
 
         // Define reactive property on ViewState if not a reserved name
@@ -229,6 +243,7 @@ export class StateManager implements StateManagerInterface {
         if (!this.states[key]) return undefined;
         const oldValue = this.states[key].value;
         this.states[key].value = value;
+        this.trackArray(key, value);
         this.commitStateChange(key, oldValue);
         return value;
     }
@@ -440,20 +455,64 @@ export class StateManager implements StateManagerInterface {
         if (this._isDestroyed) return;
         const newValue = this.states[key]?.value;
         if (_oldValue === newValue) {
+            // Cùng reference. Trước đây dừng luôn ⇒ `list.splice(i,1); setList(list)`
+            // — cách viết TỰ NHIÊN NHẤT — im lặng không cập nhật gì.
+            //
+            // Khi dev GỌI SETTER là họ đã tuyên bố ý định "giá trị này vừa đổi".
+            // Lúc đó ta đối chiếu NỘI DUNG với bản chụp nông của lần flush trước
+            // (`mutationSnapshots` — đã có sẵn cho phần cảnh báo) thay vì chỉ so
+            // reference. Khác nội dung ⇒ coi như đổi thật.
+            //
+            // ĐÂY KHÔNG PHẢI deep reactivity/Proxy (xem GAPS §2.16b — quyết định
+            // KHÔNG làm vẫn giữ nguyên): không có dep tracking runtime, không đổi
+            // granularity. Vẫn đúng một `enqueueChange(key)` ở tầng key — kết quả
+            // y hệt như dev tự viết `state.x = [...state.x]`, chỉ khác là không
+            // bắt họ phải nhớ.
+            if (fromSetter && this.mutatedInPlace(key, newValue)) {
+                this.enqueueChange(key);
+                return;
+            }
+            // Đã có cập nhật ĐANG CHỜ cho key này (thường do hook mutate mảng
+            // vừa bắt `push`/`splice` và đã làm mới bản chụp) ⇒ set lại cùng ref
+            // chỉ là thừa, KHÔNG phải bug. Không cảnh báo, tránh dương tính giả
+            // cho cách viết rất phổ biến: `list.splice(i,1); setList(list)`.
+            if (fromSetter && (this.pendingChanges.has(key) || this.dirtyKeys.has(key))) return;
             if (fromSetter) this.warnSameReference(key, newValue);
             return;
         }
         this.enqueueChange(key);
     }
 
+    /**
+     * Cùng reference nhưng NỘI DUNG (độ sâu 1) đã khác bản chụp gần nhất?
+     *
+     * Chưa có bản chụp (state chưa qua flush nào) → trả true: thà render thừa
+     * một lần còn hơn nuốt mất cập nhật.
+     * Cập nhật lại bản chụp NGAY để hai lần mutate liên tiếp trong cùng một tick
+     * đều được nhận, không phải đợi flush làm mới.
+     */
+    private mutatedInPlace(key: string | number, value: any): boolean {
+        if (value === null || typeof value !== 'object') return false;
+        const snap = this.mutationSnapshots.get(key);
+        const changed = !snap || snap.ref !== value
+            || StateManager.shallowDiffers(snap.copy, value);
+        if (changed) {
+            this.mutationSnapshots.set(key, { ref: value, copy: StateManager.shallowCopy(value) });
+        }
+        return changed;
+    }
+
     /** Key đã cảnh báo rồi — mỗi key tối đa 1 dòng cho cả vòng đời app. */
     private static warnedKeys = new Set<string>();
 
     /**
-     * Reactivity ở đây là so sánh `===`, KHÔNG deep/Proxy: `list.push(x)` hay
-     * `list[0].name = 'x'` giữ nguyên reference → không có gì cập nhật, và
-     * trước đây thất bại hoàn toàn im lặng. Đây là lớp bug tốn thời gian nhất
-     * của mô hình này (Vue bắt được bằng Proxy; React có eslint + StrictMode).
+     * Đến được đây nghĩa là: dev gọi setter, cùng reference, VÀ nội dung ở độ
+     * sâu 1 KHÔNG khác gì (`mutatedInPlace` đã trả false). Còn đúng hai khả năng:
+     *   - no-op thật (set lại y nguyên) — vô hại;
+     *   - mutate LỒNG SÂU (`user.profile.name = 'x'`) — `shallowDiffers` chỉ so
+     *     độ sâu 1 nên không thấy. Đây mới là ca cần cảnh báo.
+     * Mutate nông (`push`/`splice`/gán phần tử) rồi set KHÔNG còn tới đây nữa —
+     * nó đã được `mutatedInPlace` nhận và cập nhật bình thường.
      *
      * Hai lớp lọc để không có dương tính giả:
      *   - chỉ object/array (set lại cùng số/chuỗi là bình thường, vô hại)
@@ -470,9 +529,9 @@ export class StateManager implements StateManagerInterface {
         StateManager.warnedKeys.add(warnKey);
         console.warn(
             `[ViewState] "${String(key)}"${path ? ` (view "${path}")` : ''} được set bằng CHÍNH ` +
-            `reference cũ → không có gì cập nhật. Nếu vừa mutate tại chỗ ` +
-            `(push/splice/gán field), hãy tạo array/object MỚI: ` +
-            `state.${String(key)} = [...cũ] thay vì cũ.push(...).`
+            `reference cũ và nội dung ở cấp 1 KHÔNG đổi → không có gì cập nhật. ` +
+            `Nếu vừa sửa dữ liệu LỒNG SÂU (vd state.${String(key)}.a.b = ...), hãy tạo ` +
+            `object/array MỚI ở cấp ngoài: state.${String(key)} = { ...cũ, a: { ...cũ.a, b } }.`
         );
     }
 
@@ -525,6 +584,18 @@ export class StateManager implements StateManagerInterface {
             this.hasPendingFlush = false;
             this.flushRAF = null;
         }
+
+        // FIX(F6, docs/FIX_PLAN_2026-08-14.md): state flush chạy trên RAF #1;
+        // listener gọi Reactive.update() → ctx.scheduleUpdate() lại đặt RAF #2
+        // (ViewController.scheduleUpdate) — trong một frame, Output patch
+        // textContent ĐỒNG BỘ ngay trong listener nên đã đổi, còn
+        // @foreach/@if (chờ RAF #2) thì CHƯA — DOM tạm thời không nhất quán
+        // (đo được: `{{ count }}` đã là "1" nhưng @foreach vẫn list cũ, phải
+        // đợi thêm 1 frame nữa). Flush luôn ngay sau khi cascade lắng, CÙNG
+        // frame — không đợi RAF kế tiếp. RAF trong scheduleUpdate() vẫn giữ
+        // nguyên làm đường dự phòng cho update phát sinh NGOÀI chu kỳ flush
+        // state; gặp hàng đợi rỗng (đã flush ở đây) thì chỉ là no-op.
+        this.controller?.flushReactiveUpdatesNow?.();
     }
 
     // ─── Phát hiện mutate tại chỗ KHÔNG kèm set ──────────────────
@@ -537,6 +608,220 @@ export class StateManager implements StateManagerInterface {
 
     /** Bản sao nông của lần flush gần nhất, theo key. */
     private mutationSnapshots = new Map<string | number, { ref: any; copy: any }>();
+
+    // ─── Tự bắt mutate TẠI CHỖ (mảng và object) ─────────────────
+    //
+    // `list.push(x)` / `user.name = 'x'` KHÔNG đổi reference và KHÔNG đi qua
+    // setter nào ⇒ trước đây chỉ được PHÁT HIỆN muộn ở `detectExternalMutation`
+    // (cảnh báo, không cập nhật). Cách vá — kỹ thuật **Vue 2**, KHÔNG phải Proxy:
+    //   - MẢNG: thay các method mutate ngay trên chính mảng đó bằng bản bọc;
+    //   - OBJECT: thay từng own-property bằng cặp getter/setter.
+    // Gọi/gán xong thì `enqueueChange(key)`.
+    //
+    // Vì sao hợp kiến trúc này:
+    //   - reference KHÔNG đổi ⇒ `ForeachSlotCache` (so `slot.item === item`),
+    //     `Array.isArray`, `===` của người dùng đều nguyên vẹn;
+    //   - method vá của mảng là own-property KHÔNG enumerable; accessor của
+    //     object giữ `enumerable: true` ⇒ spread / `JSON.stringify` /
+    //     `Object.keys` / `for…in` đều không thấy gì khác;
+    //   - vẫn đúng MỘT `enqueueChange` ở TẦNG KEY GỐC ⇒ granularity không đổi,
+    //     không cần dep tracking runtime (giữ nguyên lập luận GAPS §2.16b),
+    //     `stateKeys`/contract SSR không đụng tới.
+    //
+    // Quan sát ĐỆ QUY: `user.profile.name = 'x'` (lồng sâu) trước đây vừa không
+    // cập nhật vừa KHÔNG cảnh báo (`shallowDiffers` chỉ so độ sâu 1) — im lặng
+    // hoàn toàn, ca tệ nhất. Nay bắt được.
+    //
+    // GIỚI HẠN (cần Proxy mới vượt, giống hệt Vue 2):
+    //   - THÊM KEY MỚI chưa từng có lúc quan sát: `user.extra = 1`;
+    //   - gán qua index/length của mảng: `list[0] = x`, `list.length = 0`.
+    //   Hai ca này vẫn do `detectExternalMutation` cảnh báo ở lần flush kế.
+
+    private static readonly ARRAY_MUTATORS = [
+        'push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin',
+    ] as const;
+
+    /** Tập "kênh" gắn trên một node — nhiều view/key có thể dùng chung dữ liệu. */
+    private static readonly HOOKS = Symbol.for('sao.mutationHooks');
+
+    /**
+     * Một kênh cho MỘT key. Mọi node trong cây đều giữ CÙNG object này, nên gỡ
+     * theo dõi chỉ là `notify = null` — O(1), không phải duyệt lại cả cây.
+     */
+    private trackedChannels = new Map<
+        string | number,
+        { channel: { notify: (() => void) | null }; root: any }
+    >();
+
+    /**
+     * Key vừa được hook mutate xử lý trong chu kỳ hiện tại — `detectExternalMutation`
+     * dựa vào đây để chụp lại mà KHÔNG cảnh báo. Xoá sau mỗi lần quét.
+     */
+    private hookHandledKeys = new Set<string | number>();
+
+    /** Chỉ quan sát object THUẦN và mảng — tránh phá Date/Map/Set/instance class. */
+    private static isObservable(v: any): boolean {
+        if (v === null || typeof v !== 'object' || Object.isFrozen(v)) return false;
+        if (Array.isArray(v)) return true;
+        const proto = Object.getPrototypeOf(v);
+        return proto === Object.prototype || proto === null;
+    }
+
+    /**
+     * Gắn (hoặc gỡ) bộ bắt mutate cho giá trị mới của `key`.
+     * Gọi ở MỌI chỗ gán `states[key].value`.
+     */
+    private trackArray(key: string | number, value: any): void {
+        this.untrackKey(key);
+        if (!StateManager.isObservable(value)) return;
+
+        const channel: { notify: (() => void) | null } = { notify: null };
+        channel.notify = () => {
+            if (this._isDestroyed) return;
+            // ĐƯỜNG NÓNG — chạy mỗi lần mutate. Chỉ ĐÁNH DẤU (O(1)); tuyệt đối
+            // không chụp lại ở đây. Bản trước gọi `shallowCopy(value)` tại chỗ
+            // này ⇒ mỗi lần gán một thuộc tính lại copy CẢ mảng: đo được 1000
+            // lần gán trên list 10k mất ~28ms. `detectExternalMutation` ở đầu
+            // flush vốn đã chụp lại mọi key rồi — chỉ cần cho nó biết key này
+            // đã được xử lý để đừng cảnh báo "mutate mà KHÔNG set lại".
+            this.hookHandledKeys.add(key);
+            this.enqueueChange(key);
+        };
+        this.trackedChannels.set(key, { channel, root: value });
+        StateManager.observe(value, channel, new Set());
+    }
+
+    /**
+     * Ngừng theo dõi một key: GỠ HẲN channel khỏi tập hook của từng node.
+     *
+     * Chỉ `notify = null` là KHÔNG đủ. Dữ liệu ở đây được truyền bằng THAM CHIẾU
+     * TRỰC TIẾP (item của `@foreach` đi thẳng vào view con qua props, mảng có thể
+     * nằm trong store dùng chung), nên cùng một object sống qua nhiều lần
+     * mount/destroy. Channel chết mà nằm lại thì tập hook phình vô hạn — đo được:
+     * 50 lần mount/destroy trên cùng mảng để lại 50 channel. Đúng lớp lỗi mà
+     * `tests/view/registry-cleanup.test.ts` canh ("mọi registry phải có trần").
+     *
+     * Duyệt LẠI TỪ GỐC thay vì nhớ sẵn danh sách node: nhớ danh sách sẽ giữ sống
+     * cả những node đã bị gỡ khỏi cây (item xoá khỏi list) cho tới lúc destroy —
+     * đổi một rò rỉ này lấy một rò rỉ khác. Node đã rời cây thì không ai còn tham
+     * chiếu, GC dọn cùng tập hook của nó.
+     */
+    private untrackKey(key: string | number): void {
+        const prev = this.trackedChannels.get(key);
+        if (!prev) return;
+        prev.channel.notify = null;                       // chặn notify ngay
+        StateManager.unobserve(prev.root, prev.channel, new Set());
+        this.trackedChannels.delete(key);
+    }
+
+    /** Gỡ mọi channel của manager này (destroy view). */
+    private untrackAllArrays(): void {
+        for (const key of Array.from(this.trackedChannels.keys())) this.untrackKey(key);
+        this.trackedChannels.clear();
+    }
+
+    /** Gỡ `channel` khỏi tập hook của `node` và toàn bộ cây con. */
+    private static unobserve(node: any, channel: { notify: (() => void) | null }, seen: Set<any>): void {
+        if (!StateManager.isObservable(node) || seen.has(node)) return;
+        seen.add(node);
+        const hooks: Set<{ notify: (() => void) | null }> | undefined = node[StateManager.HOOKS];
+        hooks?.delete(channel);
+        if (Array.isArray(node)) {
+            for (const item of node) StateManager.unobserve(item, channel, seen);
+            return;
+        }
+        for (const prop of Object.keys(node)) StateManager.unobserve(node[prop], channel, seen);
+    }
+
+    /**
+     * Cài bộ bắt mutate lên `node` và toàn bộ cây con, rồi ghi `channel` vào
+     * tập hook của mỗi node. `seen` chặn vòng lặp tham chiếu.
+     */
+    private static observe(node: any, channel: { notify: (() => void) | null }, seen: Set<any>): void {
+        if (!StateManager.isObservable(node) || seen.has(node)) return;
+        seen.add(node);
+
+        let hooks: Set<{ notify: (() => void) | null }> | undefined = node[StateManager.HOOKS];
+        const fresh = !hooks;
+        if (!hooks) {
+            hooks = new Set();
+            try {
+                Object.defineProperty(node, StateManager.HOOKS, {
+                    value: hooks, enumerable: false, configurable: true, writable: false,
+                });
+            } catch {
+                return;   // node bị seal → bỏ qua, vẫn còn cảnh báo lúc flush
+            }
+        }
+        hooks!.add(channel);
+
+        // Đường NÓNG — chạy mỗi lần gán/mutate. Duyệt thẳng, không `Array.from`:
+        // `notify` chỉ enqueue key, không bao giờ thêm/bớt hook nên không có
+        // rủi ro sửa Set đang duyệt.
+        const fire = () => {
+            const set: Set<{ notify: (() => void) | null }> | undefined = node[StateManager.HOOKS];
+            if (!set) return;
+            for (const ch of set) ch.notify?.();
+        };
+
+        /** Giá trị MỚI gán vào cũng phải được quan sát — chỉ khi nó đáng quan sát. */
+        const observeIncoming = (next: any) => {
+            if (!StateManager.isObservable(next)) return;   // primitive: thoát sớm, không cấp phát
+            const set: Set<{ notify: (() => void) | null }> | undefined = node[StateManager.HOOKS];
+            if (!set) return;
+            for (const ch of Array.from(set)) {
+                if (ch.notify) StateManager.observe(next, ch, new Set());
+            }
+        };
+
+        if (Array.isArray(node)) {
+            if (fresh) {
+                for (const name of StateManager.ARRAY_MUTATORS) {
+                    const original = (Array.prototype as any)[name];
+                    try {
+                        Object.defineProperty(node, name, {
+                            value: function (this: any[], ...args: any[]) {
+                                const result = original.apply(this, args);
+                                // Chỉ quan sát phần tử MỚI ĐƯA VÀO (tham số), KHÔNG
+                                // quét lại cả mảng — quét lại là O(n) mỗi lần push,
+                                // list 10k phần tử sẽ đứng hình. `push`/`unshift`/
+                                // `splice`/`fill` truyền giá trị mới qua args; các
+                                // method còn lại chỉ nhận số/hàm nên `isObservable`
+                                // tự bỏ qua.
+                                for (const arg of args) observeIncoming(arg);
+                                fire();
+                                return result;
+                            },
+                            enumerable: false, configurable: true, writable: true,
+                        });
+                    } catch { /* method không ghi đè được → bỏ qua */ }
+                }
+            }
+            for (const item of node) StateManager.observe(item, channel, seen);
+            return;
+        }
+
+        for (const prop of Object.keys(node)) {
+            StateManager.observe(node[prop], channel, seen);
+            if (!fresh) continue;                     // accessor đã cài từ lần trước
+            const desc = Object.getOwnPropertyDescriptor(node, prop);
+            if (!desc || !desc.configurable || desc.get || desc.set) continue;
+            let current = desc.value;
+            try {
+                Object.defineProperty(node, prop, {
+                    enumerable: desc.enumerable,      // giữ nguyên → spread/keys không đổi
+                    configurable: true,
+                    get: () => current,
+                    set: (next) => {
+                        if (next === current) return;
+                        current = next;
+                        observeIncoming(next);
+                        fire();
+                    },
+                });
+            } catch { /* prop không cấu hình được → bỏ qua */ }
+        }
+    }
 
     private static shallowCopy(v: any): any {
         return Array.isArray(v) ? v.slice() : { ...v };
@@ -577,11 +862,14 @@ export class StateManager implements StateManagerInterface {
                 continue;
             }
             const snap = this.mutationSnapshots.get(key);
-            if (snap && snap.ref === value && StateManager.shallowDiffers(snap.copy, value)) {
+            if (snap && snap.ref === value
+                && !this.hookHandledKeys.has(key)          // hook đã lo → không phải "quên set"
+                && StateManager.shallowDiffers(snap.copy, value)) {
                 this.warnMutatedWithoutSet(key);
             }
             this.mutationSnapshots.set(key, { ref: value, copy: StateManager.shallowCopy(value) });
         }
+        this.hookHandledKeys.clear();
     }
 
     /** Dùng CHUNG `warnedKeys` với warnSameReference — 1 key chỉ kêu 1 lần. */
@@ -682,6 +970,8 @@ export class StateManager implements StateManagerInterface {
         this.listeners.clear();
         this.multiKeyListeners = [];
         this.pendingChanges.clear();
+        this.untrackAllArrays();
+        this.hookHandledKeys.clear();
         this.mutationSnapshots.clear();
         this.states = {};
         this.setters = {};

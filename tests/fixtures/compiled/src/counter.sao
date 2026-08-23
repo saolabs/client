@@ -1,0 +1,5 @@
+@states({ count: 0 })
+<div>
+  <span id="value">{{ count }}</span>
+  <button id="inc" @click(setCount(count + 1))>+</button>
+</div>

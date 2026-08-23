@@ -15,8 +15,8 @@ function makeState(path = 'test.view') {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe('cảnh báo mutate tại chỗ', () => {
-    it('set lại CÙNG reference array → cảnh báo + không notify', () => {
+describe('mutate tại chỗ RỒI set lại — phải HOẠT ĐỘNG', () => {
+    it('push() rồi set cùng ref → CÓ notify, KHÔNG cảnh báo', () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const s = makeState('view.a');
         const list: any[] = [];
@@ -27,10 +27,77 @@ describe('cảnh báo mutate tại chỗ', () => {
 
         list.push({ id: 1 });   // mutate tại chỗ
         set(list);              // set lại chính ref đó (đường dev)
+        s.__.flushNow();
 
-        expect(seen).toEqual([]);              // đúng: không có gì để notify
+        // Gọi setter = tuyên bố "giá trị vừa đổi". So NỘI DUNG (độ sâu 1) với
+        // bản chụp thay vì chỉ so reference → nhận ra thay đổi thật.
+        // Trước đây bài test này khoá hành vi CŨ (im lặng không làm gì) — đó
+        // chính là lỗi khiến `list.splice(i,1); setList(list)` không cập nhật UI.
+        expect(seen.length).toBe(1);
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('splice() rồi set cùng ref → CÓ notify', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const s = makeState('view.a2');
+        const list: any[] = [1, 2, 3];
+        const set = s.__.register('items', list);
+        s.__.flushNow();               // chụp baseline
+
+        const seen: any[] = [];
+        s.__.subscribe('items', v => seen.push(v));
+
+        list.splice(1, 1);
+        set(list);
+        s.__.flushNow();
+
+        expect(seen.length).toBe(1);
+        expect(seen[0]).toEqual([1, 3]);
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('mutate LỒNG SÂU (a.b.c = x) → nay CÓ notify, không cần set', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const s = makeState('view.a3');
+        const user: any = { profile: { name: 'a' } };
+        s.__.register('user', user);
+        s.__.flushNow();
+
+        const seen: any[] = [];
+        s.__.subscribe('user', v => seen.push(v));
+
+        user.profile.name = 'b';       // độ sâu 2, KHÔNG gọi setter
+        s.__.flushNow();
+
+        // Trước đây ca này im lặng HOÀN TOÀN: không cập nhật và cũng không
+        // cảnh báo (`shallowDiffers` chỉ so độ sâu 1 nên không thấy gì).
+        // `StateManager.observe` nay quan sát đệ quy nên bắt được.
+        expect(seen.length).toBe(1);
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('GIỚI HẠN: thêm KEY MỚI chưa từng có → không bắt được, chỉ cảnh báo', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const s = makeState('view.a4');
+        const user: any = { name: 'a' };
+        s.__.register('user', user);
+        s.__.register('tick', 0);
+        s.__.updateStateByKey('tick', 1);
+        s.__.flushNow();               // chụp baseline
+
+        const seen: any[] = [];
+        s.__.subscribe('user', v => seen.push(v));
+
+        // Key `extra` chưa tồn tại lúc observe ⇒ không có accessor nào để bắt.
+        // Đây là giới hạn cố hữu của defineProperty (Vue 2 phải có `Vue.set`);
+        // muốn vượt thì phải dùng Proxy — xem GAPS §2.16b, đã quyết định không.
+        user.extra = 'new';
+        s.__.updateStateByKey('tick', 2);
+        s.__.flushNow();
+
+        expect(seen.length).toBe(0);
         expect(warn).toHaveBeenCalledTimes(1);
-        expect(String(warn.mock.calls[0][0])).toContain('items');
+        expect(String(warn.mock.calls[0][0])).toContain('KHÔNG set lại');
     });
 
     it('chỉ cảnh báo 1 lần cho mỗi key', () => {
@@ -93,7 +160,7 @@ describe('mutate KHÔNG kèm set — phát hiện lúc flush', () => {
         s.__.flushNow();
     }
 
-    it('push() rồi không set gì → cảnh báo ở lần flush kế tiếp', () => {
+    it('push() rồi không set gì → nay TỰ CẬP NHẬT, không còn cảnh báo', () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const s = makeState('view.m1');
         const list: any[] = [];
@@ -103,7 +170,28 @@ describe('mutate KHÔNG kèm set — phát hiện lúc flush', () => {
         flushViaOtherKey(s);            // chụp baseline
         expect(warn).not.toHaveBeenCalled();
 
+        const seen: any[] = [];
+        s.__.subscribe('items', () => seen.push(1));
+
         list.push({ id: 1 });           // mutate lặng lẽ, KHÔNG set
+        s.__.flushNow();
+
+        // Trước đây bài này khoá hành vi CŨ (chỉ cảnh báo, không cập nhật).
+        // `StateManager.trackArray` nay vá thẳng các method mutate của mảng nên
+        // `push` tự `enqueueChange` — xem tests/view/array-mutation-tracking.test.ts.
+        expect(seen.length).toBe(1);
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('gán qua INDEX (không phải method) vẫn chỉ cảnh báo — giới hạn đã biết', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const s = makeState('view.m1b');
+        const list: any[] = [{ id: 1 }];
+        s.__.register('items', list);
+        s.__.register('tick', 0);
+        flushViaOtherKey(s);
+
+        list[0] = { id: 2 };            // gán index — ngoài tầm với nếu không dùng Proxy
         flushViaOtherKey(s);
 
         expect(warn).toHaveBeenCalledTimes(1);

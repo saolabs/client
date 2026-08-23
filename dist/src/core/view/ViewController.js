@@ -1313,7 +1313,10 @@ export class ViewController {
                     }
                     let output;
                     try {
-                        output = callback(item, String(index), index, loopCtx);
+                        // Snapshot BẤT BIẾN: childrenFactory chạy muộn (sau khi
+                        // loop kết thúc) nên bắt loopCtx theo tham chiếu sẽ cho
+                        // mọi hàng cùng một giá trị cuối. Xem LoopContext.snapshot().
+                        output = callback(item, String(index), index, loopCtx.snapshot());
                     }
                     finally {
                         if (cache) {
@@ -1337,7 +1340,8 @@ export class ViewController {
                 loopCtx.setType('increment');
                 keys.forEach((key, index) => {
                     loopCtx.setCurrentTimes(index);
-                    const output = callback(list[key], key, index, loopCtx);
+                    // Xem chú thích nhánh array phía trên — cùng lý do.
+                    const output = callback(list[key], key, index, loopCtx.snapshot());
                     if (output !== undefined && output !== null) {
                         if (Array.isArray(output))
                             result.push(...output);
