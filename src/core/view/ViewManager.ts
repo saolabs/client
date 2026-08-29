@@ -354,8 +354,18 @@ export class ViewManager implements ViewManagerInterface {
      * (tránh hai instance cùng view path dùng chung ID gây clobber registry).
      */
     generateViewId(): string {
-        return `v${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+        return `c${(this.viewSeq++).toString(36)}`;
     }
+
+    /**
+     * Bộ đếm cho view do CLIENT tạo (CSR / điều hướng SPA).
+     *
+     * Tiền tố 'c' — server dùng 'v' (ViewContextServiceProvider) — nên hai nguồn
+     * id không thể trùng nhau theo cấu trúc, không phải nhờ may mắn ngẫu nhiên.
+     * View hydrate từ SSR KHÔNG đi qua đây: nó nhận thẳng __SSR_VIEW_ID__ của
+     * server, nên hai phía luôn khớp.
+     */
+    private viewSeq = 0;
 
     /** Factory đã unwrap của các view lazy — tránh await + unwrap lại mỗi lần navigate. */
     private resolvedFactories: Map<string, (...args: any[]) => any> = new Map();

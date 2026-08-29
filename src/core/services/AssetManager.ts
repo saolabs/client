@@ -225,11 +225,12 @@ export class AssetManagerService {
         return null;
     }
 
-    private matchesExtraAttrs(el: HTMLElement, spec: StyleSpec): boolean {
+    private matchesExtraAttrs(el: HTMLElement, spec: StyleSpec | ScriptSpec): boolean {
         if (spec.id && el.id !== spec.id) return false;
         if (spec.className && el.getAttribute('class') !== spec.className) return false;
         for (const [name, value] of Object.entries(spec.attributes ?? {})) {
-            if (name.toLowerCase() === 'href' || name.toLowerCase() === 'rel') continue;
+            const n = name.toLowerCase();
+            if (n === 'href' || n === 'rel' || n === 'src') continue;
             if (value === true && !el.hasAttribute(name)) return false;
             if (value === false || value == null) {
                 if (el.hasAttribute(name)) return false;
@@ -288,6 +289,18 @@ export class AssetManagerService {
     private createScriptNode(script: ScriptSpec): HTMLElement | null {
         const head = this.headEl;
         if (!head) return null;
+
+        if (script.type === 'src') {
+            const existing = this.findExistingScript(script);
+            if (existing) {
+                // Adopt <script src> do Blade SSR phát ra thay vì nạp & execute bản thứ hai
+                // khi hydrate: load lại (vd prism.min.js) reset global của lib, xoá mọi thứ
+                // đã đăng ký giữa hai lần load (grammar Prism, plugin…).
+                existing.setAttribute(OWNER_ATTR, 'script');
+                return existing;
+            }
+        }
+
         const el = document.createElement('script');
         if (script.type === 'src') {
             if (script.src) el.setAttribute('src', script.src);
@@ -298,6 +311,20 @@ export class AssetManagerService {
         el.setAttribute(OWNER_ATTR, 'script');
         head.appendChild(el);
         return el;
+    }
+
+    /** Tìm <script src> cùng src (SSR phát ra) để hydration không nạp lại lần hai. */
+    private findExistingScript(script: ScriptSpec): HTMLScriptElement | null {
+        if (typeof document === 'undefined' || !script.src) return null;
+        const expectedSrc = new URL(script.src, document.baseURI).href;
+        const nodes = document.querySelectorAll<HTMLScriptElement>('script[src]');
+        for (const node of Array.from(nodes)) {
+            if (node.src !== expectedSrc) continue;
+            if (node.hasAttribute(OWNER_ATTR)) continue; // node do AssetManager tạo — acquireOne tự quản
+            if (!this.matchesExtraAttrs(node, script)) continue;
+            return node;
+        }
+        return null;
     }
 
     // ─── Helpers ────────────────────────────────────────────────

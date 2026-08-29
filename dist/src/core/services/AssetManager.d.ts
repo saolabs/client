@@ -96,6 +96,8 @@ export declare class AssetManagerService {
     /** Tag subtree của instance bằng scope attribute (cho descendant selector). */
     private tagScope;
     private createScriptNode;
+    /** Tìm <script src> cùng src (SSR phát ra) để hydration không nạp lại lần hai. */
+    private findExistingScript;
     private applyExtraAttrs;
     /** JSON ổn định theo key để object attributes khác thứ tự vẫn cùng identity. */
     private stableSerialize;

@@ -62,7 +62,7 @@
                 </li>
             @endforeach
         </ul>
-        <div @class(['is-edit-mode'])>
+        <div @class({'is-edit-mode'})>
             <input type="text" @bind(newTodo) placeholder="Nhập công việc mới" @keydown(handleNewTodoKeyDown(event)) />
             <button @click(addTodo())>+</button>
         </div>

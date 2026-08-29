@@ -250,6 +250,11 @@ export declare class Router {
     private handleRoute;
     /** Pop đã đổi address bar; render fail thì đưa URL về chain còn active. */
     private restoreUrlAfterFailedPop;
+    /**
+     * Ghim chiều cao tài liệu bằng đúng chiều cao hiện tại, trả về hàm nhả.
+     * Chỉ chạm `min-height` của body nên không đụng layout khi đã nhả.
+     */
+    private freezeDocumentHeight;
     private applyScroll;
     /** Live region dùng lại giữa các lần điều hướng — tạo lười, chỉ 1 node. */
     private liveRegion;

@@ -392,7 +392,39 @@ export class Html {
         // New simplified format: classes: [{ type, value, factory?, stateKeys? }]
         if (Array.isArray(this.config.classes)) {
             for (const classConfig of this.config.classes) {
-                if (!classConfig || !classConfig.value)
+                if (!classConfig)
+                    continue;
+                // `class="language-{{ lang }}"` — factory trả về TÊN class chứ không
+                // phải boolean, nên không có `value` tĩnh để bật/tắt. Phải nhớ lại tên
+                // đã gắn để gỡ đúng chúng khi state đổi ('language-php' → 'language-js');
+                // tên còn lại trên element có thể do nơi khác quản lý.
+                if (classConfig.type === 'dynamic') {
+                    const generation = this.bindingGeneration;
+                    let applied = [];
+                    const applyDynamic = () => {
+                        const next = String(classConfig.factory ? classConfig.factory() : '')
+                            .split(/\s+/).filter(Boolean);
+                        for (const prev of applied) {
+                            if (next.indexOf(prev) === -1) {
+                                this.element.classList.remove(prev);
+                                this.managedClassNames.delete(prev);
+                            }
+                        }
+                        for (const name of next) {
+                            this.element.classList.add(name);
+                            this.managedClassNames.add(name);
+                        }
+                        applied = next;
+                    };
+                    applyDynamic();
+                    if (classConfig.stateKeys?.length) {
+                        const unsubscribe = this.ctx.states.__.subscribe(classConfig.stateKeys, () => { if (this.isBindingCurrent(generation))
+                            applyDynamic(); });
+                        this.bindingUnsubscribes.push(unsubscribe);
+                    }
+                    continue;
+                }
+                if (!classConfig.value)
                     continue;
                 const className = classConfig.value;
                 this.managedClassNames.add(className);

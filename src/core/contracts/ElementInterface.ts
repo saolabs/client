@@ -143,10 +143,11 @@ export type SaoElementConfig = {
             factory?: () => boolean;
         }
     } | Array<{
-        type: 'static' | 'binding';
+        /** 'dynamic' = factory trả về TÊN class (`class="language-{{ lang }}"`), không có `value`. */
+        type: 'static' | 'binding' | 'dynamic';
         value?: string;
         stateKeys?: string[];
-        factory?: () => boolean;
+        factory?: () => boolean | string;
     }>,
     styles?: {
         [prop: string]: {

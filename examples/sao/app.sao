@@ -29,9 +29,9 @@
             <header>
                 <nav>
                     <a href="{{route('web.home')}}" title="{{siteinfo('site_name')}}" class="home" @class({demo: test}) >
-                        <img src="{{asset('static/web/images/loho.png')}}" alt="{{siteinfo('site_name')}}" @class(['site-logo', 'has-login': userState]) />
+                        <img src="{{asset('static/web/images/loho.png')}}" alt="{{siteinfo('site_name')}}" @class({'site-logo', 'has-login': userState}) />
                     </a>
-                    <ul @class(['site-menu'])>
+                    <ul @class({'site-menu'})>
                         @foreach(posts as post)
                             <li class="menu-item nav-item">
                                 <a href="{{webPostUrl(post)}}" class="nav-link">
@@ -60,7 +60,7 @@
                 </nav>
 
             </header>
-            <h1 @class(['page-title'])>{{title}}</h1>
+            <h1 @class({'page-title'})>{{title}}</h1>
             <p>{{description}}</p>
             <div class="card">
                 <button @click(setCounter(counter + 1))>{{text('web.contents.clickme', {counter: counter})}}</button>

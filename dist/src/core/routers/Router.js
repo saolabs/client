@@ -506,6 +506,8 @@ export class Router {
      */
     async handleRoute(path, type = 'push', requestId = ++this.navigationSequence) {
         this.isNavigating = true;
+        // Khai ngoài try: `finally` phải nhả được kể cả khi render ném giữa chừng.
+        let releaseHeight = () => { };
         try {
             const { pathname, queryString, fragment } = this.splitLocation(path);
             const normalizedPath = this.normalizePath(pathname);
@@ -540,6 +542,10 @@ export class Router {
             // trả id 1 lần → các navigate sau là CSR (SPA takeover).
             const viewComponent = route.component || route.view;
             let transitionSucceeded = true;
+            // View cũ bị gỡ trước khi cây mới dựng xong, nên tài liệu sập chiều
+            // cao trong vài frame — footer nhảy vọt lên, thanh cuộn biến mất,
+            // trình duyệt kẹp lại scrollY. Giữ chiều cao cũ tới khi thay xong.
+            releaseHeight = this.freezeDocumentHeight();
             if (viewComponent) {
                 const vm = this.viewManager ?? this.App?.View;
                 if (vm) {
@@ -592,6 +598,7 @@ export class Router {
             console.error('[Router] Navigation error:', error);
         }
         finally {
+            releaseHeight();
             this.isNavigating = false;
             if (requestId === this.navigationSequence)
                 this.activeNavigationUrl = null;
@@ -610,6 +617,26 @@ export class Router {
         const target = from.$fragment ? `${from.$uri}#${from.$fragment}` : from.$uri;
         window.history.replaceState(window.history.state, '', target);
     }
+    /**
+     * Ghim chiều cao tài liệu bằng đúng chiều cao hiện tại, trả về hàm nhả.
+     * Chỉ chạm `min-height` của body nên không đụng layout khi đã nhả.
+     */
+    freezeDocumentHeight() {
+        if (typeof document === 'undefined' || !document.body)
+            return () => { };
+        const body = document.body;
+        const previous = body.style.minHeight;
+        try {
+            body.style.minHeight = `${document.documentElement.scrollHeight}px`;
+        }
+        catch {
+            return () => { };
+        }
+        return () => { try {
+            body.style.minHeight = previous;
+        }
+        catch { /* noop */ } };
+    }
     applyScroll(type, fragment) {
         if (typeof window === 'undefined')
             return;
@@ -625,10 +652,20 @@ export class Router {
         }
         // PageCache tự khôi phục pop position; initial giữ vị trí SSR/browser.
         if (type === 'push' || type === 'replace') {
+            // scrollTo(0,0) tuân theo `html { scroll-behavior: smooth }` nếu trang
+            // có đặt — biến cú nhảy về đầu thành cuộn chậm ~0.4s chạy SAU khi nội
+            // dung đã thay xong, nhìn như treo. Đổi route phải tức thì; smooth để
+            // dành cho anchor trong trang (nhánh fragment ở trên).
             try {
-                window.scrollTo(0, 0);
+                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
             }
-            catch { /* non-browser/test runtime */ }
+            catch {
+                // Engine cũ chưa biết 'instant' sẽ ném khi validate enum.
+                try {
+                    window.scrollTo(0, 0);
+                }
+                catch { /* non-browser/test runtime */ }
+            }
         }
     }
     /**
@@ -698,9 +735,10 @@ export class Router {
             if (navLinkEl.hasAttribute('data-nav-disabled'))
                 return;
             const navPath = navLinkEl.getAttribute('data-nav-link');
-            if (navPath && navPath.trim() !== '' && navPath !== this.currentUri) {
+            if (navPath && navPath.trim() !== '') {
                 e.preventDefault();
-                this.navigate(navPath);
+                if (navPath !== this.currentUri)
+                    this.navigate(navPath);
                 return;
             }
         }
@@ -710,9 +748,10 @@ export class Router {
             if (navigateEl.hasAttribute('data-nav-disabled'))
                 return;
             const navPath = navigateEl.getAttribute('data-navigate');
-            if (navPath && navPath.trim() !== '' && navPath !== this.currentUri) {
+            if (navPath && navPath.trim() !== '') {
                 e.preventDefault();
-                this.navigate(navPath);
+                if (navPath !== this.currentUri)
+                    this.navigate(navPath);
                 return;
             }
         }
@@ -737,17 +776,20 @@ export class Router {
             if (linkUrl.host !== currentUrl.host)
                 return; // External
             const path = linkUrl.pathname + linkUrl.search + linkUrl.hash;
-            if (path === this.currentUri && !linkUrl.hash)
-                return; // Same page
+            // Link trỏ về đúng route đang đứng vẫn phải nuốt click. Thoát sớm mà
+            // không preventDefault là để browser tự điều hướng — reload cả tài
+            // liệu, mất sạch state SPA. Đây là logo và mục menu đang active.
             e.preventDefault();
+            if (path === this.currentUri && !linkUrl.hash)
+                return; // Same page — no-op
             this.navigate(path);
         }
         catch {
             // Relative URL
             if (href && !href.startsWith('http') && !href.startsWith('//')) {
-                if (href === this.currentUri)
-                    return;
                 e.preventDefault();
+                if (href === this.currentUri)
+                    return; // Same page — no-op
                 this.navigate(href);
             }
         }

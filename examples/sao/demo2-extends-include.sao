@@ -16,7 +16,7 @@
 @extends(__layout__ + 'base')
 @block('content')
     <Header></Header>
-    <div class="demo" @class(['active': status]) @attr({dataCount: count(demoList), dataUserName: user.name})>
+    <div class="demo" @class({'active': status}) @attr({dataCount: count(demoList), dataUserName: user.name})>
         <h1>Hello, {{ user.name }}!</h1>
         <p>Your email is <span>{{ user.email }}</span>.</p>
 

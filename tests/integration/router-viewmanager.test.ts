@@ -418,6 +418,26 @@ describe('Router — click interception', () => {
         expect(download.defaultPrevented).toBe(false);
     });
 
+    it('link trỏ về chính route đang đứng vẫn phải nuốt click (không reload)', async () => {
+        setup();
+        router.start(true);
+        await (router as any).handleRoute('/about', 'push');
+
+        // Logo và mục menu đang active đều là link về chính trang hiện tại.
+        // Thoát mà không preventDefault ⇒ browser tự điều hướng ⇒ reload cả tài liệu.
+        const link = document.createElement('a');
+        link.href = '/about';
+        document.body.appendChild(link);
+
+        const ev = {
+            target: link, button: 0, ctrlKey: false, metaKey: false,
+            shiftKey: false, altKey: false, defaultPrevented: false,
+            preventDefault() { this.defaultPrevented = true; },
+        } as any;
+        (router as any).handleAutoNavigation(ev);
+        expect(ev.defaultPrevented).toBe(true);
+    });
+
     it('click link nội bộ giữ fragment và đi qua SPA transaction', async () => {
         setup();
         router.start(true);

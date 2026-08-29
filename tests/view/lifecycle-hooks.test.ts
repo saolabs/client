@@ -296,4 +296,20 @@ describe('AssetManager — script (không export)', () => {
         a.ctrl.destroy(); a.container.remove();
         b.ctrl.destroy(); b.container.remove();
     });
+
+    it('adopt <script src> do SSR phát ra thay vì chèn bản thứ hai khi hydrate', () => {
+        const ssr = document.createElement('script');
+        ssr.src = '/vendor/prism.js';
+        document.body.appendChild(ssr);
+        try {
+            const v = makeView({}, { path: 'comp.JS', scripts: [{ type: 'src', src: '/vendor/prism.js' }] });
+            expect(document.querySelectorAll('script[src="/vendor/prism.js"]').length).toBe(1);
+            // Node SSR được adopt (đánh dấu owner), không tạo node mới trong <head>.
+            expect(ssr.getAttribute('data-sao-asset')).toBe('script');
+            expect(document.head.querySelector('script[src="/vendor/prism.js"]')).toBeNull();
+            v.ctrl.destroy(); v.container.remove();
+        } finally {
+            ssr.remove();
+        }
+    });
 });
