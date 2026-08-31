@@ -244,7 +244,7 @@ sequenceDiagram
 
 ## 4. Block System — Chi tiết từng thành phần
 
-### 4.1 `Block` ([Block.ts](file:///Users/doanln/Desktop/2026/Projects/saolabs/client/src/core/elements/Block.ts))
+### 4.1 `Block` ([Block.ts](../src/core/elements/Block.ts))
 
 **Vai trò**: Đại diện cho nội dung mà page view muốn "đẩy" vào layout.
 
@@ -264,7 +264,7 @@ Block {
 }
 ```
 
-### 4.2 `BlockOutlet` ([BlockOutlet.ts](file:///Users/doanln/Desktop/2026/Projects/saolabs/client/src/core/elements/BlockOutlet.ts))
+### 4.2 `BlockOutlet` ([BlockOutlet.ts](../src/core/elements/BlockOutlet.ts))
 
 **Vai trò**: Đánh dấu vị trí trong layout DOM nơi block content sẽ được chèn vào.
 
@@ -282,7 +282,7 @@ BlockOutlet {
 }
 ```
 
-### 4.3 `BlockManager` ([BlockManager.ts](file:///Users/doanln/Desktop/2026/Projects/saolabs/client/src/core/services/BlockManager.ts))
+### 4.3 `BlockManager` ([BlockManager.ts](../src/core/services/BlockManager.ts))
 
 **Vai trò**: Global singleton — kết nối Block ↔ BlockOutlet.
 
@@ -299,7 +299,7 @@ Dữ liệu chính:
 4. Chèn children vào DOM giữa `outlet.openTag` và `outlet.closeTag`
 5. Track children vào `mountedChildren` cho cleanup sau
 
-### 4.4 `YieldElement` ([Yield.ts](file:///Users/doanln/Desktop/2026/Projects/saolabs/client/src/core/elements/Yield.ts))
+### 4.4 `YieldElement` ([Yield.ts](../src/core/elements/Yield.ts))
 
 **Vai trò**: Placeholder đơn giản — có thể hiển thị default value.
 
@@ -310,7 +310,7 @@ Dữ liệu chính:
 > [!NOTE]
 > Yield hiện tại chưa có logic chèn content giữa markers. `render()` chỉ chèn markers rỗng. Đây có thể là phần cần phát triển thêm.
 
-### 4.5 `Section` ([Section.ts](file:///Users/doanln/Desktop/2026/Projects/saolabs/client/src/core/view/Section.ts)) — Legacy
+### 4.5 `Section` ([Section.ts](../src/core/view/Section.ts)) — Legacy
 
 - Section đang được **phased out** theo comment trong code
 - Thay thế bằng Block/BlockOutlet system
@@ -528,8 +528,8 @@ Có `runtimeConfig.commitConstructorData` trong config nhưng `commitData()` ch�
 
 ```
 ┌──────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   .sao file  │────→│    Compiler       │────→│  Compiled JS     │
-│              │     │  (../compiler)    │     │  (View subclass) │
+│   .sao file  │────→│     Builder       │────→│  Compiled JS     │
+│              │     │ PHP: saola/compiler│    │  (View subclass) │
 │ @extends     │     │                  │     │  extendView()    │
 │ @block       │     │                  │     │  block()         │
 │ @useBlock    │     │                  │     │  useBlock()      │

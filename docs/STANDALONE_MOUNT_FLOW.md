@@ -35,7 +35,7 @@ Router.handleRoute('/login')
 
 ## 2. Phân tích các Element chưa hoàn thiện
 
-Khi `Wrapper.render()` sinh ra danh sách phần tử con và chuyển vào [mountElementList](file:///Users/doanln/Desktop/2026/Projects/saolabs/client/src/core/helpers/view.ts#L11), hàm này đang bỏ trống (không xử lý/mount) các loại element sau:
+Khi `Wrapper.render()` sinh ra danh sách phần tử con và chuyển vào [mountElementList](../src/core/helpers/view.ts#L11), hàm này đang bỏ trống (không xử lý/mount) các loại element sau:
 
 | Class | `saoType` | Vai trò trong hệ thống | Trạng thái hiện tại |
 |---|---|---|---|
@@ -62,7 +62,7 @@ if (typeof element === 'string' || typeof element === 'number') {
 
 ## 3. Đề xuất Phương án Triển khai (Kế hoạch Chi tiết)
 
-Chúng ta sẽ hoàn thiện hàm `mountElementList` và `mountElementListBefore` trong [view.ts](file:///Users/doanln/Desktop/2026/Projects/saolabs/client/src/core/helpers/view.ts):
+Chúng ta sẽ hoàn thiện hàm `mountElementList` và `mountElementListBefore` trong [view.ts](../src/core/helpers/view.ts):
 
 ### Bước 1: Sửa lỗi thiếu append cho String/Number
 Bổ sung `rootElement.appendChild(el)` khi gặp kiểu string/number:

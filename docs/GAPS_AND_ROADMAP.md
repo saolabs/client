@@ -3,6 +3,12 @@
 > Theo dõi lỗi đã phát hiện, phương án khắc phục, và tiến độ để client đáp ứng
 > yêu cầu một frontend framework thực chiến (so với Vue/React). File này là
 > **living document** — cập nhật trạng thái khi làm, không xoá lịch sử.
+>
+> **⚠ Đường dẫn test đã đổi (2026-08).** Các mục dưới trích `compiler/tests/test_*.py`
+> và `compiler/tests/test_*.js` — đó là bộ test của compiler Python/JS cũ, nay nằm ở
+> `builder/.reference/python/tests/` (Python) và `builder/tests/` (JS). Test chính thức
+> của compiler hiện tại là PHPUnit trong `compiler/tests/Unit/`, cộng bộ parity
+> `compiler/tests/Parity/`.
 
 **Cập nhật 2026-08-04 (phiên rà soát #2):** vá **GAP-10** (`ForeachSlotCache`
 đánh rơi slot → refresh list làm view con `@include` biến mất, §2.10),
@@ -346,7 +352,7 @@ nhưng phải chờ tải chunk mới hydrate xong (trang hiện mà bấm chưa
 Cách khử triệt để là server phát `<link rel="modulepreload">` cho chunk entry —
 chưa làm, thuộc `core/` + app shell.
 
-**Test:** [`compiler/tests/test_registry_lazy.js`](../../compiler/tests/test_registry_lazy.js)
+**Test:** [`compiler/tests/test_registry_lazy.js`](../../builder/tests/test_registry_lazy.js)
 (9 test, gồm regression "mặc định eager 100%").
 
 ---

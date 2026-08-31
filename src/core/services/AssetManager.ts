@@ -304,6 +304,9 @@ export class AssetManagerService {
         const el = document.createElement('script');
         if (script.type === 'src') {
             if (script.src) el.setAttribute('src', script.src);
+            // Dynamic script tags default to async=true in browsers, causing dependencies to execute out-of-order.
+            // Setting async=false forces the browser to execute them in insertion order.
+            el.async = false;
         } else {
             el.textContent = script.content ?? '';
         }

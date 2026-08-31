@@ -4,11 +4,8 @@
  * Khác biệt cốt lõi so với `tests/contract/*.ts`: những bài đó re-implement
  * TAY pattern mà compiler ĐƯỢC KỲ VỌNG sinh ra, nên compiler sinh sai vẫn lọt
  * (xem docs/FIX_PLAN_2026-08-14.md §F5). Ở đây `.sao` trong
- * `tests/fixtures/compiled/src/` được `globalSetup.ts` compile bằng đúng CLI
- * Python của `compiler/`, và bài test mount thẳng file `.js` sinh ra.
- *
- * Nếu thiếu python3/python, `globalSetup` bỏ qua compile — mọi bài ở đây phải
- * tự skip có cảnh báo (KHÔNG được pass im lặng).
+ * `tests/fixtures/compiled/src/` được `globalSetup.ts` compile bằng đúng
+ * `@saolabs/builder` + `saola/compiler`, rồi bài test mount thẳng file `.js`.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -24,7 +21,7 @@ function skipIfMissing(name: string): boolean {
     if (existsSync(file)) return false;
     console.warn(
         `[compiled-views.test] BỎ QUA — không tìm thấy ${file}. ` +
-        'globalSetup không compile được fixture (thiếu python3/python?). ' +
+        'globalSetup không compile được fixture (kiểm tra Builder/Composer). ' +
         'Đây KHÔNG phải pass — kiểm tra log globalSetup ở đầu run.'
     );
     return true;
@@ -130,11 +127,8 @@ describe('compiled-views: methods (F3 — gọi method component trong {{ }})', 
 /**
  * Marker parity SSR↔CSR trên fixture của PIPELINE THẬT (F4).
  *
- * `compiler/tests/test_state_output_marker_sync.py` đã guard việc này ở tầng
- * compiler, nhưng nó gọi thẳng 2 CLI Python trên `.sao` THÔ — BỎ QUA bước
- * Preprocessor mà app thật luôn chạy (JS→PHP syntax, và biến đổi ngữ nghĩa:
- * đo được `{{ items.length }}` → `App.Helper.count(items)`). Bài này chạy trên
- * output ĐÃ QUA preprocessor nên phủ đúng phần compiler test không với tới.
+ * Bài này đọc đồng thời hai output của cùng một `CompileResult`, đúng đường
+ * Builder dùng trong production, nên bắt được mọi lệch marker SSR↔CSR.
  *
  * Bất biến: dãy id output của sao2js và dãy marker id của sao2blade phải khớp
  * TUYỆT ĐỐI theo thứ tự — lệch một vị trí làm mọi id sau nó trong cùng scope
@@ -149,7 +143,7 @@ describe('compiled-views: marker parity SSR↔CSR (F4, qua pipeline thật)', ()
 
     it('mọi fixture: dãy id output khớp tuyệt đối giữa sao2js và sao2blade', () => {
         if (!existsSync(GENERATED_JS) || !existsSync(GENERATED_BLADE)) {
-            console.warn('[compiled-views.test] BỎ QUA parity — chưa có .generated (thiếu python3?).');
+            console.warn('[compiled-views.test] BỎ QUA parity — chưa có .generated (kiểm tra Builder/Composer).');
             return;
         }
         const names = readdirSync(GENERATED_JS)
