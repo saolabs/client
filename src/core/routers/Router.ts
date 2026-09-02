@@ -330,6 +330,14 @@ export class Router {
      * flatten một chỗ.
      */
     addRoutes(routes: RouteDefinition[]): this {
+        // Route KHÔNG có component (API, redirect, fallback) vẫn cần TÊN để
+        // sinh URL — chỉ không vào bảng khớp path. flattenRouteTree lọc chúng
+        // ra khỏi nhánh khớp, nên đăng ký tên riêng ở đây.
+        for (const route of routes) {
+            if (route.name && !(route.component || route.view)) {
+                this.addRouteConfig(route);
+            }
+        }
         for (const route of this.flattenRouteTree(routes)) {
             const component = route.component || route.view || '';
             this.addRoute(route.path, component, route.meta || {});
@@ -355,8 +363,12 @@ export class Router {
         if (config.mode) this.mode = config.mode;
         if (config.base) this.base = config.base;
         if (config.defaultRoute) this.defaultRoute = config.defaultRoute;
-        if (config.routes) this.addRoutes(config.routes);
-        if (config.allRoutes) this.addRoutes(config.allRoutes);
+        // MỘT danh sách thôi. Server từng phát cả `routes` (chỉ route có
+        // component) lẫn `allRoutes` (đủ) — tập con của nhau, nên đăng ký cả
+        // hai là mỗi route vào bảng hai lần. `allRoutes` giữ lại làm bí danh
+        // cho payload cũ.
+        const routes = config.routes ?? config.allRoutes;
+        if (routes) this.addRoutes(routes);
         if (config.beforeEach) this._beforeEach = config.beforeEach;
         if (config.afterEach) this._afterEach = config.afterEach;
         return this;

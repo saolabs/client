@@ -165,6 +165,17 @@ export declare class ViewManager implements ViewManagerInterface {
      * mang nội dung từ server/URL, nội suy vào innerHTML là đường tiêm HTML.
      */
     showError(message: string, details?: any): void;
+    /**
+     * Khoá registry thật sự dùng cho `name`.
+     *
+     * Server có ThemeAwareViewFinder nên một view theme không đè vẫn render
+     * được từ base. Client không có đường đó: `__layout__` là tiền tố của CẢ
+     * context, nên `@extends(__layout__ + "workspace")` sinh khoá
+     * `themes.{slug}.layouts.workspace` dù registry chỉ có bản của base.
+     * Server gửi kèm cặp `__view_fallback_from__/to__` trong systemData; ở đây
+     * chỉ đổi tiền tố khi khoá gốc không có.
+     */
+    private resolveRegistryKey;
     hasView(name: string): boolean;
     exists(name: string): boolean;
     /**

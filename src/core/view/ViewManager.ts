@@ -336,8 +336,32 @@ export class ViewManager implements ViewManagerInterface {
     }
 
     // ─── View Loading ───────────────────────────────────────────
+    /**
+     * Khoá registry thật sự dùng cho `name`.
+     *
+     * Server có ThemeAwareViewFinder nên một view theme không đè vẫn render
+     * được từ base. Client không có đường đó: `__layout__` là tiền tố của CẢ
+     * context, nên `@extends(__layout__ + "workspace")` sinh khoá
+     * `themes.{slug}.layouts.workspace` dù registry chỉ có bản của base.
+     * Server gửi kèm cặp `__view_fallback_from__/to__` trong systemData; ở đây
+     * chỉ đổi tiền tố khi khoá gốc không có.
+     */
+    private resolveRegistryKey(name: string): string {
+        if (Object.prototype.hasOwnProperty.call(this.viewRegistry, name)) return name;
+
+        const from = (this.systemData as any)?.__view_fallback_from__;
+        const to = (this.systemData as any)?.__view_fallback_to__;
+        if (typeof from !== 'string' || typeof to !== 'string' || !from || !to) return name;
+
+        const rebased = name === from
+            ? to
+            : (name.startsWith(from + '.') ? to + name.slice(from.length) : name);
+
+        return Object.prototype.hasOwnProperty.call(this.viewRegistry, rebased) ? rebased : name;
+    }
+
     hasView(name: string): boolean {
-        return Object.prototype.hasOwnProperty.call(this.viewRegistry, name);
+        return Object.prototype.hasOwnProperty.call(this.viewRegistry, this.resolveRegistryKey(name));
     }
 
     exists(name: string): boolean {
@@ -380,7 +404,8 @@ export class ViewManager implements ViewManagerInterface {
             const cached = this.viewFromStore(name, data, cache);
             if (cached) return cached;
 
-            const factory = this.resolvedFactories.get(name) ?? this.viewRegistry[name];
+            const key = this.resolveRegistryKey(name);
+            const factory = this.resolvedFactories.get(key) ?? this.viewRegistry[key];
             if (!factory || typeof factory !== 'function') {
                 logger.error(`View "${name}" not found in registry.`);
                 return null;
@@ -419,7 +444,8 @@ export class ViewManager implements ViewManagerInterface {
             const cached = this.viewFromStore(name, data, cache);
             if (cached) return cached;
 
-            const factory = this.resolvedFactories.get(name) ?? this.viewRegistry[name];
+            const key = this.resolveRegistryKey(name);
+            const factory = this.resolvedFactories.get(key) ?? this.viewRegistry[key];
             if (!factory || typeof factory !== 'function') {
                 logger.error(`View "${name}" not found in registry.`);
                 return null;
