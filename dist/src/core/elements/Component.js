@@ -220,16 +220,25 @@ export class Component {
     hydrateChild() {
         if (this._childMounted && this.viewRef)
             return;
+        // Không có marker view của server giữa cặp marker component → server
+        // KHÔNG render view con ở đây. Hydrate tiếp thì child giữ viewId do
+        // client sinh ('c…'), rồi đi tìm class "{c…}-{id}" và marker
+        // "s:v:c…" không tồn tại → dựng cây mới CẠNH cây server, tức nhân đôi
+        // DOM. Dọn phần server bỏ lại rồi đi đường CSR — giống nhánh
+        // "partial hydration fallback" ở render() khi marker component vắng.
+        const ssrViewId = this.discoverChildViewId();
+        if (!ssrViewId) {
+            this.unmountChild();
+            this.mountChild();
+            return;
+        }
         const childView = this.resolveChildView();
         if (!childView)
             return;
         const childCtrl = childView.__ctrl__;
         // Ghi đè viewId = viewId server (trước render — Wrapper/Html/Output của
         // child claim theo marker/class prefix bằng viewId này)
-        const ssrViewId = this.discoverChildViewId();
-        if (ssrViewId) {
-            childCtrl.viewId = ssrViewId;
-        }
+        childCtrl.viewId = ssrViewId;
         // Commit state TRƯỚC render (factory @if/@foreach sinh đúng cây khớp SSR);
         // flush ngay khi chưa subscribe → discard pending, không phá DOM claim.
         childCtrl.initMode = InitModes.HYDRATE;

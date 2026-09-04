@@ -153,6 +153,30 @@ describe('@include — SSR hydration', () => {
         expect(container.textContent).toContain('Msg: xin chào');
     });
 
+    it('hydrate: marker component có nhưng THIẾU marker view → CSR sạch, không nhân đôi', async () => {
+        // Server để lại nội dung giữa cặp marker component mà KHÔNG có
+        // <!--s:v:…--> (view con không phải .sao đã compile, hoặc partial cũ).
+        // Không có viewId server để claim → phải dựng lại bằng CSR, và phần
+        // server bỏ lại phải bị dọn, nếu không trang có HAI <section>.
+        container.innerHTML = [
+            `<!--s:v:${PARENT_ID}-s-->`,
+            `<div class="${PARENT_ID}-page-root">`,
+            `<!--s:c:${PARENT_ID}-inc1-s-->`,
+            `<section class="legacy-child">Msg: hello</section>`,
+            `<!--s:c:${PARENT_ID}-inc1-e-->`,
+            `</div>`,
+            `<!--s:v:${PARENT_ID}-e-->`,
+        ].join('');
+
+        const result = await vm.hydrateView('web.parent', { __SSR_VIEW_ID__: PARENT_ID });
+        expect(result).not.toBeNull();
+
+        const sections = container.querySelectorAll('section');
+        expect(sections.length).toBe(1);
+        expect(sections[0].classList.contains('legacy-child')).toBe(false);
+        expect(container.textContent).toContain('Msg: hello');
+    });
+
     it('CSR mount cùng view → cấu trúc marker tương đồng SSR (s:c: + s:v:)', async () => {
         // Xoá SSR DOM — mount CSR từ đầu
         container.innerHTML = '';

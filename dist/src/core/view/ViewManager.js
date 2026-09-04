@@ -311,10 +311,19 @@ export class ViewManager {
      */
     async view(name, data, cache) {
         try {
-            const cached = this.viewFromStore(name, data, cache);
+            // Khoá store phải là khoá registry ĐÃ RESOLVE, không phải tên được
+            // yêu cầu. Khi theme đang bật, `__layout__` là tiền tố của cả context
+            // nên tên yêu cầu là `themes.{slug}.layouts.docs` còn view thật lấy
+            // từ base: `ctrl.path` = `web.layouts.docs`. Hai chỗ dọn store
+            // (`pageCache.onEvict` và `destroyLayoutView`) đều xoá theo
+            // `ctrl.path`, nên lưu theo tên yêu cầu là instance ĐÃ DESTROY nằm
+            // lại trong store vĩnh viễn — lần điều hướng sau `extendView` trả về
+            // nó và `render()` trả rỗng. Không bật theme thì hai khoá trùng nhau
+            // nên bug này ẩn hoàn toàn.
+            const key = this.resolveRegistryKey(name);
+            const cached = this.viewFromStore(key, data, cache);
             if (cached)
                 return cached;
-            const key = this.resolveRegistryKey(name);
             const factory = this.resolvedFactories.get(key) ?? this.viewRegistry[key];
             if (!factory || typeof factory !== 'function') {
                 logger.error(`View "${name}" not found in registry.`);
@@ -330,10 +339,12 @@ export class ViewManager {
                     logger.error(`Lazy view "${name}" did not resolve to a factory or View.`);
                     return null;
                 }
-                this.resolvedFactories.set(name, lazyFactory);
+                // Cache theo `key` cho khớp chỗ đọc ở trên; theo `name` thì
+                // lần sau luôn trượt cache khi theme đang bật.
+                this.resolvedFactories.set(key, lazyFactory);
                 view = lazyFactory(data ?? {}, systemData);
             }
-            return this.finalizeView(name, view, cache);
+            return this.finalizeView(key, view, cache);
         }
         catch (err) {
             // Gồm cả chunk 404 / mạng lỗi khi import() — không để throw ra Router.
@@ -348,10 +359,11 @@ export class ViewManager {
      */
     resolveViewSync(name, data, cache) {
         try {
-            const cached = this.viewFromStore(name, data, cache);
+            // Xem ghi chú ở view(): khoá store bám khoá registry đã resolve.
+            const key = this.resolveRegistryKey(name);
+            const cached = this.viewFromStore(key, data, cache);
             if (cached)
                 return cached;
-            const key = this.resolveRegistryKey(name);
             const factory = this.resolvedFactories.get(key) ?? this.viewRegistry[key];
             if (!factory || typeof factory !== 'function') {
                 logger.error(`View "${name}" not found in registry.`);
@@ -363,7 +375,7 @@ export class ViewManager {
                     `không await được. Gọi App.View.preloadView("${name}") trước, hoặc để view này eager trong registry.`);
                 return null;
             }
-            return this.finalizeView(name, view, cache);
+            return this.finalizeView(key, view, cache);
         }
         catch (err) {
             logger.error(`Error loading view ${name}:`, err);
@@ -649,8 +661,10 @@ export class ViewManager {
                         // this.block(...) call; push the new content into it the same
                         // way the initial mount does (mountViewBlocks clears the old
                         // content first, so the placeholder is removed as part of this).
+                        // Block tìm outlet THEO TÊN nên viewId của page là đủ;
+                        // section thì không — xem mountSectionsAcrossChain().
                         this.blockManager.mountViewBlocks(ctrl.viewId);
-                        this.sectionManager.mountViewSections(ctrl.viewId);
+                        this.mountSectionsAcrossChain(ctrl.viewId, this.currentLayoutChain);
                         commitView(ctrl);
                         this.blockManager.startAll();
                         this.sectionManager.startAll();
@@ -898,7 +912,7 @@ export class ViewManager {
             }
         }
         this.blockManager.mountViewBlocks(pageCtrl.viewId);
-        this.sectionManager.mountViewSections(pageCtrl.viewId);
+        this.mountSectionsAcrossChain(pageCtrl.viewId, layoutChain);
         pageCtrl.mount();
         for (const layout of newLayouts)
             commitView(layout.__ctrl__);
@@ -908,6 +922,28 @@ export class ViewManager {
         this.blockManager.startAll();
         this.sectionManager.startAll();
         activateView(pageCtrl);
+    }
+    /**
+     * Đưa `@section` của page tới `@yield` của layout.
+     *
+     * `mountViewSections` lọc yield theo `yieldEl.ctx.viewId`, mà YIELD THUỘC
+     * LAYOUT khai báo nó chứ không thuộc page — nên gọi riêng với viewId của
+     * page thì không yield nào khớp. Chỉ quét các layout MỚI cũng không đủ:
+     * điều hướng giữa hai trang dùng chung một layout thì `common` phủ hết
+     * chuỗi, vòng lặp mount layout không chạy lần nào, và section của trang mới
+     * không bao giờ tới nơi.
+     *
+     * Quét cả chuỗi là an toàn: mountViewSections chỉ áp lại `activeSections`
+     * hiện hành vào từng yield, gọi thừa không đổi kết quả.
+     */
+    mountSectionsAcrossChain(pageViewId, layoutChain) {
+        this.sectionManager.mountViewSections(pageViewId);
+        for (const layout of layoutChain) {
+            const layoutId = layout?.__ctrl__?.viewId;
+            if (layoutId && layoutId !== pageViewId) {
+                this.sectionManager.mountViewSections(layoutId);
+            }
+        }
     }
     /** Hydration strategy: claim Blade DOM without insert/clear mutations. */
     activateHydratedChain(pageView, layoutChain) {
@@ -1309,11 +1345,18 @@ export class ViewManager {
         }
         const navigationGeneration = ++this.navigationGeneration;
         const targetUrl = route?.$uri ?? route?.$urlPath ?? name;
-        // Tách __SSR_VIEW_ID__ khỏi data TRƯỚC khi tạo view — đây là key nội bộ
-        // hydration, không phải view data. Tạo factory với viewData PHẲNG đã sạch
-        // → ctrl.data không lẫn __SSR_VIEW_ID__, và (data flat) factory đọc đúng.
-        const { __SSR_VIEW_ID__: ssrViewId, ...viewData } = data;
-        const view = await this.view(name, viewData, false);
+        // Router only supplies route params and the SSR id. Seed the page from
+        // the matching server instance before constructing data-derived states.
+        const { __SSR_VIEW_ID__: ssrViewId, ...routeData } = data;
+        const key = this.resolveRegistryKey(name);
+        const serverData = this.ssrViewData[key]?.instances?.[ssrViewId]?.data ?? {};
+        const viewData = { ...serverData, ...routeData };
+        // Compiled factories capture this id in their render closures; assigning
+        // ctrl.viewId afterwards alone cannot update those closures.
+        const constructorData = { ...viewData, __SSR_VIEW_ID__: ssrViewId };
+        const view = await this.view(name, constructorData, false);
+        // Keep the internal id out of application data after factory setup.
+        delete constructorData.__SSR_VIEW_ID__;
         if (!view) {
             this.showError(`hydrateView: View "${name}" không tìm thấy.`);
             return null;

@@ -88,6 +88,12 @@ export function readBootConfig(): Record<string, any> | null {
         out.view = view;
     }
 
+    // Danh sách bundle nạp rời (theme…) — server là chỗ DUY NHẤT biết theme nào
+    // đang bật, nên client không đoán đường dẫn. Xem EXTENSION_ARCHITECTURE §8.
+    if (Array.isArray(cfg.bundles)) {
+        out.bundles = cfg.bundles.filter((u: unknown) => typeof u === 'string' && u !== '');
+    }
+
     const routes = cfg.router?.allRoutes ?? cfg.router?.routes;
     if (Array.isArray(routes)) {
         out.router = {

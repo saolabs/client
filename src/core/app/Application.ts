@@ -303,6 +303,15 @@ export class Application implements ApplicationInterface {
             (provider as any).initApplication();
         }
         provider.register();
+
+        // Đăng ký SAU khi app đã boot — plugin nạp muộn qua App.push(), hoặc
+        // provider của theme cắm vào giữa phiên. boot() vòng lặp chính đã chạy
+        // xong và có cờ chặn, nên nếu không gọi ở đây thì provider chỉ chạy nửa
+        // vòng đời: register() có, boot() không, và KHÔNG có lỗi nào phát ra.
+        if (this.booted && typeof provider.boot === 'function') {
+            provider.boot();
+        }
+
         return this;
     }
 

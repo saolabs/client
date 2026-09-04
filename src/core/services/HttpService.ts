@@ -192,7 +192,17 @@ export class HttpService {
             this.pending.delete(requestKey);
 
             if (!raw.ok) {
-                throw Object.assign(new Error(`HTTP ${raw.status} ${raw.statusText}`), { response });
+                // Ưu tiên message của server (Laravel 422 trả "The email field is
+                // required."): caller nào cũng in `err.message`, mà "HTTP 422
+                // Unprocessable Content" thì người dùng không biết sai ở đâu.
+                // Body đầy đủ (kèm `errors` từng field) vẫn nằm ở `err.response`.
+                const serverMessage = typeof (responseData as any)?.message === 'string'
+                    ? (responseData as any).message.trim()
+                    : '';
+                const message = serverMessage !== ''
+                    ? serverMessage
+                    : `HTTP ${raw.status} ${raw.statusText}`;
+                throw Object.assign(new Error(message), { response });
             }
 
             return response;

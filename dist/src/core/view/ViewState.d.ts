@@ -221,6 +221,24 @@ export declare class StateManager implements StateManagerInterface {
     private warnMutatedWithoutSet;
     private flushChanges;
     /**
+     * Vùng reactive re-render ở RAF kế tiếp, còn listener của Output/Text/binding
+     * chạy NGAY trong đợt flush này. Nên khi guard đổi chiều
+     * (`@if(record !== null)` thành false), factory bên trong vùng —
+     * `{{ record['name'] }}` — vẫn chạy một lần với state mới và ném, dù DOM đó
+     * chỉ còn sống thêm một frame.
+     *
+     * Có vùng đang chờ dựng lại thì chạy lại listener SAU đợt đó: element hoặc
+     * đã bị destroy (listener no-op), hoặc chạy được với state nhất quán. Còn
+     * ném nữa mới là lỗi thật và đi tiếp tới boundary.
+     *
+     * rAF của flushReactiveUpdates đã đăng ký TRƯỚC (trong chính đợt flush này,
+     * lúc vùng gọi scheduleUpdate), nên rAF đăng ký ở đây chạy sau nó.
+     *
+     * Giới hạn: chỉ bắt được khi vùng bọc đã kịp vào hàng đợi trước listener
+     * này — đúng với @if/@foreach bọc ngoài vì chúng subscribe trước con.
+     */
+    private retryAfterReactiveFlush;
+    /**
      * Lỗi ném ra từ callback subscribe — đưa về error boundary thay vì nuốt.
      *
      * MỌI factory người dùng chạy khi state đổi đều đi qua đây: Output `{{ }}`,

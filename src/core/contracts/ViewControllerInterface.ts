@@ -60,6 +60,8 @@ export interface ViewControllerInterface {
     addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler, modifiers?: EventModifier[]): void;
     /** Called by reactive system to schedule an update */
     scheduleUpdate(reactive: ReactiveInterface): void;
+    /** Còn vùng reactive chờ re-render trong frame này không? */
+    hasPendingReactiveUpdate(): boolean;
     /** Flush đồng bộ các reactive update đang chờ (sau mount/hydrate). */
     flushReactiveUpdatesNow(): void;
     /**

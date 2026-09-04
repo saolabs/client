@@ -26,7 +26,7 @@ const SYSTEM_SERVICE_KEYS = new Set(['Marker', 'Store', 'Storage', 'Event', 'Htt
  * services: { Auth: AuthService, Toast: ToastService }
  * → 2 providers, mỗi cái dependsOn ['core'], register = app.set(name, new Class(app))
  */
-function servicesFromMap(map: Record<string, new (app: ApplicationInterface) => any>): ServiceProviderInterface[] {
+function servicesFromMap(map: Record<string, any>): ServiceProviderInterface[] {
     const appInstance = app<ApplicationInterface>();
     return Object.entries(map)
         .filter(([name]) => {
@@ -36,13 +36,42 @@ function servicesFromMap(map: Record<string, new (app: ApplicationInterface) => 
             }
             return true;
         })
-        .map(([name, ServiceClass]) => ({
+        .map(([name, value]) => ({
             name,
             dependsOn: [PROVIDER_NAMES.CORE],
             register() {
-                appInstance.set(name, new ServiceClass(appInstance));
+                // Bundle nạp rời (theme) hay gửi INSTANCE hoặc object thuần chứ
+                // không phải class — `new` vô điều kiện sẽ ném "is not a
+                // constructor". Chỉ dựng khi thật sự là class.
+                const isClass = typeof value === 'function' && value.prototype;
+                appInstance.set(name, isClass ? new value(appInstance) : value);
             }
         }));
+}
+
+/**
+ * `config.helpers` = { tên: fn } → MỘT provider gộp, phụ thuộc `helper`.
+ *
+ * Không gán tay sau `init()`: `App.Helper` chỉ tồn tại sau khi
+ * HelperServiceProvider register, nên phải để resolveProviderOrder xếp chỗ.
+ * Gán tay thì provider nào đọc helper trong boot() của mình sẽ nhận undefined.
+ */
+function helpersFromMap(map: Record<string, any>): ServiceProviderInterface[] {
+    const appInstance = app<ApplicationInterface>();
+    if (!map || Object.keys(map).length === 0) return [];
+
+    return [{
+        name: 'bundle.helpers',
+        dependsOn: [PROVIDER_NAMES.HELPER],
+        register() {
+            const helper = appInstance.get<Record<string, any>>('Helper');
+            if (!helper) {
+                console.warn('[Bootstrap] Helper chưa sẵn sàng, bỏ qua config.helpers.');
+                return;
+            }
+            Object.assign(helper, map);
+        }
+    }];
 }
 
 /**
@@ -75,6 +104,11 @@ export function buildDefaultProviders(config: Record<string, any> = {}): NamedSe
         ? servicesFromMap(config.services)
         : [];
 
+    // config.helpers: { tên: fn } → một provider phụ thuộc `helper`
+    const helperProviders = config.helpers
+        ? helpersFromMap(config.helpers)
+        : [];
+
     // config.providers: (ProviderClass | NamedServiceProvider)[] → instantiate classes
     const customProviders: NamedServiceProvider[] = Array.isArray(config.providers)
         ? config.providers
@@ -90,5 +124,5 @@ export function buildDefaultProviders(config: Record<string, any> = {}): NamedSe
             })
         : [];
 
-    return [...defaults, ...serviceProviders, ...customProviders];
+    return [...defaults, ...serviceProviders, ...helperProviders, ...customProviders];
 }

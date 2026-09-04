@@ -139,7 +139,7 @@ describe('Html constructor — SSR hydration', () => {
         // Fallback: element mới được tạo (không crash)
         expect(html.element).toBeDefined();
         expect(html.element).not.toBeNull();
-        expect(html.element.classList.contains('non-existent-id')).toBe(true);
+        expect(html.element.classList.contains(`${viewId}-non-existent-id`)).toBe(true);
 
         document.body.removeChild(container);
     });
@@ -195,7 +195,9 @@ describe('Html constructor — SSR hydration', () => {
         });
 
         expect(html.element.tagName.toLowerCase()).toBe('div');
-        expect(html.element.classList.contains('fresh-div')).toBe(true);
+        // CSR gắn ĐÚNG class hydrate như Blade emit ($__VIEW_ID__ . '-' . $id),
+        // để DOM do server và do client sinh ra giống hệt nhau.
+        expect(html.element.classList.contains('v-csr01-fresh-div')).toBe(true);
     });
 });
 

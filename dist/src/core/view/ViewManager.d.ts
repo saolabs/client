@@ -270,6 +270,20 @@ export declare class ViewManager implements ViewManagerInterface {
     private activateRenderedChain;
     /** CSR strategy: insert new DOM, while preserving/reusing a compatible Layout. */
     private activateCreatedChain;
+    /**
+     * Đưa `@section` của page tới `@yield` của layout.
+     *
+     * `mountViewSections` lọc yield theo `yieldEl.ctx.viewId`, mà YIELD THUỘC
+     * LAYOUT khai báo nó chứ không thuộc page — nên gọi riêng với viewId của
+     * page thì không yield nào khớp. Chỉ quét các layout MỚI cũng không đủ:
+     * điều hướng giữa hai trang dùng chung một layout thì `common` phủ hết
+     * chuỗi, vòng lặp mount layout không chạy lần nào, và section của trang mới
+     * không bao giờ tới nơi.
+     *
+     * Quét cả chuỗi là an toàn: mountViewSections chỉ áp lại `activeSections`
+     * hiện hành vào từng yield, gọi thừa không đổi kết quả.
+     */
+    private mountSectionsAcrossChain;
     /** Hydration strategy: claim Blade DOM without insert/clear mutations. */
     private activateHydratedChain;
     /**

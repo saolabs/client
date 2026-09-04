@@ -8,6 +8,17 @@ export { Application } from './src/core/app/Application.js';
 export { app } from './src/core/helpers/app.js';
 export { default as App } from './src/core/bootstrap/app.js';
 
+// Bundle nạp rời (theme / gói mở rộng)
+export { defineBundle, loadBundles, mergeBundles, bootBundles } from './src/core/bootstrap/bundle.js';
+export type { SaolaBundle, MergedBundles, ViewFactory } from './src/core/contracts/BundleInterface.js';
+
+// Service Provider — lớp base + hằng tên, để app và theme viết provider của mình.
+// KHÔNG export thì cả tính năng "người dùng thêm provider" chỉ dùng được nội bộ.
+export { ServiceProvider } from './src/core/bootstrap/providers/ServiceProvider.js';
+export { PROVIDER_NAMES, resolveProviderOrder } from './src/core/bootstrap/providers/provider-order.js';
+export type { NamedServiceProvider, ProviderName } from './src/core/bootstrap/providers/provider-order.js';
+export type { ServiceProviderInterface } from './src/core/contracts/ServiceProviderInterface.js';
+
 // Services
 export { MarkerService } from './src/core/services/MarkerService.js';
 export { EventService } from './src/core/services/EventService.js';

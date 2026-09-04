@@ -293,6 +293,13 @@ export declare class ViewController implements ViewControllerInterface {
      * Multiple calls in the same frame are batched into a single RAF.
      */
     scheduleUpdate(reactive: ReactiveInterface): void;
+    /**
+     * Có vùng reactive nào đang chờ re-render trong frame này không?
+     *
+     * StateManager dùng để phân biệt "factory ném vì vùng bọc nó sắp bị dựng
+     * lại" với lỗi thật (xem StateManager.retryAfterReactiveFlush).
+     */
+    hasPendingReactiveUpdate(): boolean;
     private flushReactiveUpdates;
     pushBlockAndSections(): void;
     /**

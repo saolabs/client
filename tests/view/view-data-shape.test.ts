@@ -8,7 +8,7 @@
  * ViewManager.view() PHẢI truyền data phẳng (không bọc { data }).
  * Tham chiếu: docs/HYDRATION.md §9.2
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { ViewManager } from '../../src/core/view/ViewManager';
 import { View } from '../../src/core/view/View';
 import { app } from '../../src/core/helpers/app';
@@ -58,6 +58,26 @@ function setup() {
 }
 
 describe('ViewManager.view() — data shape phẳng', () => {
+    it('hydrate supplies the matching SSR instance data and id before factory setup', async () => {
+        setup();
+        let captured: any;
+        vm.setViewRegistry({ 'web.compiled': (data: any) => {
+            captured = { ...data };
+            return makeCompiledStyleFactory()(data);
+        } });
+        vm.init({ ssrData: { 'web.compiled': { instances: {
+            'vx-other': { data: { todos: ['wrong instance'] } },
+            'vx-123': { data: { todos: [{ id: 7, text: 'Saved task' }], filter: 'all' } },
+        } } } });
+        // Isolate the constructor contract from DOM mounting, covered by hydration tests.
+        const render = vi.spyOn(vm as any, 'renderPageView').mockResolvedValue({ type: 'cancelled' });
+        await vm.hydrateView('web.compiled', { __SSR_VIEW_ID__: 'vx-123', filter: 'active' });
+        expect(captured).toEqual({ __SSR_VIEW_ID__: 'vx-123', todos: [{ id: 7, text: 'Saved task' }], filter: 'active' });
+        expect(render.mock.calls[0][1]).toEqual({ todos: [{ id: 7, text: 'Saved task' }], filter: 'active' });
+        expect(render.mock.calls[0][0].__ctrl__.viewId).toBe('vx-123');
+        render.mockRestore();
+    });
+
     it('factory nhận __data__ PHẲNG (không bọc { data })', async () => {
         setup();
         const view = await vm.view('web.compiled', { foo: 'bar', n: 1 }, false);

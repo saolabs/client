@@ -951,6 +951,16 @@ export class ViewController implements ViewControllerInterface {
         }
     }
 
+    /**
+     * Có vùng reactive nào đang chờ re-render trong frame này không?
+     *
+     * StateManager dùng để phân biệt "factory ném vì vùng bọc nó sắp bị dựng
+     * lại" với lỗi thật (xem StateManager.retryAfterReactiveFlush).
+     */
+    hasPendingReactiveUpdate(): boolean {
+        return this.pendingReactiveUpdates.size > 0;
+    }
+
     private flushReactiveUpdates(): void {
         if (this._isDestroyed) return;
         this.hasScheduledUpdate = false;

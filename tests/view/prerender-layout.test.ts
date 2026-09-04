@@ -39,7 +39,15 @@ function makeLayoutFactory() {
 /** contentRenderFactory identities, so tests can tell which one ended up registered without needing to render/claim DOM. */
 export const factoryRefs: { skeleton?: Function; realContent?: Function; footer?: Function } = {};
 
-/** Mirrors the shape real compiled output produces for @extends + @await + @block (see compiler/examples/sao/await.sao). */
+/**
+ * Mirrors the shape real compiled output produces for @extends + @await + @block
+ * (see compiler/examples/sao/await.sao).
+ *
+ * Fixture này VIẾT TAY nên nó mù với khâu sinh code: nó từng xanh suốt trong khi
+ * compiler emit `this.section('footer', ..., () => '')` — block tĩnh biến mất khỏi
+ * JS, SSR hiện footer còn CSR mất. Cổng giữ cho fixture khớp compiler thật là
+ * compiler/tests/Unit/AwaitStaticBlockTest.php — sửa hình dạng ở đây thì sửa cả ở đó.
+ */
 function makeAwaitExtendsPageFactory() {
     return () => {
         const view = new View('web.slow', 'view');
@@ -154,6 +162,104 @@ describe('hydrateView — @extends/@block page with @await', () => {
             expect(contentBlock).toBeTruthy();
             expect(contentBlock.contentRenderFactory).toBe(factoryRefs.realContent);
             expect(contentBlock.contentRenderFactory).not.toBe(factoryRefs.skeleton);
+        } finally {
+            application.set('Http', previousHttp);
+        }
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// @section khai báo trong prerender() của trang @await
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Hình dạng compiler thật sinh cho `@await` + `@extends` + `@section` tĩnh
+ * (xem saola/resources/saola/web/views/modules/demo/await.sao đã compile):
+ * section không đụng biến await bị loại khỏi render() và chỉ khai báo trong
+ * prerender(), còn `@yield` nhận nó thì nằm trong LAYOUT.
+ */
+function makeYieldLayoutFactory() {
+    return () => {
+        const view = new View('layouts.yielding', 'layout');
+        view.__ctrl__.setup({
+            superView: null,
+            data: {},
+            render: function (this: any) {
+                return this.wrapper((parent: any) => [
+                    this.html('yl-main', 'main', parent, {}, (p: any) => [
+                        this.blockOutlet('yl-ob', 'content', p),
+                        this.yield('yl-y1', 'note', null, p),
+                    ]),
+                ]);
+            },
+        } as any);
+        return view;
+    };
+}
+
+function makeAwaitSectionPageFactory() {
+    return () => {
+        const view = new View('web.noted', 'view');
+        view.__ctrl__.setup({
+            superView: 'layouts.yielding',
+            data: {},
+            hasAwaitData: true,
+            hasPrerender: true,
+            fetch: { url: '/noted' },
+            prerender: function (this: any) {
+                this.section('note', { type: 'static', contentType: 'text', stateKeys: [] }, () => 'GHI CHÚ TĨNH');
+                this.block('n-content', 'content', (p: any) => [
+                    this.html('n-skel', 'div', p, {}, () => [this.text('LOADING')]),
+                ]);
+                return this.extendView('layouts.yielding');
+            },
+            render: function (this: any) {
+                this.block('n-content', 'content', (p: any) => [
+                    this.html('n-real', 'div', p, {}, () => [this.text('REAL CONTENT')]),
+                ]);
+                return this.extendView('layouts.yielding');
+            },
+        } as any);
+        return view;
+    };
+}
+
+describe('prerender → fetch → swap: @section chỉ khai báo trong prerender()', () => {
+    afterEach(() => { document.body.innerHTML = ''; });
+
+    it('vẫn mount section vào yield của layout sau khi fetch xong', async () => {
+        const application = app() as any;
+        const previousHttp = application.get('Http');
+        let resolveFetch!: (value: any) => void;
+        const pending = new Promise((resolve) => { resolveFetch = resolve; });
+        application.set('Http', { get: () => pending });
+
+        try {
+            const container = document.createElement('div');
+            document.body.appendChild(container);
+            const vm = new ViewManager(app() as any);
+            vm.setApp(app() as any);
+            (app() as any).set('View', vm);
+            vm.init({
+                container,
+                registry: {
+                    'layouts.yielding': makeYieldLayoutFactory(),
+                    'web.noted': makeAwaitSectionPageFactory(),
+                },
+            });
+
+            await vm.mountView('web.noted', {}, { $urlPath: '/noted' } as any);
+            expect(container.textContent).toContain('LOADING');
+
+            resolveFetch({ data: { ready: true } });
+            await pending;
+            await frame();
+            await frame();
+
+            expect(container.textContent).toContain('REAL CONTENT');
+            // Yield thuộc layout, không thuộc page — mount theo viewId của page
+            // là trượt, và nội dung tĩnh của trang @await biến mất khỏi CSR.
+            expect(container.textContent).toContain('GHI CHÚ TĨNH');
         } finally {
             application.set('Http', previousHttp);
         }

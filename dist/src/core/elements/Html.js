@@ -53,6 +53,13 @@ export class Html {
         const directElement = element instanceof HTMLElement
             ? element
             : (config.element instanceof HTMLElement ? config.element : null);
+        // ── Class hydrate = "{viewId}-{id}" ────────────────────────────────────
+        // Blade emit `$__VIEW_ID__ . '-' . $id` cho MỌI element, nên CSR phải gắn
+        // đúng class đó. Trước đây nhánh create dùng id THÔ ('e1') → cùng một view
+        // render bởi server và bởi client ra hai DOM khác nhau, và mọi element CSR
+        // dùng chung vài chục tên class ('e1', 'e13'...) trên toàn tài liệu.
+        const viewId = ctx.viewId ?? null;
+        const hydrateClass = id ? (viewId ? `${viewId}-${id}` : id) : null;
         if (directElement) {
             this.element = directElement;
             this.tagName = this.element.tagName.toLowerCase();
@@ -64,14 +71,11 @@ export class Html {
             // Tham chiếu: COMPILER_CONTRACT.md §hydration, docs/FOREACH_RECONCILIATION_DESIGN.md
             //
             // Thuật toán (top-down):
-            //   1. Xây dựng hydrateClass = "{viewId}-{id}"
-            //   2. Tìm trong parentElement.element trước (để tránh cross-view collision)
-            //   3. Fallback: document.querySelector nếu không có parentElement
-            //   4. Không tìm thấy → tạo element mới (partial hydration)
-            const viewId = ctx.viewId ?? null;
+            //   1. Tìm trong parentElement.element trước (để tránh cross-view collision)
+            //   2. Fallback: document.querySelector nếu không có parentElement
+            //   3. Không tìm thấy → tạo element mới (partial hydration)
             let found = null;
-            if (id) {
-                const hydrateClass = viewId ? `${viewId}-${id}` : id;
+            if (hydrateClass) {
                 // viewId (server uniqid) là hex CÓ THỂ bắt đầu bằng chữ số → class
                 // "6a3a...-32a9c14a" làm selector ".6a3a..." KHÔNG hợp lệ
                 // (querySelector ném SyntaxError). CSS.escape() escape ký tự đầu.
@@ -93,15 +97,15 @@ export class Html {
             else {
                 // Partial hydration fallback: element không có trong SSR output
                 this.element = document.createElement(tagName);
-                if (id)
-                    this.element.classList.add(id);
+                if (hydrateClass)
+                    this.element.classList.add(hydrateClass);
             }
         }
         else {
             // ── CSR (create mode): tạo element mới ───────────────────────────────
             this.element = document.createElement(this.tagName);
-            if (id)
-                this.element.classList.add(id);
+            if (hydrateClass)
+                this.element.classList.add(hydrateClass);
         }
         this.childrenFactory = childrenFactory;
         this.initialize();

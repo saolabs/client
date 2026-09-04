@@ -841,6 +841,15 @@ export class ViewController {
             requestAnimationFrame(() => this.flushReactiveUpdates());
         }
     }
+    /**
+     * Có vùng reactive nào đang chờ re-render trong frame này không?
+     *
+     * StateManager dùng để phân biệt "factory ném vì vùng bọc nó sắp bị dựng
+     * lại" với lỗi thật (xem StateManager.retryAfterReactiveFlush).
+     */
+    hasPendingReactiveUpdate() {
+        return this.pendingReactiveUpdates.size > 0;
+    }
     flushReactiveUpdates() {
         if (this._isDestroyed)
             return;
