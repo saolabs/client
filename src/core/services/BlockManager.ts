@@ -152,9 +152,17 @@ export class BlockManagerService implements BlockManagerInterface {
         // Render block content using the factory — elements thuộc về PAGE ctrl
         const content = block.contentRenderFactory!(outlet.parentElement as any);
 
-        if (!Array.isArray(content)) return;
+        // Marker `s:b:` của chính block phải bao quanh content — Blade emit cặp này
+        // trong @block (ViewStorageManager::getMarkerOpenTag), nên thiếu nó ở đây là
+        // DOM sau SPA nav khác DOM từ server: hydrate lần sau không tìm ra block để
+        // claim, và cổng tests/e2e/ssr-csr-parity thấy marker lệch một phía.
+        // Block dựng sẵn openTag/closeTag trong constructor; chỗ chèn là ở đây, cùng
+        // insertion model với content (RUNTIME_CONTRACT.md §2).
+        insertBeforeClose(block.openTag);
 
-        for (const child of content) {
+        // Content không phải mảng vẫn phải đóng marker — block rỗng ở server là cặp
+        // marker liền nhau, không phải không có marker.
+        for (const child of Array.isArray(content) ? content : []) {
             if (child === null || child === undefined) continue;
             if (typeof child === 'string' || typeof child === 'number') {
                 insertBeforeClose(document.createTextNode(String(child)));
@@ -180,6 +188,8 @@ export class BlockManagerService implements BlockManagerInterface {
                 }
             }
         }
+
+        insertBeforeClose(block.closeTag);
 
         // Track mounted children for lifecycle (start/stop/destroy)
         this.mountedChildren.set(this.outletKey(outlet), children);

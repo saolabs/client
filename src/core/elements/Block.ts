@@ -140,6 +140,11 @@ export class Block implements BlockInterface {
             markerRegistry.remove(this.markerKey);
             this.markerKey = null;
         }
+        // openTag/closeTag nay NẰM TRONG DOM (BlockManager.mountBlockIntoOutlet chèn
+        // chúng quanh content). Bỏ lại comment mồ côi thì lần hydrate sau
+        // SaoMarker.first('block', id) có thể bắt trúng cặp cũ và claim nhầm vùng.
+        this.openTag.remove();
+        this.closeTag.remove();
     }
     update(): void {
         // Update logic (e.g. re-render content on state change)

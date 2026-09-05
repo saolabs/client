@@ -54,7 +54,8 @@ export interface RouterInterface {
     getCurrentRoute(): ActiveRouteInterface | null;
     /** Navigation guards */
     beforeEach(guard: (to: ActiveRouteInterface, from: ActiveRouteInterface, urlPath: string) => boolean | Promise<boolean>): this;
-    afterEach(hook: (to: ActiveRouteInterface, from: ActiveRouteInterface) => void): this;
+    /** Đăng ký hook sau điều hướng; trả về hàm huỷ đăng ký. Nhiều hook cùng sống được. */
+    afterEach(hook: (to: ActiveRouteInterface, from: ActiveRouteInterface) => void): () => void;
     /** Start listening to URL changes */
     start(skipInitial?: boolean): void;
     /** Stop listening */

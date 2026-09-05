@@ -176,7 +176,15 @@ export class Router {
 
     /** Navigation guards */
     private _beforeEach: NavigationGuard | null = null;
-    private _afterEach: AfterNavigationHook | null = null;
+    /**
+     * NHIỀU hook, không phải một.
+     *
+     * Trước đây đây là một slot duy nhất, và mỗi layout muốn biết "đã điều hướng
+     * xong" đều phải giành lấy nó: layout mới đăng ký đè hook của layout cũ, rồi
+     * layout cũ destroy lại xoá hook của layout mới → không còn hook nào. Đúng
+     * chuỗi docs → demo → docs. Hook giờ là tập hợp, `afterEach()` trả về hàm huỷ.
+     */
+    private afterHooks = new Set<AfterNavigationHook>();
 
     /** Caches */
     private routeCache: Map<string, RouteMatch | null> = new Map();
@@ -370,7 +378,7 @@ export class Router {
         const routes = config.routes ?? config.allRoutes;
         if (routes) this.addRoutes(routes);
         if (config.beforeEach) this._beforeEach = config.beforeEach;
-        if (config.afterEach) this._afterEach = config.afterEach;
+        if (config.afterEach) this.afterEach(config.afterEach);
         return this;
     }
 
@@ -381,9 +389,10 @@ export class Router {
         return this;
     }
 
-    afterEach(hook: AfterNavigationHook): this {
-        this._afterEach = hook;
-        return this;
+    /** Đăng ký hook chạy sau mỗi lần điều hướng. Trả về hàm HUỶ đăng ký. */
+    afterEach(hook: AfterNavigationHook): () => void {
+        this.afterHooks.add(hook);
+        return () => { this.afterHooks.delete(hook); };
     }
 
     // ─── Navigation ─────────────────────────────────────────────
@@ -600,7 +609,7 @@ export class Router {
         this.routeConfigs = {};
         this.routeCache.clear();
         this._beforeEach = null;
-        this._afterEach = null;
+        this.afterHooks.clear();
         this.currentRoute = null;
         this.liveRegion?.remove();
         this.liveRegion = null;
@@ -752,9 +761,15 @@ export class Router {
             this.applyScroll(type, fragment);
             this.announceNavigation(type);
 
-            // After hook
-            if (this._afterEach) {
-                this._afterEach({ ...route, path: normalizedPath }, from);
+            // After hook — chạy trên BẢN SAO: hook được phép tự huỷ đăng ký trong
+            // lúc chạy. Bọc try/catch từng hook: một hook hỏng (view đã destroy
+            // chẳng hạn) không được phép làm chết điều hướng của tất cả phần còn lại.
+            for (const hook of [...this.afterHooks]) {
+                try {
+                    hook({ ...route, path: normalizedPath }, from);
+                } catch (error) {
+                    console.error('[Router] afterEach hook lỗi:', error);
+                }
             }
         } catch (error) {
             console.error('[Router] Navigation error:', error);
