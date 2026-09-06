@@ -1,4 +1,4 @@
-import { MarkerCollectionInterface, MarkerModelInterface, MarkerRecord } from "../contracts/MarkerInterface";
+import { MarkerCollectionInterface, MarkerModelInterface, MarkerRecord } from "../contracts/MarkerInterface.js";
 
 /**
  * SaoMarker Model - Represents a custom marker element

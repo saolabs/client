@@ -17,28 +17,28 @@
  *   - Section system → Block/BlockOutlet
  */
 
-import type { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { ActiveRouteInterface, RouterNavigationType } from "../contracts/RouterInterface";
-import { FragmentInterface, HtmlInterface } from "../contracts/utils";
-import type { ViewControllerConfig, ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { ViewInterface } from "../contracts/ViewInterface";
-import type { ViewManagerInterface, ActiveViewInfo } from "../contracts/ViewManagerInterface";
-import { BlockManager, BlockManagerService } from "../services/BlockManager";
-import { SectionManager, SectionManagerService } from "../services/SectionManager";
-import devtools from "../devtools/hook";
-import { BlockOutlet } from "../elements/BlockOutlet";
-import { PageCacheService, PageCacheEntry, detachWrapperDOM } from "../services/PageCache";
-import { Html } from "../elements/Html";
-import { hasData } from "../helpers/utils";
-import { activateView, claimHydratedView, commitView, flushView } from "../helpers/view";
-import markerRegistry from "../services/MarkerRegistry";
-import logger from "../services/LoggerService";
-import { StoreService } from "../services/StoreService";
-import { View } from "./View";
-import { InitMode, InitModes } from "../contracts/common";
-import { OOTEnum } from "../types/utils";
-import { WrapperInterface } from "../contracts/ElementInterface";
-import { app } from "../helpers/app";
+import type { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import { ActiveRouteInterface, RouterNavigationType } from "../contracts/RouterInterface.js";
+import { FragmentInterface, HtmlInterface } from "../contracts/utils.js";
+import type { ViewControllerConfig, ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import type { ViewInterface } from "../contracts/ViewInterface.js";
+import type { ViewManagerInterface, ActiveViewInfo } from "../contracts/ViewManagerInterface.js";
+import { BlockManager, BlockManagerService } from "../services/BlockManager.js";
+import { SectionManager, SectionManagerService } from "../services/SectionManager.js";
+import devtools from "../devtools/hook.js";
+import { BlockOutlet } from "../elements/BlockOutlet.js";
+import { PageCacheService, PageCacheEntry, detachWrapperDOM } from "../services/PageCache.js";
+import { Html } from "../elements/Html.js";
+import { hasData } from "../helpers/utils.js";
+import { activateView, claimHydratedView, commitView, flushView } from "../helpers/view.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import logger from "../services/LoggerService.js";
+import { StoreService } from "../services/StoreService.js";
+import { View } from "./View.js";
+import { InitMode, InitModes } from "../contracts/common.js";
+import { OOTEnum } from "../types/utils.js";
+import { WrapperInterface } from "../contracts/ElementInterface.js";
+import { app } from "../helpers/app.js";
 
 /**
  * SSR boot info — server nhúng sau khi render xong (RUNTIME_CONTRACT §6).

@@ -1,49 +1,90 @@
 #!/usr/bin/env node
-/**
- * Xác minh mọi entry trong package.json `exports` trỏ tới file CÓ THẬT sau build.
- *
- * Có để bắt lỗi kiểu `./core -> ./dist/core/index.js` (đường dẫn không bao giờ
- * tồn tại vì tsconfig `rootDir: "."` đẩy mọi thứ trong src/ ra dist/src/...).
- * Loại lỗi này im lặng cho tới khi người dùng import mới nổ → phải chặn ở
- * khâu đóng gói.
- *
- * Chạy: node scripts/check-exports.js   (đã gắn vào prepublishOnly)
- */
-const fs = require('fs');
-const path = require('path');
+/** Test the packed package in an isolated consumer, without Vitest aliases. */
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
-const root = path.resolve(__dirname, '..');
-const pkg = require(path.join(root, 'package.json'));
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'saola-consumer-'));
+const run = (cmd, args, cwd = temp) => execFileSync(cmd, args, {
+    cwd, timeout: 30000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, npm_config_cache: path.join(temp, 'npm-cache'), npm_config_update_notifier: 'false', npm_config_offline: 'true' },
+});
 
-const problems = [];
-const checked = [];
-
-/** Mỗi entry có thể là string hoặc object { types, import, require }. */
-function targetsOf(entry) {
-    if (typeof entry === 'string') return [entry];
-    if (entry && typeof entry === 'object') {
-        return Object.values(entry).filter(v => typeof v === 'string');
+try {
+    const packed = JSON.parse(run('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', temp], root));
+    const packageDir = path.join(temp, 'node_modules', ...pkg.name.split('/'));
+    fs.mkdirSync(packageDir, { recursive: true });
+    run('tar', ['-xzf', path.join(temp, packed[0].filename), '-C', packageDir, '--strip-components=1']);
+    const manifest = JSON.parse(fs.readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
+    for (const [name, entry] of Object.entries(manifest.exports)) {
+        for (const target of Object.values(entry)) {
+            assert.ok(fs.statSync(path.join(packageDir, target)).isFile(), `${name}: missing ${target}`);
+        }
     }
-    return [];
-}
 
-for (const [name, entry] of Object.entries(pkg.exports || {})) {
-    for (const target of targetsOf(entry)) {
-        const full = path.join(root, target);
-        const ok = fs.existsSync(full);
-        checked.push({ name, target, ok });
-        if (!ok) problems.push(`  ${name} -> ${target}`);
-    }
-}
+    // The client is a browser runtime; provide a DOM without resolving it through Vite.
+    const require = createRequire(import.meta.url);
+    fs.writeFileSync(path.join(temp, 'dom.cjs'), `
+        const { JSDOM } = require(${JSON.stringify(require.resolve('jsdom'))});
+        const dom = new JSDOM('<!doctype html><html><body></body></html>', {url: 'http://localhost/'});
+        for (const key of ['window', 'document', 'Element', 'HTMLElement', 'Node', 'NodeFilter',
+            'Comment', 'Text', 'DocumentFragment', 'Event', 'CustomEvent', 'MutationObserver',
+            'AbortController', 'AbortSignal', 'getComputedStyle']) {
+            globalThis[key] = key === 'window' ? dom.window : dom.window[key];
+        }
+    `);
 
-for (const { name, target, ok } of checked) {
-    console.log(`${ok ? '  OK  ' : '  MISS'}  ${name} -> ${target}`);
-}
+    // Import by package name, with the exact exports and bytes delivered to users.
+    fs.writeFileSync(path.join(temp, 'consumer.mjs'), `
+        import assert from 'node:assert/strict';
+        import { View, HttpService, StateManager } from '@saolabs/client';
+        import { createPlugin } from '@saolabs/client/plugins';
+        import { mount, mountView, nextFrame } from '@saolabs/client/testing';
+        assert.equal(typeof View, 'function');
+        assert.equal(typeof new HttpService().get, 'function');
+        assert.equal(typeof StateManager, 'function');
+        assert.equal(createPlugin('example', () => {}).name, 'example');
+        assert.equal(typeof mount, 'function');
+        assert.equal(typeof nextFrame, 'function');
+        const harness = mountView(function () { return this.wrapper(() => [this.text('packed')]); });
+        assert.ok(harness.view instanceof View);
+        assert.equal(harness.text(), 'packed');
+        harness.destroy();
+        // Browser services own timers; this subprocess tests loading and mounting.
+        process.exit(0);
+    `);
+    run(process.execPath, ['--require', './dom.cjs', 'consumer.mjs']);
+    // CommonJS consumers can use the standard asynchronous ESM boundary.
+    fs.writeFileSync(path.join(temp, 'consumer.cjs'), `
+        const assert = require('node:assert/strict');
+        import('@saolabs/client').then(m => { assert.equal(typeof m.View, 'function'); process.exit(0); })
+            .catch(error => { console.error(error); process.exit(1); });
+    `);
+    run(process.execPath, ['--require', './dom.cjs', 'consumer.cjs']);
 
-if (problems.length > 0) {
-    console.error(`\n✗ ${problems.length} export trỏ tới file không tồn tại:\n${problems.join('\n')}`);
-    console.error('\nChạy `npm run build` trước, hoặc sửa/xoá entry trong package.json.\n');
-    process.exit(1);
+    fs.writeFileSync(path.join(temp, 'consumer.mts'), `
+        import { HttpService, type HttpResponse } from '@saolabs/client';
+        import { createPlugin } from '@saolabs/client/plugins';
+        import { mount, type Harness } from '@saolabs/client/testing';
+        const result: Promise<HttpResponse<{name: string}>> = new HttpService().get('/users');
+        createPlugin('typed', () => {});
+        const mountView: typeof mount = mount;
+        let harness: Harness | undefined;
+        // @ts-expect-error URL must be a string; published declarations must keep this check.
+        new HttpService().get(42);
+    `);
+    run(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'),
+        '--noEmit', '--strict', '--skipLibCheck', '--module', 'NodeNext', '--target', 'ES2020', 'consumer.mts']);
+    console.log('Packed consumer passed: all 3 exports, native ESM, CJS dynamic import, strict NodeNext types.');
+} catch (error) {
+    console.error(error.stderr?.toString() || error.stdout?.toString() || error);
+    process.exitCode = 1;
+} finally {
+    fs.rmSync(temp, { recursive: true, force: true });
 }
-
-console.log(`\n✓ ${checked.length} export đều resolve được.\n`);

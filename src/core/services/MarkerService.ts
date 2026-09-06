@@ -1,8 +1,8 @@
-import { MarkerCollectionInterface, MarkerFilter, MarkerModelInterface, MarkerRecord, RegistryIDOrAttributes } from "../contracts/MarkerInterface";
-import { app } from "../helpers/app";
-import { generateUUID } from "../helpers/utils";
-import { MarkerCollection, MarkerModel } from "./MarkerModel";
-import { MarkerRegistry, MarkerRegistryService } from "./MarkerRegistry";
+import { MarkerCollectionInterface, MarkerFilter, MarkerModelInterface, MarkerRecord, RegistryIDOrAttributes } from "../contracts/MarkerInterface.js";
+import { app } from "../helpers/app.js";
+import { generateUUID } from "../helpers/utils.js";
+import { MarkerCollection, MarkerModel } from "./MarkerModel.js";
+import { MarkerRegistry, MarkerRegistryService } from "./MarkerRegistry.js";
 
 
 

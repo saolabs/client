@@ -1,8 +1,8 @@
-import { InitMode, InitModes } from "../contracts/common";
-import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../helpers/utils";
-import type { SaoObjectType } from "../types/utils";
+import { InitMode, InitModes } from "../contracts/common.js";
+import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { generateUUID } from "../helpers/utils.js";
+import type { SaoObjectType } from "../types/utils.js";
 
 /**
  * Fragment — renders multiple root nodes into a parent without a wrapping tag.

@@ -1,4 +1,4 @@
-import HeadService from "./HeadService";
+import HeadService from "./HeadService.js";
 const HEAD_SECTION_PREFIX = 'meta:';
 /**
  * SectionManager — connects `@section(name, ...)` declarations to `@yield(name, ...)`

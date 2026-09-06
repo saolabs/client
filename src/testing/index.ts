@@ -10,13 +10,13 @@
  * Không phụ thuộc test runner nào (không import vitest/jest) — chạy được với
  * bất kỳ runner nào miễn là môi trường có DOM.
  */
-import { View } from '../core/view/View';
-import { ViewController } from '../core/view/ViewController';
-import { ViewManager } from '../core/view/ViewManager';
-import { Html } from '../core/elements/Html';
-import { app } from '../core/helpers/app';
-import MarkerRegistry from '../core/services/MarkerRegistry';
-import { HelperService } from '../core/services/HelperService';
+import { View } from '../core/view/View.js';
+import { ViewController } from '../core/view/ViewController.js';
+import { ViewManager } from '../core/view/ViewManager.js';
+import { Html } from '../core/elements/Html.js';
+import { app } from '../core/helpers/app.js';
+import MarkerRegistry from '../core/services/MarkerRegistry.js';
+import { HelperService } from '../core/services/HelperService.js';
 
 // ── RAF polyfill (một số môi trường DOM giả lập không có) ─────
 if (typeof globalThis.requestAnimationFrame !== 'function') {

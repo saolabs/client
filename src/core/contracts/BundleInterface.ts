@@ -1,5 +1,5 @@
-import type { ApplicationInterface } from "./ApplicationInterface";
-import type { ServiceProviderInterface } from "./ServiceProviderInterface";
+import type { ApplicationInterface } from "./ApplicationInterface.js";
+import type { ServiceProviderInterface } from "./ServiceProviderInterface.js";
 
 /** Factory view mà registry nhận: đồng bộ, hoặc lazy trả Promise<module>. */
 export type ViewFactory = ((...args: any[]) => any) | (() => Promise<any>);

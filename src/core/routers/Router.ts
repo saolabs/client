@@ -14,7 +14,7 @@
  *   - Browser back/forward handling
  */
 
-import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
+import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
 
 // ─── Types ──────────────────────────────────────────────────────
 

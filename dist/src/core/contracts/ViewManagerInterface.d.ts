@@ -1,6 +1,6 @@
-import type { ViewInterface } from "./ViewInterface";
-import type { ApplicationInterface } from "./ApplicationInterface";
-import { RouterNavigationType } from "./RouterInterface";
+import type { ViewInterface } from "./ViewInterface.js";
+import type { ApplicationInterface } from "./ApplicationInterface.js";
+import { RouterNavigationType } from "./RouterInterface.js";
 export interface ActiveViewInfo {
     view: ViewInterface;
     path: string;

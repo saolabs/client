@@ -1,7 +1,7 @@
-import { InitModes } from "../contracts/common";
-import { app } from "../helpers/app";
-import { mountElementList } from "../helpers/view";
-import { TextElement } from "./TextElement";
+import { InitModes } from "../contracts/common.js";
+import { app } from "../helpers/app.js";
+import { mountElementList } from "../helpers/view.js";
+import { TextElement } from "./TextElement.js";
 /**
  * Wrapper — renders multiple root nodes into a parent without a wrapping tag.
  *

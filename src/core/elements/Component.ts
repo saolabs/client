@@ -1,12 +1,12 @@
-import { InitMode, InitModes } from "../contracts/common";
-import { ComponentInterface } from "../contracts/ComponentInterface";
-import { HtmlInterface, SaoChildrenFactory } from "../contracts/ElementInterface";
-import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { ViewInterface } from "../contracts/ViewInterface";
-import { generateUUID } from "../helpers/utils";
-import { activateView, claimHydratedView, commitView, mountChildrenBeforeAnchor } from "../helpers/view";
-import markerRegistry from "../services/MarkerRegistry";
-import { SaoObjectType } from "../types/utils";
+import { InitMode, InitModes } from "../contracts/common.js";
+import { ComponentInterface } from "../contracts/ComponentInterface.js";
+import { HtmlInterface, SaoChildrenFactory } from "../contracts/ElementInterface.js";
+import { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { ViewInterface } from "../contracts/ViewInterface.js";
+import { generateUUID } from "../helpers/utils.js";
+import { activateView, claimHydratedView, commitView, mountChildrenBeforeAnchor } from "../helpers/view.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import { SaoObjectType } from "../types/utils.js";
 
 export class Component implements ComponentInterface {
     saoType: SaoObjectType = 'Component';

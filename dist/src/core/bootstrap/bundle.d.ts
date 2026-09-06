@@ -7,8 +7,8 @@
  * entry của app, nên hai bên dùng CHUNG một instance runtime. Xem
  * docs/EXTENSION_ARCHITECTURE.md §7.
  */
-import type { ApplicationInterface } from "../contracts/ApplicationInterface";
-import type { MergedBundles, SaolaBundle } from "../contracts/BundleInterface";
+import type { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import type { MergedBundles, SaolaBundle } from "../contracts/BundleInterface.js";
 /**
  * Khai báo một bundle. Chỉ là identity + kiểu — nó tồn tại để tên khoá là HỢP
  * ĐỒNG chứ không phải quy ước truyền miệng, và để IDE gợi ý được.

@@ -1,9 +1,9 @@
-import { InitMode, InitModes } from "../contracts/common";
-import type { HtmlInterface, OutputInterface } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../helpers/utils";
-import markerRegistry from "../services/MarkerRegistry";
-import type { SaoObjectType } from "../types/utils";
+import { InitMode, InitModes } from "../contracts/common.js";
+import type { HtmlInterface, OutputInterface } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { generateUUID } from "../helpers/utils.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import type { SaoObjectType } from "../types/utils.js";
 
 /**
  * Output — reactive text output between comment markers.

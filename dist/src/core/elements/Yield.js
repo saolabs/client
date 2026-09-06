@@ -1,6 +1,6 @@
-import { InitModes } from "../contracts/common";
-import { generateUUID } from "../helpers/utils";
-import { SaoMarker } from "../services/MarkerService";
+import { InitModes } from "../contracts/common.js";
+import { generateUUID } from "../helpers/utils.js";
+import { SaoMarker } from "../services/MarkerService.js";
 export class YieldElement {
     constructor({ ctx, name = '', initMode = InitModes.CREATE, id = null, defaultValue = '' }) {
         this.saoType = "Yield";

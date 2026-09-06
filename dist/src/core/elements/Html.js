@@ -1,8 +1,8 @@
-import { InitModes } from "../contracts/common";
-import { mountElementList, hydrateElementList } from "../helpers/view";
-import { TextElement } from "./TextElement";
-import SectionManager from "../services/SectionManager";
-import { runEnter, runLeave } from "../helpers/transition";
+import { InitModes } from "../contracts/common.js";
+import { mountElementList, hydrateElementList } from "../helpers/view.js";
+import { TextElement } from "./TextElement.js";
+import SectionManager from "../services/SectionManager.js";
+import { runEnter, runLeave } from "../helpers/transition.js";
 /**
  * Escape một chuỗi để dùng làm CSS class/id selector. Class hydrate dạng
  * "{viewId}-{id}" có viewId là hex (uniqid) CÓ THỂ bắt đầu bằng chữ số, làm

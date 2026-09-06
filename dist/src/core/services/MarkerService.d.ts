@@ -1,4 +1,4 @@
-import { MarkerCollectionInterface, MarkerFilter, MarkerModelInterface, MarkerRecord, RegistryIDOrAttributes } from "../contracts/MarkerInterface";
+import { MarkerCollectionInterface, MarkerFilter, MarkerModelInterface, MarkerRecord, RegistryIDOrAttributes } from "../contracts/MarkerInterface.js";
 /**
  * Marker Service - Manages custom markup elements
  * Supports both HydrationMarker (comments)

@@ -1,4 +1,4 @@
-import { ServiceProvider } from "./ServiceProvider";
+import { ServiceProvider } from "./ServiceProvider.js";
 export declare class ViewServiceProvider extends ServiceProvider {
     readonly name: "view";
     readonly dependsOn: "core"[];

@@ -1,18 +1,19 @@
-import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface, EventModifier } from "../contracts/ElementInterface";
-import type { LoopContextInterface } from "../contracts/LoopContextInterface";
-import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo } from "../contracts/ViewControllerInterface";
-import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface";
-import type { SaoObjectType } from "../types/utils";
-import { ViewState } from "./ViewState";
-import { LoopContext } from "./LoopContext";
-import { Component } from "../elements/Component";
-import { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface";
-import { InitMode } from "../contracts/common";
-import { ComponentInterface } from "../contracts/ComponentInterface";
-import { ForeachSlotCache } from "../elements/ForeachSlotCache";
+import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface.js";
+import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface, EventModifier } from "../contracts/ElementInterface.js";
+import type { LoopContextInterface } from "../contracts/LoopContextInterface.js";
+import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo } from "../contracts/ViewControllerInterface.js";
+import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { ViewState } from "./ViewState.js";
+import { LoopContext } from "./LoopContext.js";
+import { Component } from "../elements/Component.js";
+import type { ViewUserConfig } from "./View.js";
+import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import { SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface.js";
+import { InitMode } from "../contracts/common.js";
+import { ComponentInterface } from "../contracts/ComponentInterface.js";
+import { ForeachSlotCache } from "../elements/ForeachSlotCache.js";
 type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | SaoNodeInterface;
 /**
  * ViewController — the brain behind a View.
@@ -158,7 +159,7 @@ export declare class ViewController implements ViewControllerInterface {
         fallback?: any;
     };
     /** Set user-defined properties/methods on the View instance */
-    setUserDefinedConfig(userConfig: Record<string, any>): void;
+    setUserDefinedConfig<T extends object>(userConfig: ViewUserConfig<T>): void;
     /** Set the compiled render factory */
     setRenderFactory(factory: ViewRenderFactory): void;
     /** Set root element — the container this view renders into */

@@ -1,7 +1,7 @@
-import { InitMode } from "../contracts/common";
-import type { HtmlInterface, SaoChildrenFactory, SaoElementChildren, WrapperInterface } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { SaoObjectType } from "../types/utils";
+import { InitMode } from "../contracts/common.js";
+import type { HtmlInterface, SaoChildrenFactory, SaoElementChildren, WrapperInterface } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import type { SaoObjectType } from "../types/utils.js";
 /**
  * Wrapper — renders multiple root nodes into a parent without a wrapping tag.
  *

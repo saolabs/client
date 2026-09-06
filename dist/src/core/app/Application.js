@@ -26,7 +26,7 @@
  * app.boot();
  * const router = app.make('router');
  */
-import { OOTEnum } from '../types/utils';
+import { OOTEnum } from '../types/utils.js';
 // ─── Application ────────────────────────────────────────────────
 export class Application {
     constructor() {

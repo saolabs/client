@@ -1,15 +1,15 @@
-import type { BlockInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import { InitMode, InitModes } from "../contracts/common";
-import type { FragmentInterface, HtmlInterface } from "../contracts/ElementInterface";
-import { MarkerModelInterface } from "../contracts/MarkerInterface";
-import type { ReactiveInterface } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../helpers/utils";
-import { MarkerModel } from "../services/MarkerModel";
-import markerRegistry from "../services/MarkerRegistry";
-import { SaoMarker } from "../services/MarkerService";
-import type { SaoObjectType } from "../types/utils";
-import { Fragment } from "./Fragment";
+import type { BlockInterface, BlockRenderFactory } from "../contracts/BlockInterface.js";
+import { InitMode, InitModes } from "../contracts/common.js";
+import type { FragmentInterface, HtmlInterface } from "../contracts/ElementInterface.js";
+import { MarkerModelInterface } from "../contracts/MarkerInterface.js";
+import type { ReactiveInterface } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { generateUUID } from "../helpers/utils.js";
+import { MarkerModel } from "../services/MarkerModel.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import { SaoMarker } from "../services/MarkerService.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { Fragment } from "./Fragment.js";
 /**
  * Block — a named mounting slot used in layout views.
  * 

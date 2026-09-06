@@ -1,5 +1,5 @@
-import type { SectionInterface, SectionManagerInterface } from "../contracts/SectionInterface";
-import type { YieldInterface } from "../contracts/ElementInterface";
+import type { SectionInterface, SectionManagerInterface } from "../contracts/SectionInterface.js";
+import type { YieldInterface } from "../contracts/ElementInterface.js";
 /**
  * SectionManager — connects `@section(name, ...)` declarations to `@yield(name, ...)`
  * markers, cross-controller (a page declares a section, a layout — or nothing —

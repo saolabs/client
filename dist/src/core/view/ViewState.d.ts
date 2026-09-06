@@ -1,5 +1,5 @@
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { StateManagerInterface, ViewStateInterface, StateListener } from "../contracts/ViewStateInterface";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import type { StateManagerInterface, ViewStateInterface, StateListener } from "../contracts/ViewStateInterface.js";
 /**
  * StateManager — manages reactive state for a ViewController.
  *
@@ -76,8 +76,10 @@ export declare class StateManager implements StateManagerInterface {
      * Value is optional (defaults to undefined until commitConstructorData runs).
      */
     register(key: string | number, value?: any): (newValue: any) => void;
-    /** Huỷ subscription của các computed khi destroy. */
-    private computedUnsubs;
+    private computedNodes;
+    private computedDependents;
+    /** Invalidate the dependency graph synchronously; evaluation remains lazy. */
+    private invalidateComputed;
     /**
      * State dẫn xuất có memo hoá (kiểu Vue `computed`).
      *
@@ -93,7 +95,7 @@ export declare class StateManager implements StateManagerInterface {
      * states.__.computed('fullName', () => `${first} ${last}`, ['first', 'last']);
      * this.output('o', p, true, ['fullName'], () => states.__.getStateByKey('fullName'));
      */
-    computed(key: string, fn: () => any, deps?: string[]): () => any;
+    computed<T>(key: string, fn: () => T, deps?: string[]): () => T;
     /** Update state by key */
     updateStateByKey(key: string | number, value: any): any;
     /**

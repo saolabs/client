@@ -15,7 +15,7 @@ export interface StateManagerInterface {
      * (đánh dấu bẩn lúc dep đổi, tính lúc đọc). Đọc qua `getStateByKey(key)`
      * hoặc `subscribe([key])` như state thường.
      */
-    computed(key: string, fn: () => any, deps?: string[]): () => any;
+    computed<T>(key: string, fn: () => T, deps?: string[]): () => T;
     /** Update state by key */
     updateStateByKey(key: string | number, value: any): any;
     /** Get state value by key (supports nested paths: 'user.name') */

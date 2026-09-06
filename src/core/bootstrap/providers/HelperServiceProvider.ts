@@ -1,6 +1,6 @@
-import { HelperService } from "../../services/HelperService";
-import { PROVIDER_NAMES } from "./provider-order";
-import { ServiceProvider } from "./ServiceProvider";
+import { HelperService } from "../../services/HelperService.js";
+import { PROVIDER_NAMES } from "./provider-order.js";
+import { ServiceProvider } from "./ServiceProvider.js";
 
 export class HelperServiceProvider extends ServiceProvider {
     readonly name = PROVIDER_NAMES.HELPER;

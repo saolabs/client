@@ -43,6 +43,9 @@ global.AbortSignal = w.AbortSignal;
 const shim = require(shimPath);
 const reg = shim.__registry;
 const buildDir = path.join(__dirname, '..', '..', '.test-build', 'tests');
+if (fs.existsSync(path.dirname(buildDir))) {
+    fs.writeFileSync(path.join(path.dirname(buildDir), 'package.json'), '{"type":"commonjs"}\n');
+}
 
 function collectTestFiles(dir) {
     if (!fs.existsSync(dir)) return [];

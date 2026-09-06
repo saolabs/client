@@ -1,7 +1,7 @@
-import type { SaoObjectType } from "../types/utils";
-import type { ViewControllerInterface } from "./ViewControllerInterface";
-import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren, SaoNodeInterface } from "./ElementInterface";
-import { MarkerModelInterface } from "./MarkerInterface";
+import type { SaoObjectType } from "../types/utils.js";
+import type { ViewControllerInterface } from "./ViewControllerInterface.js";
+import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren, SaoNodeInterface } from "./ElementInterface.js";
+import { MarkerModelInterface } from "./MarkerInterface.js";
 /** Reactive region bounded by comment markers — re-renders when deps change */
 export interface ReactiveInterface extends SaoNodeInterface {
     saoType: SaoObjectType;

@@ -1,5 +1,5 @@
-import { Application } from "../app/Application";
-import { AppFactory, ServiceKey } from "../contracts/ApplicationInterface";
+import { Application } from "../app/Application.js";
+import { AppFactory, ServiceKey } from "../contracts/ApplicationInterface.js";
 
 
 /**

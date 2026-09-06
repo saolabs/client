@@ -1,14 +1,14 @@
-import { InitMode, InitModes } from "../contracts/common";
-import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface";
-import type { MarkerModelInterface } from "../contracts/MarkerInterface";
-import type { ReactiveInterface, ReactiveChildrenFactory, ReactiveRenderFn } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../helpers/utils";
-import { mountChildrenBeforeAnchor } from "../helpers/view";
-import markerRegistry from "../services/MarkerRegistry";
-import type { SaoObjectType } from "../types/utils";
-import { ForeachSlotCache } from "./ForeachSlotCache";
-import { isLeaving } from "../helpers/transition";
+import { InitMode, InitModes } from "../contracts/common.js";
+import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface.js";
+import type { MarkerModelInterface } from "../contracts/MarkerInterface.js";
+import type { ReactiveInterface, ReactiveChildrenFactory, ReactiveRenderFn } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { generateUUID } from "../helpers/utils.js";
+import { mountChildrenBeforeAnchor } from "../helpers/view.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { ForeachSlotCache } from "./ForeachSlotCache.js";
+import { isLeaving } from "../helpers/transition.js";
 
 /**
  * Reactive — a region in the DOM bounded by comment markers that 

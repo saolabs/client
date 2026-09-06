@@ -26,6 +26,51 @@ function makeManager(states: Record<string, any> = {}) {
 }
 
 describe('computed — lazy + memo', () => {
+    it('invalidates chains immediately and batches unused computations', () => {
+        const { manager } = makeManager({ a: 1 });
+        const fn = vi.fn(() => manager.getStateByKey('a') * 2);
+        const double = manager.computed('double', fn, ['a']);
+        const quad = manager.computed('quad', () => double() * 2, ['double']);
+        expect(quad()).toBe(4);
+        manager.updateStateByKey('a', 2);
+        expect(quad()).toBe(8);
+        manager.updateStateByKey('a', 3);
+        manager.updateStateByKey('a', 4);
+        expect(fn).toHaveBeenCalledTimes(2);
+        manager.flushNow();
+        expect(fn).toHaveBeenCalledTimes(2);
+        expect(quad()).toBe(16);
+        expect(fn).toHaveBeenCalledTimes(3);
+        manager.destroy();
+    });
+
+    it('updates dependency edges when registering an existing computed', () => {
+        const { manager } = makeManager({ a: 1, b: 3 });
+        const read = manager.computed('value', () => manager.getStateByKey('a'), ['a']);
+        expect(read()).toBe(1);
+        const next = vi.fn(() => manager.getStateByKey('b'));
+        manager.computed('value', next, ['b']);
+        expect(read()).toBe(3);
+        manager.updateStateByKey('a', 7);
+        expect(read()).toBe(3);
+        expect(next).toHaveBeenCalledTimes(1);
+        manager.updateStateByKey('b', 9);
+        expect(read()).toBe(9);
+        manager.destroy();
+    });
+
+    it('rejects dependency cycles and ignores writes through the generic update API', () => {
+        const { manager } = makeManager({ a: 1 });
+        const read = manager.computed('double', () => manager.getStateByKey('a') * 2, ['a']);
+        manager.computed('quad', () => read() * 2, ['double']);
+        expect(() => manager.computed('double', () => 0, ['quad'])).toThrow(/cycle/);
+        expect(read()).toBe(2);
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        expect(() => manager.updateStateByKey('double', 99)).not.toThrow();
+        expect(read()).toBe(2);
+        manager.destroy();
+    });
+
     it('chưa đọc thì CHƯA tính (lazy)', () => {
         const { manager } = makeManager({ a: 1 });
         const fn = vi.fn(() => manager.getStateByKey('a') * 2);

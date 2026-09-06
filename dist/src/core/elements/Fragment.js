@@ -1,5 +1,5 @@
-import { InitModes } from "../contracts/common";
-import { generateUUID } from "../helpers/utils";
+import { InitModes } from "../contracts/common.js";
+import { generateUUID } from "../helpers/utils.js";
 /**
  * Fragment — renders multiple root nodes into a parent without a wrapping tag.
  *

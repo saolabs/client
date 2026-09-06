@@ -1,6 +1,6 @@
-import { HtmlInterface } from "../contracts/ElementInterface";
-import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface";
+import { HtmlInterface } from "../contracts/ElementInterface.js";
+import { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface.js";
 
 /**
  * Section — a `@section(name, ...)` declaration.

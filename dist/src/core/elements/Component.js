@@ -1,7 +1,7 @@
-import { InitModes } from "../contracts/common";
-import { generateUUID } from "../helpers/utils";
-import { activateView, claimHydratedView, commitView, mountChildrenBeforeAnchor } from "../helpers/view";
-import markerRegistry from "../services/MarkerRegistry";
+import { InitModes } from "../contracts/common.js";
+import { generateUUID } from "../helpers/utils.js";
+import { activateView, claimHydratedView, commitView, mountChildrenBeforeAnchor } from "../helpers/view.js";
+import markerRegistry from "../services/MarkerRegistry.js";
 export class Component {
     constructor({ ctx, parent = null, id = null, stateKeys = [], data = {}, dataFactory = null, path = null, type = 'default', condition = null, initMode = InitModes.CREATE, }) {
         this.saoType = 'Component';

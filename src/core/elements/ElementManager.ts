@@ -1,12 +1,12 @@
-import type { BlockRenderFactory } from "../contracts/BlockInterface";
-import type { HtmlInterface, SaoElementConfig, SaoChildrenFactory } from "../contracts/ElementInterface";
-import type { ReactiveRenderFn } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { Html } from "./Html";
-import { TextElement } from "./TextElement";
-import { Reactive } from "./Reactive";
-import { Fragment } from "./Fragment";
-import { Block } from "./Block";
+import type { BlockRenderFactory } from "../contracts/BlockInterface.js";
+import type { HtmlInterface, SaoElementConfig, SaoChildrenFactory } from "../contracts/ElementInterface.js";
+import type { ReactiveRenderFn } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { Html } from "./Html.js";
+import { TextElement } from "./TextElement.js";
+import { Reactive } from "./Reactive.js";
+import { Fragment } from "./Fragment.js";
+import { Block } from "./Block.js";
 
 /**
  * OneElementManager — factory/registry for creating One elements.

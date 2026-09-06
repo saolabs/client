@@ -1,8 +1,8 @@
-import { InitModes } from "../contracts/common";
-import { generateUUID } from "../helpers/utils";
-import { MarkerModel } from "../services/MarkerModel";
-import markerRegistry from "../services/MarkerRegistry";
-import { SaoMarker } from "../services/MarkerService";
+import { InitModes } from "../contracts/common.js";
+import { generateUUID } from "../helpers/utils.js";
+import { MarkerModel } from "../services/MarkerModel.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import { SaoMarker } from "../services/MarkerService.js";
 /**
  * Block — a named mounting slot used in layout views.
  *

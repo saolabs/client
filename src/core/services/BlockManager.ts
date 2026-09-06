@@ -1,7 +1,7 @@
-import type { BlockInterface, BlockManagerInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import type { HtmlInterface } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { Block } from "../elements/Block";
+import type { BlockInterface, BlockManagerInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface.js";
+import type { HtmlInterface } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { Block } from "../elements/Block.js";
 
 /**
  * BlockManager — manages all block slots in a layout view.

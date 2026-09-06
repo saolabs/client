@@ -1,7 +1,7 @@
-import { APIClientInterface } from "../../contracts/ApiInterface";
-import { ApiClient } from "../../helpers/ApiClient";
-import { PROVIDER_NAMES } from "./provider-order";
-import { ServiceProvider } from "./ServiceProvider";
+import { APIClientInterface } from "../../contracts/ApiInterface.js";
+import { ApiClient } from "../../helpers/ApiClient.js";
+import { PROVIDER_NAMES } from "./provider-order.js";
+import { ServiceProvider } from "./ServiceProvider.js";
 
 export class ApiServiceProvider extends ServiceProvider {
     readonly name = PROVIDER_NAMES.API;

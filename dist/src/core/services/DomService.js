@@ -1,4 +1,4 @@
-import { app } from "../helpers/app";
+import { app } from "../helpers/app.js";
 export class DomService {
     constructor() {
         this.container = document.createElement('template');

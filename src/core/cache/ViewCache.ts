@@ -1,4 +1,4 @@
-import type { ViewCacheInterface } from "../contracts/ViewCacheInterface";
+import type { ViewCacheInterface } from "../contracts/ViewCacheInterface.js";
 
 /**
  * ViewCache — stores rendered view DOM for instant restore on navigation.

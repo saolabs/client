@@ -1,9 +1,9 @@
-import { InitModes } from "../contracts/common";
-import { generateUUID } from "../helpers/utils";
-import { mountChildrenBeforeAnchor } from "../helpers/view";
-import markerRegistry from "../services/MarkerRegistry";
-import { ForeachSlotCache } from "./ForeachSlotCache";
-import { isLeaving } from "../helpers/transition";
+import { InitModes } from "../contracts/common.js";
+import { generateUUID } from "../helpers/utils.js";
+import { mountChildrenBeforeAnchor } from "../helpers/view.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import { ForeachSlotCache } from "./ForeachSlotCache.js";
+import { isLeaving } from "../helpers/transition.js";
 /**
  * Reactive — a region in the DOM bounded by comment markers that
  * can re-render its content when reactive dependencies change.

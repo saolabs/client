@@ -1,11 +1,11 @@
-import { InitMode, InitModes } from "../contracts/common";
-import { HtmlInterface, YieldInterface } from "../contracts/ElementInterface";
-import { MarkerModelInterface } from "../contracts/MarkerInterface";
-import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../helpers/utils";
-import { MarkerModel } from "../services/MarkerModel";
-import { SaoMarker } from "../services/MarkerService";
-import { SaoObjectType } from "../types/utils";
+import { InitMode, InitModes } from "../contracts/common.js";
+import { HtmlInterface, YieldInterface } from "../contracts/ElementInterface.js";
+import { MarkerModelInterface } from "../contracts/MarkerInterface.js";
+import { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { generateUUID } from "../helpers/utils.js";
+import { MarkerModel } from "../services/MarkerModel.js";
+import { SaoMarker } from "../services/MarkerService.js";
+import { SaoObjectType } from "../types/utils.js";
 
 export class YieldElement implements YieldInterface{
     saoType: SaoObjectType = "Yield";

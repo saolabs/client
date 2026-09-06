@@ -8,9 +8,9 @@
  * docs/EXTENSION_ARCHITECTURE.md §7.
  */
 
-import type { ApplicationInterface } from "../contracts/ApplicationInterface";
-import type { MergedBundles, SaolaBundle } from "../contracts/BundleInterface";
-import logger from "../services/LoggerService";
+import type { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import type { MergedBundles, SaolaBundle } from "../contracts/BundleInterface.js";
+import logger from "../services/LoggerService.js";
 
 /**
  * Khai báo một bundle. Chỉ là identity + kiểu — nó tồn tại để tên khoá là HỢP

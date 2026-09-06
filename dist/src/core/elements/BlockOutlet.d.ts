@@ -1,9 +1,9 @@
-import type { BlockOutletInterface } from "../contracts/BlockInterface";
-import { InitMode } from "../contracts/common";
-import type { HtmlInterface } from "../contracts/ElementInterface";
-import { MarkerModelInterface } from "../contracts/MarkerInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { SaoObjectType } from "../types/utils";
+import type { BlockOutletInterface } from "../contracts/BlockInterface.js";
+import { InitMode } from "../contracts/common.js";
+import type { HtmlInterface } from "../contracts/ElementInterface.js";
+import { MarkerModelInterface } from "../contracts/MarkerInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import type { SaoObjectType } from "../types/utils.js";
 export declare class BlockOutlet implements BlockOutletInterface {
     saoType: SaoObjectType;
     id: string;

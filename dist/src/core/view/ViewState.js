@@ -1,4 +1,4 @@
-import devtools from "../devtools/hook";
+import devtools from "../devtools/hook.js";
 /**
  * StateManager — manages reactive state for a ViewController.
  *
@@ -36,8 +36,8 @@ export class StateManager {
         this.controller = null;
         /** Properties that should NOT become state keys */
         this.ownProperties = ['__', 'on', 'off', 'unsubscribe'];
-        /** Huỷ subscription của các computed khi destroy. */
-        this.computedUnsubs = [];
+        this.computedNodes = new Map();
+        this.computedDependents = new Map();
         // ─── Pause / Resume (dirty tracking) ────────────────────────
         // Thiết kế: ROUTE_RENDER_FLOW.md §7, §8.2-8.3.
         // Khi paused: state VẪN nhận giá trị mới, nhưng không notify listener —
@@ -93,9 +93,10 @@ export class StateManager {
         if (!this._canUpdateStateByKey)
             return;
         for (const key in stateMap) {
-            if (stateMap.hasOwnProperty(key) && this.states[key]) {
+            if (stateMap.hasOwnProperty(key) && this.states[key] && !this.computedNodes.has(key)) {
                 this.states[key].value = stateMap[key];
                 this.trackArray(key, stateMap[key]);
+                this.invalidateComputed(key, false);
             }
         }
     }
@@ -166,6 +167,22 @@ export class StateManager {
     register(key, value) {
         return this.useState(value, key)[1];
     }
+    /** Invalidate the dependency graph synchronously; evaluation remains lazy. */
+    invalidateComputed(key, notify = true) {
+        const seen = new Set([key]);
+        const pending = [key];
+        for (let i = 0; i < pending.length; i++) {
+            for (const dependent of this.computedDependents.get(pending[i]) ?? []) {
+                if (seen.has(dependent))
+                    continue;
+                seen.add(dependent);
+                this.computedNodes.get(dependent)?.dirty();
+                if (notify)
+                    (this._isPaused ? this.dirtyKeys : this.pendingChanges).add(dependent);
+                pending.push(dependent);
+            }
+        }
+    }
     /**
      * State dẫn xuất có memo hoá (kiểu Vue `computed`).
      *
@@ -182,60 +199,82 @@ export class StateManager {
      * this.output('o', p, true, ['fullName'], () => states.__.getStateByKey('fullName'));
      */
     computed(key, fn, deps = []) {
+        if (this._isDestroyed)
+            throw new Error('[ViewState] Cannot register computed after destroy.');
+        // Validate before replacing any edges, including indirect cycles.
+        const reaches = (name, seen = new Set()) => {
+            if (name === key)
+                return true;
+            if (seen.has(name))
+                return false;
+            seen.add(name);
+            return (this.computedNodes.get(name)?.deps ?? []).some(dep => reaches(dep, seen));
+        };
+        if (deps.some(dep => reaches(dep)))
+            throw new Error(`[ViewState] Computed dependency cycle: ${key}`);
         const existing = this.states[key];
-        if (existing) {
-            // Khai báo lại (re-render): cập nhật fn tại chỗ, giữ nguyên subscription.
-            if (existing.__computed__) {
-                existing.__setFn__(fn);
-                return () => this.getStateByKey(key);
-            }
-            console.warn(`[ViewState] computed("${key}") trùng tên với state thường — bỏ qua.`);
-            return () => this.getStateByKey(key);
+        if (existing && !existing.__computed__)
+            throw new Error(`[ViewState] State already exists: ${key}`);
+        for (const dep of this.computedNodes.get(key)?.deps ?? []) {
+            const dependents = this.computedDependents.get(dep);
+            dependents?.delete(key);
+            if (dependents?.size === 0)
+                this.computedDependents.delete(dep);
         }
-        let compute = fn;
         let cache;
         let dirty = true;
+        let evaluating = false;
         const slot = {
             key,
             __computed__: true,
-            __setFn__: (next) => { compute = next; dirty = true; },
-            setValue: () => {
-                console.warn(`[ViewState] computed("${key}") là read-only — bỏ qua set.`);
-            },
+            setValue: () => console.warn(`[ViewState] computed("${key}") is read-only.`),
         };
-        // Getter trên chính slot → MỌI đường đọc (getStateByKey, proxy,
-        // states[key].value trực tiếp) đều nhận giá trị tươi.
         Object.defineProperty(slot, 'value', {
             get: () => {
                 if (dirty) {
-                    cache = compute();
-                    dirty = false;
+                    if (evaluating)
+                        throw new Error(`[ViewState] Recursive computed read: ${key}`);
+                    evaluating = true;
+                    try {
+                        cache = fn();
+                        dirty = false;
+                    }
+                    finally {
+                        evaluating = false;
+                    }
                 }
                 return cache;
             },
+            set: slot.setValue,
             enumerable: true,
         });
         this.states[key] = slot;
         this.setters[key] = slot.setValue;
-        if (!this.ownProperties.includes(key)) {
+        this.computedNodes.set(key, { deps: [...new Set(deps)], dirty: () => { dirty = true; } });
+        for (const dep of deps) {
+            if (!this.computedDependents.has(dep))
+                this.computedDependents.set(dep, new Set());
+            this.computedDependents.get(dep).add(key);
+        }
+        if (!existing && !this.ownProperties.includes(key)) {
             Object.defineProperty(this.stateInstance, key, {
-                get: () => this.states[key].value,
-                configurable: false,
+                get: () => this.states[key]?.value,
+                set: slot.setValue,
                 enumerable: true,
             });
         }
-        if (deps.length > 0) {
-            this.computedUnsubs.push(this.subscribe(deps, () => {
-                dirty = true;
-                this.enqueueChange(key); // báo subscriber; KHÔNG đọc value → giữ lazy
-            }));
-        }
+        if (existing)
+            this.enqueueChange(key);
         return () => this.getStateByKey(key);
     }
     /** Update state by key */
     updateStateByKey(key, value) {
         if (!this.states[key])
             return undefined;
+        if (this.computedNodes.has(String(key))) {
+            this.setters[key](value);
+            return this.states[key].value;
+        }
         const oldValue = this.states[key].value;
         this.states[key].value = value;
         this.trackArray(key, value);
@@ -518,6 +557,7 @@ export class StateManager {
     enqueueChange(key) {
         if (this._isDestroyed)
             return;
+        this.invalidateComputed(key);
         // Paused → ghi sổ, không notify (giá trị đã được set vào states)
         if (this._isPaused) {
             this.dirtyKeys.add(key);
@@ -920,13 +960,8 @@ export class StateManager {
             cancelAnimationFrame(this.flushRAF);
             this.flushRAF = null;
         }
-        for (const unsub of this.computedUnsubs) {
-            try {
-                unsub();
-            }
-            catch { /* listener đã gỡ */ }
-        }
-        this.computedUnsubs = [];
+        this.computedNodes.clear();
+        this.computedDependents.clear();
         this.listeners.clear();
         this.multiKeyListeners = [];
         this.pendingChanges.clear();

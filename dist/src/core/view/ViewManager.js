@@ -16,20 +16,20 @@
  *   - Element tree rendering → ViewController.render()
  *   - Section system → Block/BlockOutlet
  */
-import { BlockManager } from "../services/BlockManager";
-import { SectionManager } from "../services/SectionManager";
-import devtools from "../devtools/hook";
-import { BlockOutlet } from "../elements/BlockOutlet";
-import { PageCacheService, detachWrapperDOM } from "../services/PageCache";
-import { Html } from "../elements/Html";
-import { hasData } from "../helpers/utils";
-import { activateView, claimHydratedView, commitView } from "../helpers/view";
-import markerRegistry from "../services/MarkerRegistry";
-import logger from "../services/LoggerService";
-import { StoreService } from "../services/StoreService";
-import { InitModes } from "../contracts/common";
-import { OOTEnum } from "../types/utils";
-import { app } from "../helpers/app";
+import { BlockManager } from "../services/BlockManager.js";
+import { SectionManager } from "../services/SectionManager.js";
+import devtools from "../devtools/hook.js";
+import { BlockOutlet } from "../elements/BlockOutlet.js";
+import { PageCacheService, detachWrapperDOM } from "../services/PageCache.js";
+import { Html } from "../elements/Html.js";
+import { hasData } from "../helpers/utils.js";
+import { activateView, claimHydratedView, commitView } from "../helpers/view.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import logger from "../services/LoggerService.js";
+import { StoreService } from "../services/StoreService.js";
+import { InitModes } from "../contracts/common.js";
+import { OOTEnum } from "../types/utils.js";
+import { app } from "../helpers/app.js";
 function isRenderableObject(result) {
     return typeof result === 'object' && result !== null && 'saoType' in result;
 }

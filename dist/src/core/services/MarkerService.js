@@ -1,7 +1,7 @@
-import { app } from "../helpers/app";
-import { generateUUID } from "../helpers/utils";
-import { MarkerCollection, MarkerModel } from "./MarkerModel";
-import { MarkerRegistry } from "./MarkerRegistry";
+import { app } from "../helpers/app.js";
+import { generateUUID } from "../helpers/utils.js";
+import { MarkerCollection, MarkerModel } from "./MarkerModel.js";
+import { MarkerRegistry } from "./MarkerRegistry.js";
 /**
  * Marker Service - Manages custom markup elements
  * Supports both HydrationMarker (comments)

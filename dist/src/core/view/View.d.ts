@@ -1,7 +1,13 @@
-import type { ViewType } from "../contracts/ViewControllerInterface";
-import type { ViewInterface, ViewLifecycleHooks } from "../contracts/ViewInterface";
-import type { SaoObjectType } from "../types/utils";
-import { ViewController } from "./ViewController";
+import type { ViewType } from "../contracts/ViewControllerInterface.js";
+import type { ViewInterface, ViewLifecycleHooks } from "../contracts/ViewInterface.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { ViewController } from "./ViewController.js";
+/** Declared View API without the legacy catch-all that would hide misspelled members. */
+type ViewMembers = {
+    [K in keyof View as string extends K ? never : number extends K ? never : K]: View[K];
+};
+/** The exported object's methods run on the View after its members are merged. */
+export type ViewUserConfig<T extends object> = T & ThisType<T & ViewMembers>;
 /**
  * View — the base class for all views in SaoView.
  *
@@ -76,4 +82,5 @@ export declare class View implements ViewInterface, ViewLifecycleHooks {
     get superView(): ViewInterface | null;
     get originView(): ViewInterface | null;
 }
+export {};
 //# sourceMappingURL=View.d.ts.map

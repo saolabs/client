@@ -1,1 +1,1 @@
-export { ViewCache } from './ViewCache';
+export { ViewCache } from './ViewCache.js';

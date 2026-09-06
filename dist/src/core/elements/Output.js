@@ -1,6 +1,6 @@
-import { InitModes } from "../contracts/common";
-import { generateUUID } from "../helpers/utils";
-import markerRegistry from "../services/MarkerRegistry";
+import { InitModes } from "../contracts/common.js";
+import { generateUUID } from "../helpers/utils.js";
+import markerRegistry from "../services/MarkerRegistry.js";
 /**
  * Output — reactive text output between comment markers.
  *

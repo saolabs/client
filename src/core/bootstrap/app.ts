@@ -1,10 +1,10 @@
-import { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { app } from "../helpers/app";
-import { Router } from "../routers";
-import { buildDefaultProviders, resolveProviderOrder } from "./providers";
-import { readSSRBoot, readBootConfig, mergeBootConfig } from "./ssr";
-import { bootBundles, loadBundles } from "./bundle";
-import type { MergedBundles } from "../contracts/BundleInterface";
+import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import { app } from "../helpers/app.js";
+import { Router } from "../routers/index.js";
+import { buildDefaultProviders, resolveProviderOrder } from "./providers/index.js";
+import { readSSRBoot, readBootConfig, mergeBootConfig } from "./ssr.js";
+import { bootBundles, loadBundles } from "./bundle.js";
+import type { MergedBundles } from "../contracts/BundleInterface.js";
 
 const App: ApplicationInterface = app<ApplicationInterface>();
 

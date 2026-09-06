@@ -1,12 +1,12 @@
-import { ESK, InitMode, InitModes } from "../contracts/common";
-import type { DOMElement, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElement, SaoElementChildren, SaoElementConfig } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
-import { mountElementList, hydrateElementList } from "../helpers/view";
-import type { SaoObjectType } from "../types/utils";
-import { TextElement } from "./TextElement";
-import SectionManager from "../services/SectionManager";
-import { runEnter, runLeave } from "../helpers/transition";
+import { ESK, InitMode, InitModes } from "../contracts/common.js";
+import type { DOMElement, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElement, SaoElementChildren, SaoElementConfig } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
+import { mountElementList, hydrateElementList } from "../helpers/view.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { TextElement } from "./TextElement.js";
+import SectionManager from "../services/SectionManager.js";
+import { runEnter, runLeave } from "../helpers/transition.js";
 
 /**
  * Escape một chuỗi để dùng làm CSS class/id selector. Class hydrate dạng

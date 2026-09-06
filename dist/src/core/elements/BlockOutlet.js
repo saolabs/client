@@ -1,7 +1,7 @@
-import { InitModes } from "../contracts/common";
-import { generateUUID } from "../helpers/utils";
-import { MarkerModel } from "../services/MarkerModel";
-import markerRegistry from "../services/MarkerRegistry";
+import { InitModes } from "../contracts/common.js";
+import { generateUUID } from "../helpers/utils.js";
+import { MarkerModel } from "../services/MarkerModel.js";
+import markerRegistry from "../services/MarkerRegistry.js";
 export class BlockOutlet {
     constructor({ ctx, parentElement = null, name, id = null, initMode = InitModes.CREATE }) {
         this.saoType = 'BlockOutlet';

@@ -1,14 +1,14 @@
-import { RouterInterface, ViewManagerInterface } from "./utils";
-import type { HelperInterface } from "./HelperInterface";
-import type { EventServiceInterface } from "./EventServiceInterface";
-import type { HttpServiceInterface } from "./HttpServiceInterface";
-import type { StoreServiceInterface } from "./StoreServiceInterface";
-import type { StorageServiceInterface } from "./StorageServiceInterface";
-import type { LoggerServiceInterface } from "./LoggerServiceInterface";
-import type { HeadServiceInterface } from "./HeadServiceInterface";
-import { APIClientInterface } from "./ApiInterface";
-import type { ServiceProviderInterface } from "./ServiceProviderInterface";
-import { SaoObjectType } from "../types/utils";
+import { RouterInterface, ViewManagerInterface } from "./utils.js";
+import type { HelperInterface } from "./HelperInterface.js";
+import type { EventServiceInterface } from "./EventServiceInterface.js";
+import type { HttpServiceInterface } from "./HttpServiceInterface.js";
+import type { StoreServiceInterface } from "./StoreServiceInterface.js";
+import type { StorageServiceInterface } from "./StorageServiceInterface.js";
+import type { LoggerServiceInterface } from "./LoggerServiceInterface.js";
+import type { HeadServiceInterface } from "./HeadServiceInterface.js";
+import { APIClientInterface } from "./ApiInterface.js";
+import type { ServiceProviderInterface } from "./ServiceProviderInterface.js";
+import { SaoObjectType } from "../types/utils.js";
 export interface ApplicationInterface {
     [key: string]: any;
     transient<T>(key: ServiceKey, value: any): this;

@@ -1,4 +1,4 @@
-import type { HeadLinkOptions, HeadServiceInterface, HeadTagOptions, HeadTagScope } from "../contracts/HeadServiceInterface";
+import type { HeadLinkOptions, HeadServiceInterface, HeadTagOptions, HeadTagScope } from "../contracts/HeadServiceInterface.js";
 
 interface ManagedHeadEntry {
     scope: HeadTagScope;

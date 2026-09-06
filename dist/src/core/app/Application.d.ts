@@ -26,18 +26,18 @@
  * app.boot();
  * const router = app.make('router');
  */
-import type { ApplicationInterface, ServiceKey, ServiceFactory, ServiceBinding } from '../contracts/ApplicationInterface';
-import type { ServiceProviderInterface } from '../contracts/ServiceProviderInterface';
-import type { ViewManagerInterface, RouterInterface } from '../contracts/utils';
-import type { HelperInterface } from '../contracts/HelperInterface';
-import type { EventServiceInterface } from '../contracts/EventServiceInterface';
-import type { HttpServiceInterface } from '../contracts/HttpServiceInterface';
-import type { StoreServiceInterface } from '../contracts/StoreServiceInterface';
-import type { StorageServiceInterface } from '../contracts/StorageServiceInterface';
-import type { LoggerServiceInterface } from '../contracts/LoggerServiceInterface';
-import type { HeadServiceInterface } from '../contracts/HeadServiceInterface';
-import { APIClientInterface } from '../contracts/ApiInterface';
-import { SaoObjectType } from '../types/utils';
+import type { ApplicationInterface, ServiceKey, ServiceFactory, ServiceBinding } from '../contracts/ApplicationInterface.js';
+import type { ServiceProviderInterface } from '../contracts/ServiceProviderInterface.js';
+import type { ViewManagerInterface, RouterInterface } from '../contracts/utils.js';
+import type { HelperInterface } from '../contracts/HelperInterface.js';
+import type { EventServiceInterface } from '../contracts/EventServiceInterface.js';
+import type { HttpServiceInterface } from '../contracts/HttpServiceInterface.js';
+import type { StoreServiceInterface } from '../contracts/StoreServiceInterface.js';
+import type { StorageServiceInterface } from '../contracts/StorageServiceInterface.js';
+import type { LoggerServiceInterface } from '../contracts/LoggerServiceInterface.js';
+import type { HeadServiceInterface } from '../contracts/HeadServiceInterface.js';
+import { APIClientInterface } from '../contracts/ApiInterface.js';
+import { SaoObjectType } from '../types/utils.js';
 export declare class Application implements ApplicationInterface {
     readonly saoType: SaoObjectType;
     isInitialized: boolean;

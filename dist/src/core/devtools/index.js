@@ -10,8 +10,8 @@
  * App.devtools.enableShortcut();    // Ctrl+Shift+D bật/tắt panel
  * App.devtools.getViewTree();       // đọc cây view bằng code
  */
-import devtools from './hook';
-import inspector, { bindDevtoolsShortcut } from './inspector';
+import devtools from './hook.js';
+import inspector, { bindDevtoolsShortcut } from './inspector.js';
 export const Devtools = {
     /** Bật thu thập sự kiện (chưa mở UI) — dùng khi chỉ cần đọc bằng code. */
     enable: () => devtools.enable(),

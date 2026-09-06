@@ -1,8 +1,8 @@
-import type { SaoObjectType } from "../types/utils";
-import type { ViewControllerInterface } from "./ViewControllerInterface";
-import type { HtmlInterface, FragmentInterface, SaoChildrenFactoryOutput, SaoNodeInterface } from "./ElementInterface";
-import { InitMode } from "./common";
-import { MarkerModelInterface } from "./MarkerInterface";
+import type { SaoObjectType } from "../types/utils.js";
+import type { ViewControllerInterface } from "./ViewControllerInterface.js";
+import type { HtmlInterface, FragmentInterface, SaoChildrenFactoryOutput, SaoNodeInterface } from "./ElementInterface.js";
+import { InitMode } from "./common.js";
+import { MarkerModelInterface } from "./MarkerInterface.js";
 export type BlockConstructorParams = {
     ctx: ViewControllerInterface;
     name: string;

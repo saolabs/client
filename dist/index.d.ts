@@ -27,6 +27,7 @@ export { HeadService } from './src/core/services/HeadService.js';
 export { Devtools, devtools, inspector } from './src/core/devtools/index.js';
 export type { DevtoolsEvent, DevtoolsEventType, DevtoolsViewNode } from './src/core/devtools/index.js';
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';
+export type { ViewUserConfig } from './src/core/view/View.js';
 export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
 export { Reactive } from './src/core/elements/Reactive.js';
 export { Block } from './src/core/elements/Block.js';

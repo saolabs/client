@@ -1,4 +1,4 @@
-import { Application } from "../app/Application";
+import { Application } from "../app/Application.js";
 /**
  * Container instance để quản lý services
  * Tương tự Laravel's app container

@@ -1,7 +1,7 @@
-import { app } from "../helpers/app";
-import { buildDefaultProviders, resolveProviderOrder } from "./providers";
-import { readSSRBoot, readBootConfig, mergeBootConfig } from "./ssr";
-import { bootBundles, loadBundles } from "./bundle";
+import { app } from "../helpers/app.js";
+import { buildDefaultProviders, resolveProviderOrder } from "./providers/index.js";
+import { readSSRBoot, readBootConfig, mergeBootConfig } from "./ssr.js";
+import { bootBundles, loadBundles } from "./bundle.js";
 const App = app();
 // ⚠️ Flags PHẢI dùng isOne=false để có thể cập nhật sau init/start
 App.set('isInitialized', false);

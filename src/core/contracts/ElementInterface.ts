@@ -1,6 +1,6 @@
-import type { SaoObjectType } from "../types/utils";
-import type { ViewControllerInterface } from "./ViewControllerInterface";
-import type { ReactiveInterface } from "./ReactiveInterface";
+import type { SaoObjectType } from "../types/utils.js";
+import type { ViewControllerInterface } from "./ViewControllerInterface.js";
+import type { ReactiveInterface } from "./ReactiveInterface.js";
 
 // ─── Element Interfaces ──────────────────────────────────────────
 

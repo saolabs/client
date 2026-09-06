@@ -1,10 +1,10 @@
-import { app } from "../../helpers/app";
-import { PROVIDER_NAMES } from "./provider-order";
-import { ApiServiceProvider } from "./ApiServiceProvider";
-import { CoreServiceProvider } from "./CoreServiceProvider";
-import { HelperServiceProvider } from "./HelperServiceProvider";
-import { RouteServiceProvider } from "./RouteServiceProvider";
-import { ViewServiceProvider } from "./ViewServiceProvider";
+import { app } from "../../helpers/app.js";
+import { PROVIDER_NAMES } from "./provider-order.js";
+import { ApiServiceProvider } from "./ApiServiceProvider.js";
+import { CoreServiceProvider } from "./CoreServiceProvider.js";
+import { HelperServiceProvider } from "./HelperServiceProvider.js";
+import { RouteServiceProvider } from "./RouteServiceProvider.js";
+import { ViewServiceProvider } from "./ViewServiceProvider.js";
 /** Tên system providers — không cho phép override */
 const SYSTEM_PROVIDER_NAMES = new Set(Object.values(PROVIDER_NAMES));
 /** Tên system services — không cho phép ghi đè qua config.services */

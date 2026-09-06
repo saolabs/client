@@ -1,5 +1,5 @@
-import { SaoObjectType } from "../types/utils";
-import type { ApplicationInterface } from "./ApplicationInterface";
+import { SaoObjectType } from "../types/utils.js";
+import type { ApplicationInterface } from "./ApplicationInterface.js";
 /** Service Provider — register() đăng ký, boot() khởi động */
 export interface ServiceProviderInterface {
     saoType?: SaoObjectType;

@@ -14,7 +14,7 @@
  *   - Page thuộc layout: DOM được detach THEO TỪNG OUTLET (outletContents);
  *     chỉ restore được khi layout đang mount trùng `layoutPath`.
  */
-import type { ViewInterface } from "../contracts/ViewInterface";
+import type { ViewInterface } from "../contracts/ViewInterface.js";
 
 /** Nội dung một outlet đã detach (page thuộc layout) */
 export interface OutletContent {

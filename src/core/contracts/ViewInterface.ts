@@ -1,6 +1,6 @@
-import type { SaoObjectType } from "../types/utils";
-import type { ViewControllerInterface, ViewType } from "./ViewControllerInterface";
-import type { FragmentInterface } from "./ElementInterface";
+import type { SaoObjectType } from "../types/utils.js";
+import type { ViewControllerInterface, ViewType } from "./ViewControllerInterface.js";
+import type { FragmentInterface } from "./ElementInterface.js";
 
 // ─── View Interface ──────────────────────────────────────────────
 

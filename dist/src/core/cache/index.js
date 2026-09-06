@@ -1,2 +1,2 @@
-export { ViewCache } from './ViewCache';
+export { ViewCache } from './ViewCache.js';
 //# sourceMappingURL=index.js.map

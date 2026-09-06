@@ -1,9 +1,9 @@
-import { InitMode } from "../contracts/common";
-import type { HtmlInterface, SaoElementChildren } from "../contracts/ElementInterface";
-import type { MarkerModelInterface } from "../contracts/MarkerInterface";
-import type { ReactiveInterface, ReactiveChildrenFactory } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { SaoObjectType } from "../types/utils";
+import { InitMode } from "../contracts/common.js";
+import type { HtmlInterface, SaoElementChildren } from "../contracts/ElementInterface.js";
+import type { MarkerModelInterface } from "../contracts/MarkerInterface.js";
+import type { ReactiveInterface, ReactiveChildrenFactory } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import type { SaoObjectType } from "../types/utils.js";
 /**
  * Reactive — a region in the DOM bounded by comment markers that
  * can re-render its content when reactive dependencies change.

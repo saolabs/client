@@ -1,6 +1,6 @@
-import type { HtmlInterface, TextInterface } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { SaoObjectType } from "../types/utils";
+import type { HtmlInterface, TextInterface } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { SaoObjectType } from "../types/utils.js";
 /**
  * TextElement — wraps a DOM Text node.
  *

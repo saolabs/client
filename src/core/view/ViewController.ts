@@ -1,36 +1,37 @@
-import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
+import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface.js";
 import type {
     FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput,
     SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface,
     TextInterface, WrapperInterface, YieldInterface, EventModifier
-} from "../contracts/ElementInterface";
-import type { LoopContextInterface } from "../contracts/LoopContextInterface";
-import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo, ErrorBoundaryHandler } from "../contracts/ViewControllerInterface";
-import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface";
-import type { ViewStateInterface } from "../contracts/ViewStateInterface";
-import type { SaoObjectType } from "../types/utils";
-import { ViewState } from "./ViewState";
-import { LoopContext } from "./LoopContext";
-import { Reactive } from "../elements/Reactive";
-import BlockManager, { BlockManagerService } from "../services/BlockManager";
-import SectionManager from "../services/SectionManager";
-import devtools from "../devtools/hook";
-import { Component } from "../elements/Component";
-import { generateUUID } from "../helpers/utils";
-import { Output } from "../elements/Output";
-import { View } from "./View";
-import { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface";
-import { Section } from "./Section";
-import { InitMode } from "../contracts/common";
-import { Block, BlockOutlet, Fragment, Html, TextElement } from "../elements";
-import { Wrapper } from "../elements/Wrapper";
-import { YieldElement } from "../elements/Yield";
-import { app } from "../helpers/app";
-import { ComponentInterface } from "../contracts/ComponentInterface";
-import { ForeachSlotCache } from "../elements/ForeachSlotCache";
-import AssetManager, { StyleSpec, ScriptSpec } from "../services/AssetManager";
+} from "../contracts/ElementInterface.js";
+import type { LoopContextInterface } from "../contracts/LoopContextInterface.js";
+import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo, ErrorBoundaryHandler } from "../contracts/ViewControllerInterface.js";
+import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface.js";
+import type { ViewStateInterface } from "../contracts/ViewStateInterface.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { ViewState } from "./ViewState.js";
+import { LoopContext } from "./LoopContext.js";
+import { Reactive } from "../elements/Reactive.js";
+import BlockManager, { BlockManagerService } from "../services/BlockManager.js";
+import SectionManager from "../services/SectionManager.js";
+import devtools from "../devtools/hook.js";
+import { Component } from "../elements/Component.js";
+import { generateUUID } from "../helpers/utils.js";
+import { Output } from "../elements/Output.js";
+import { View } from "./View.js";
+import type { ViewUserConfig } from "./View.js";
+import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface.js";
+import { Section } from "./Section.js";
+import { InitMode } from "../contracts/common.js";
+import { Block, BlockOutlet, Fragment, Html, TextElement } from "../elements/index.js";
+import { Wrapper } from "../elements/Wrapper.js";
+import { YieldElement } from "../elements/Yield.js";
+import { app } from "../helpers/app.js";
+import { ComponentInterface } from "../contracts/ComponentInterface.js";
+import { ForeachSlotCache } from "../elements/ForeachSlotCache.js";
+import AssetManager, { StyleSpec, ScriptSpec } from "../services/AssetManager.js";
 
 type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | SaoNodeInterface;
 
@@ -273,7 +274,7 @@ export class ViewController implements ViewControllerInterface {
     }
 
     /** Set user-defined properties/methods on the View instance */
-    setUserDefinedConfig(userConfig: Record<string, any>): void {
+    setUserDefinedConfig<T extends object>(userConfig: ViewUserConfig<T>): void {
         for (const [key, value] of Object.entries(userConfig)) {
             if (!this.ownProperties.has(key)) {
                 (this.view as any)[key] = typeof value === 'function' && value.bind

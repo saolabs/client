@@ -13,7 +13,7 @@
  * state/đường dẫn/thông báo lỗi do người dùng kiểm soát, nội suy chuỗi vào
  * innerHTML ở đây là đường tiêm HTML (đúng lỗi đã vá ở GAP-07).
  */
-import devtools, { DevtoolsEvent, DevtoolsViewNode } from './hook';
+import devtools, { DevtoolsEvent, DevtoolsViewNode } from './hook.js';
 
 const PANEL_ID = '__saola_devtools_panel__';
 const HIGHLIGHT_ID = '__saola_devtools_highlight__';

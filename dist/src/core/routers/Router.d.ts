@@ -13,7 +13,7 @@
  *   - Route caching (pattern match + ActiveRoute)
  *   - Browser back/forward handling
  */
-import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
+import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
 export interface RouteDefinition {
     /** URL pattern: '/users/{id}', '/posts/{page?}' */
     path: string;

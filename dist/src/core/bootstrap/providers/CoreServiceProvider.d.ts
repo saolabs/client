@@ -1,4 +1,4 @@
-import { ServiceProvider } from "./ServiceProvider";
+import { ServiceProvider } from "./ServiceProvider.js";
 export declare class CoreServiceProvider extends ServiceProvider {
     readonly name: "core";
     register(): void;

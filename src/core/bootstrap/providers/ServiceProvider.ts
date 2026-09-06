@@ -1,8 +1,8 @@
-import { ApplicationInterface } from "../../contracts/ApplicationInterface";
-import { ServiceProviderInterface } from "../../contracts/utils";
-import { app } from "../../helpers/app";
-import { SaoObjectType, OOTEnum } from "../../types/utils";
-import { NamedServiceProvider } from "./provider-order";
+import { ApplicationInterface } from "../../contracts/ApplicationInterface.js";
+import { ServiceProviderInterface } from "../../contracts/utils.js";
+import { app } from "../../helpers/app.js";
+import { SaoObjectType, OOTEnum } from "../../types/utils.js";
+import { NamedServiceProvider } from "./provider-order.js";
 
 /**
  * Base class cho Service Provider — API giống Laravel.

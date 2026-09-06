@@ -1,6 +1,6 @@
-import { HtmlInterface } from "../contracts/ElementInterface";
-import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface";
+import { HtmlInterface } from "../contracts/ElementInterface.js";
+import { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface.js";
 /**
  * Section — a `@section(name, ...)` declaration.
  *
@@ -21,6 +21,6 @@ export declare class Section implements SectionInterface {
     renderFactory: SectionContentRenderer;
     constructor({ ctx, name, type, contentType, stateKeys, renderFactory }: SectionConstruvtorArgs);
     /** Evaluate current content. `parentElement` only meaningful for contentType 'html'. */
-    evaluate(parentElement?: HtmlInterface | null): string | import("../contracts/ElementInterface").SaoElementChildren;
+    evaluate(parentElement?: HtmlInterface | null): string | import("../contracts/ElementInterface.js").SaoElementChildren;
 }
 //# sourceMappingURL=Section.d.ts.map

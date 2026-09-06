@@ -1,14 +1,14 @@
-import { ApplicationInterface } from "../../contracts/ApplicationInterface";
-import { app } from "../../helpers/app";
-import { NamedServiceProvider, PROVIDER_NAMES } from "./provider-order";
-import { ApiServiceProvider } from "./ApiServiceProvider";
-import { CoreServiceProvider } from "./CoreServiceProvider";
-import { HelperServiceProvider } from "./HelperServiceProvider";
-import { RouteServiceProvider } from "./RouteServiceProvider";
-import { ServiceProvider } from "./ServiceProvider";
-import { ViewServiceProvider } from "./ViewServiceProvider";
-import { ServiceProviderInterface } from "../../contracts/ServiceProviderInterface";
-import { OOTEnum } from "../../types/utils";
+import { ApplicationInterface } from "../../contracts/ApplicationInterface.js";
+import { app } from "../../helpers/app.js";
+import { NamedServiceProvider, PROVIDER_NAMES } from "./provider-order.js";
+import { ApiServiceProvider } from "./ApiServiceProvider.js";
+import { CoreServiceProvider } from "./CoreServiceProvider.js";
+import { HelperServiceProvider } from "./HelperServiceProvider.js";
+import { RouteServiceProvider } from "./RouteServiceProvider.js";
+import { ServiceProvider } from "./ServiceProvider.js";
+import { ViewServiceProvider } from "./ViewServiceProvider.js";
+import { ServiceProviderInterface } from "../../contracts/ServiceProviderInterface.js";
+import { OOTEnum } from "../../types/utils.js";
 
 /** Provider class type — constructor nhận optional app */
 type ProviderClass = new (app?: ApplicationInterface) => ServiceProvider;

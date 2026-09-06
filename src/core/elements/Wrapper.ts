@@ -1,13 +1,13 @@
-import { InitMode, InitModes } from "../contracts/common";
-import type { DOMElement, FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElement, SaoElementChildren, WrapperInterface } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { app } from "../helpers/app";
-import { generateUUID } from "../helpers/utils";
-import { mountElementList } from "../helpers/view";
-import { MarkerRegistryService } from "../services";
-import type { SaoObjectType } from "../types/utils";
-import { Html } from "./Html";
-import { TextElement } from "./TextElement";
+import { InitMode, InitModes } from "../contracts/common.js";
+import type { DOMElement, FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElement, SaoElementChildren, WrapperInterface } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { app } from "../helpers/app.js";
+import { generateUUID } from "../helpers/utils.js";
+import { mountElementList } from "../helpers/view.js";
+import { MarkerRegistryService } from "../services/index.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { Html } from "./Html.js";
+import { TextElement } from "./TextElement.js";
 
 /**
  * Wrapper — renders multiple root nodes into a parent without a wrapping tag.

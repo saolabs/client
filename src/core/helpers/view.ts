@@ -1,5 +1,5 @@
-import type { HtmlInterface, SaoNodeInterface, SaoElementChildren, SaoElement, DOMElement, WrapperInterface, TextInterface, SaoChildrenFactoryOutput } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
+import type { HtmlInterface, SaoNodeInterface, SaoElementChildren, SaoElement, DOMElement, WrapperInterface, TextInterface, SaoChildrenFactoryOutput } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 
 /** Commit initial data; hydration discards pending notifications before subscribe. */
 export function commitView(ctrl: ViewControllerInterface, discardPending: boolean = false): void {

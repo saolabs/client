@@ -1,9 +1,9 @@
-import { InitMode } from "../contracts/common";
-import { ComponentInterface } from "../contracts/ComponentInterface";
-import { HtmlInterface } from "../contracts/ElementInterface";
-import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { ViewInterface } from "../contracts/ViewInterface";
-import { SaoObjectType } from "../types/utils";
+import { InitMode } from "../contracts/common.js";
+import { ComponentInterface } from "../contracts/ComponentInterface.js";
+import { HtmlInterface } from "../contracts/ElementInterface.js";
+import { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { ViewInterface } from "../contracts/ViewInterface.js";
+import { SaoObjectType } from "../types/utils.js";
 export declare class Component implements ComponentInterface {
     saoType: SaoObjectType;
     ctx: ViewControllerInterface;

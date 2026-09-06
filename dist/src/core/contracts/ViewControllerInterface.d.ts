@@ -1,13 +1,14 @@
-import type { SaoObjectType } from "../types/utils";
-import type { ViewInterface, ViewRenderFactory } from "./ViewInterface";
-import type { ViewStateInterface } from "./ViewStateInterface";
-import type { HtmlInterface, FragmentInterface, SaoElementEventHandler, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, WrapperInterface, EventModifier } from "./ElementInterface";
-import type { ReactiveInterface } from "./ReactiveInterface";
-import type { BlockInterface } from "./BlockInterface";
-import type { LoopContextInterface } from "./LoopContextInterface";
-import { SectionInterface } from "../contracts/SectionInterface";
-import type { ForeachSlotCache } from "../elements/ForeachSlotCache";
-import type { InitMode } from "./common";
+import type { SaoObjectType } from "../types/utils.js";
+import type { ViewInterface, ViewRenderFactory } from "./ViewInterface.js";
+import type { ViewUserConfig } from "../view/View.js";
+import type { ViewStateInterface } from "./ViewStateInterface.js";
+import type { HtmlInterface, FragmentInterface, SaoElementEventHandler, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, WrapperInterface, EventModifier } from "./ElementInterface.js";
+import type { ReactiveInterface } from "./ReactiveInterface.js";
+import type { BlockInterface } from "./BlockInterface.js";
+import type { LoopContextInterface } from "./LoopContextInterface.js";
+import { SectionInterface } from "../contracts/SectionInterface.js";
+import type { ForeachSlotCache } from "../elements/ForeachSlotCache.js";
+import type { InitMode } from "./common.js";
 export type ViewType = 'view' | 'layout' | 'component' | 'template';
 export interface ViewControllerInterface {
     saoType: SaoObjectType;
@@ -89,7 +90,7 @@ export interface ViewControllerInterface {
     /** App reference */
     App: any;
     setApp(app: any): void;
-    setUserDefinedConfig(config: Record<string, any>): void;
+    setUserDefinedConfig<T extends object>(config: ViewUserConfig<T>): void;
     /** Set root element — the container this view renders into */
     setRootElement(rootElement: HtmlInterface): void;
     setParentElement(parentElement: HtmlInterface): void;

@@ -1,6 +1,6 @@
-import type { SectionInterface, SectionManagerInterface } from "../contracts/SectionInterface";
-import type { YieldInterface } from "../contracts/ElementInterface";
-import HeadService from "./HeadService";
+import type { SectionInterface, SectionManagerInterface } from "../contracts/SectionInterface.js";
+import type { YieldInterface } from "../contracts/ElementInterface.js";
+import HeadService from "./HeadService.js";
 
 const HEAD_SECTION_PREFIX = 'meta:';
 

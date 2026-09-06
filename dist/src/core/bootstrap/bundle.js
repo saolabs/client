@@ -7,7 +7,7 @@
  * entry của app, nên hai bên dùng CHUNG một instance runtime. Xem
  * docs/EXTENSION_ARCHITECTURE.md §7.
  */
-import logger from "../services/LoggerService";
+import logger from "../services/LoggerService.js";
 /**
  * Khai báo một bundle. Chỉ là identity + kiểu — nó tồn tại để tên khoá là HỢP
  * ĐỒNG chứ không phải quy ước truyền miệng, và để IDE gợi ý được.

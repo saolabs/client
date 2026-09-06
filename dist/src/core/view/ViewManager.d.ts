@@ -16,16 +16,16 @@
  *   - Element tree rendering → ViewController.render()
  *   - Section system → Block/BlockOutlet
  */
-import type { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { ActiveRouteInterface, RouterNavigationType } from "../contracts/RouterInterface";
-import { HtmlInterface } from "../contracts/utils";
-import type { ViewInterface } from "../contracts/ViewInterface";
-import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
-import { BlockManagerService } from "../services/BlockManager";
-import { SectionManagerService } from "../services/SectionManager";
-import { PageCacheService } from "../services/PageCache";
-import { StoreService } from "../services/StoreService";
-import { InitMode } from "../contracts/common";
+import type { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import { ActiveRouteInterface, RouterNavigationType } from "../contracts/RouterInterface.js";
+import { HtmlInterface } from "../contracts/utils.js";
+import type { ViewInterface } from "../contracts/ViewInterface.js";
+import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
+import { BlockManagerService } from "../services/BlockManager.js";
+import { SectionManagerService } from "../services/SectionManager.js";
+import { PageCacheService } from "../services/PageCache.js";
+import { StoreService } from "../services/StoreService.js";
+import { InitMode } from "../contracts/common.js";
 /**
  * SSR boot info — server nhúng sau khi render xong (RUNTIME_CONTRACT §6).
  * `view` = registry path của page entry, `viewId` = id server đã dùng để prefix

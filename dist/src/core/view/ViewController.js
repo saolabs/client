@@ -1,18 +1,18 @@
-import { ViewState } from "./ViewState";
-import { LoopContext } from "./LoopContext";
-import { Reactive } from "../elements/Reactive";
-import BlockManager from "../services/BlockManager";
-import SectionManager from "../services/SectionManager";
-import devtools from "../devtools/hook";
-import { Component } from "../elements/Component";
-import { generateUUID } from "../helpers/utils";
-import { Output } from "../elements/Output";
-import { Section } from "./Section";
-import { Block, BlockOutlet, Fragment, Html, TextElement } from "../elements";
-import { Wrapper } from "../elements/Wrapper";
-import { YieldElement } from "../elements/Yield";
-import { app } from "../helpers/app";
-import AssetManager from "../services/AssetManager";
+import { ViewState } from "./ViewState.js";
+import { LoopContext } from "./LoopContext.js";
+import { Reactive } from "../elements/Reactive.js";
+import BlockManager from "../services/BlockManager.js";
+import SectionManager from "../services/SectionManager.js";
+import devtools from "../devtools/hook.js";
+import { Component } from "../elements/Component.js";
+import { generateUUID } from "../helpers/utils.js";
+import { Output } from "../elements/Output.js";
+import { Section } from "./Section.js";
+import { Block, BlockOutlet, Fragment, Html, TextElement } from "../elements/index.js";
+import { Wrapper } from "../elements/Wrapper.js";
+import { YieldElement } from "../elements/Yield.js";
+import { app } from "../helpers/app.js";
+import AssetManager from "../services/AssetManager.js";
 /**
  * ViewController — the brain behind a View.
  *

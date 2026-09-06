@@ -1,4 +1,4 @@
-import type { ViewManagerInterface } from "./ViewManagerInterface";
+import type { ViewManagerInterface } from "./ViewManagerInterface.js";
 export type RouterNavigationType = 'push' | 'pop';
 export type RouterMode = 'history' | 'hash';
 export interface RouteInterface {

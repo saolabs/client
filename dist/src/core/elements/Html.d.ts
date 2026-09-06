@@ -1,8 +1,8 @@
-import { InitMode } from "../contracts/common";
-import type { HtmlInterface, SaoChildrenFactory, SaoElementChildren, SaoElementConfig } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
-import type { SaoObjectType } from "../types/utils";
+import { InitMode } from "../contracts/common.js";
+import type { HtmlInterface, SaoChildrenFactory, SaoElementChildren, SaoElementConfig } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
+import type { SaoObjectType } from "../types/utils.js";
 export declare class Html implements HtmlInterface {
     saoType: SaoObjectType;
     element: HTMLElement;

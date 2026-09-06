@@ -1,6 +1,6 @@
-import { ViewManager } from "../../view";
-import { PROVIDER_NAMES } from "./provider-order";
-import { ServiceProvider } from "./ServiceProvider";
+import { ViewManager } from "../../view/index.js";
+import { PROVIDER_NAMES } from "./provider-order.js";
+import { ServiceProvider } from "./ServiceProvider.js";
 
 export class ViewServiceProvider extends ServiceProvider {
     readonly name = PROVIDER_NAMES.VIEW;

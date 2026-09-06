@@ -1,7 +1,7 @@
-import type { SaoElementChildren, SaoObjectType } from "../types/utils";
-import type { ViewControllerInterface } from "./ViewControllerInterface";
-import type { HtmlInterface, FragmentInterface, SaoChildrenFactoryOutput, SaoNodeInterface } from "./ElementInterface";
-import { InitMode } from "./common";
+import type { SaoElementChildren, SaoObjectType } from "../types/utils.js";
+import type { ViewControllerInterface } from "./ViewControllerInterface.js";
+import type { HtmlInterface, FragmentInterface, SaoChildrenFactoryOutput, SaoNodeInterface } from "./ElementInterface.js";
+import { InitMode } from "./common.js";
 
 export type SectionItemType = 'static' | 'dynamic' | 'async' | 'reactive';
 export type SectionContentType = 'text' | 'html'

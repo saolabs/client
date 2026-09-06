@@ -1,5 +1,5 @@
-import { app } from "../../helpers/app";
-import { OOTEnum } from "../../types/utils";
+import { app } from "../../helpers/app.js";
+import { OOTEnum } from "../../types/utils.js";
 /**
  * Base class cho Service Provider — API giống Laravel.
  *

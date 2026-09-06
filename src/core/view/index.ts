@@ -1,5 +1,5 @@
-export { View } from './View';
-export { ViewController } from './ViewController';
-export { ViewState, StateManager } from './ViewState';
-export { LoopContext } from './LoopContext';
-export { ViewManager } from './ViewManager';
+export { View } from './View.js';
+export { ViewController } from './ViewController.js';
+export { ViewState, StateManager } from './ViewState.js';
+export { LoopContext } from './LoopContext.js';
+export { ViewManager } from './ViewManager.js';

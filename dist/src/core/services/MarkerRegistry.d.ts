@@ -17,7 +17,7 @@
  *   - Compiler — to know tag shortcut mappings for generated code
  *   - DevTools (future) — to inspect/debug the element tree via markers
  */
-import { MarkerRegistryInterface, MarkerRegistryRecord } from "../contracts/MarkerInterface";
+import { MarkerRegistryInterface, MarkerRegistryRecord } from "../contracts/MarkerInterface.js";
 export declare class MarkerRegistryService implements MarkerRegistryInterface {
     static class: string;
     /**

@@ -49,17 +49,13 @@ export default async function setup() {
     try {
         Builder = require(path.join(BUILDER_ROOT, 'src', 'index.js'));
     } catch (err) {
-        console.warn(
-            `\n[fixtures] KHÔNG nạp được builder Node API (${(err as Error).message}) — ` +
-            'BỎ QUA compile fixture. Test liên quan sẽ tự skip, KHÔNG được coi là pass.\n'
-        );
-        return;
+        throw new Error(`Cannot load the compiler fixture builder: ${String(err)}`);
     }
 
     const builder = new Builder();
     builder.projectRoot = SAOLA_APP_ROOT;
 
-    if (!existsSync(SRC_DIR)) return;
+    if (!existsSync(SRC_DIR)) throw new Error(`Missing compiler fixtures: ${SRC_DIR}`);
     const files = readdirSync(SRC_DIR).filter((f) => f.endsWith('.sao'));
 
     for (const file of files) {
@@ -80,12 +76,22 @@ export default async function setup() {
             idMode: 'terse',
         });
 
-        const outJs = path.join(OUT_JS_DIR, `${name}.${lang}`);
+        const outJs = path.join(OUT_JS_DIR, `${name}.${result.lang ?? lang}`);
         writeFileSync(outJs, result.js, 'utf-8');
 
         const outBlade = path.join(OUT_BLADE_DIR, `${name}.blade.php`);
         writeFileSync(outBlade, result.blade, 'utf-8');
     }
+
+    const guide = readFileSync(path.join(SAOLA_APP_ROOT, 'docs/SAO_FILE.md'), 'utf8');
+    const example = guide.match(/```sao\r?\n([\s\S]*?)```/);
+    if (!example) throw new Error('The getting-started guide must contain a runnable .sao example.');
+    const guideResult = await builder.compileWithPhp(example[1], {
+        viewPath: 'fixtures.getting-started', functionName: 'GettingStarted', factoryName: 'GettingStarted',
+        emit: 'both', lang: 'ts', idMode: 'terse',
+    });
+    writeFileSync(path.join(OUT_JS_DIR, 'getting-started.ts'), guideResult.js);
+    writeFileSync(path.join(OUT_BLADE_DIR, 'getting-started.blade.php'), guideResult.blade);
 
     console.log(`[fixtures] đã compile ${files.length} file .sao qua Builder + saola/compiler → .generated/{js,blade}`);
 }

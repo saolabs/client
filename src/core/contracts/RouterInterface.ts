@@ -1,4 +1,4 @@
-import type { ViewManagerInterface } from "./ViewManagerInterface";
+import type { ViewManagerInterface } from "./ViewManagerInterface.js";
 
 // ─── Router Interface ────────────────────────────────────────────
 

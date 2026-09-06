@@ -1,4 +1,4 @@
-import { ViewController } from "./ViewController";
+import { ViewController } from "./ViewController.js";
 /**
  * View — the base class for all views in SaoView.
  *
