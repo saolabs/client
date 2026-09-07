@@ -86,25 +86,7 @@ export class Component implements ComponentInterface {
      *   open: s:c:{id}-s   close: s:c:{id}-e
      */
     private claimSSRMarkers(): { open: Comment; close: Comment } | null {
-        const searchRoot = this.parent?.element ?? document.body;
-        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
-
-        const openText = markerRegistry.openComment('component', this.id);
-        const closeText = markerRegistry.closeComment('component', this.id);
-        let openNode: Comment | null = null;
-
-        let node: Comment | null;
-        while ((node = walker.nextNode() as Comment | null)) {
-            const value = node.nodeValue?.trim() ?? '';
-            if (!openNode && value === openText) {
-                openNode = node;
-                continue;
-            }
-            if (openNode && value === closeText) {
-                return { open: openNode, close: node };
-            }
-        }
-        return null;
+        return markerRegistry.claim('component', this.id, this.parent?.element ?? null);
     }
 
     mergeData(newData: Record<string, any>): void {

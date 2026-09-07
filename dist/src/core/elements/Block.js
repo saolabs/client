@@ -2,7 +2,6 @@ import { InitModes } from "../contracts/common.js";
 import { generateUUID } from "../helpers/utils.js";
 import { MarkerModel } from "../services/MarkerModel.js";
 import markerRegistry from "../services/MarkerRegistry.js";
-import { SaoMarker } from "../services/MarkerService.js";
 /**
  * Block — a named mounting slot used in layout views.
  *
@@ -40,42 +39,30 @@ export class Block {
         this.viewId = viewId ?? ctx.viewId; // Associate block with current viewId
         this.initMode = initMode;
         this.contentRenderFactory = contentRenderFactory || ((parentElement) => []);
-        if (this.initMode === InitModes.HYDRATE) {
-            let marker = SaoMarker.first('block', this.id);
-            if (marker) {
-                this.marker = marker;
-                this.openTag = marker.openTag;
-                this.closeTag = marker.closeTag;
-            }
-            else {
-                this.openTag = markerRegistry.createMarkerStart('block', this.id);
-                this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
-                this.markerKey = markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
-                this.marker = new MarkerModel({
-                    tagName: "s:b",
-                    name: "block",
-                    markerID: this.id,
-                    openTag: this.openTag,
-                    closeTag: this.closeTag,
-                    children: [],
-                    attributes: {}
-                });
-            }
+        // Hydrate: claim cặp marker server qua index O(1) của MarkerRegistry.
+        // (Trước dùng SaoMarker.first() — walker dùng chung bị exhaust nên chỉ
+        // block ĐẦU TIÊN claim được, các block sau lặng lẽ tạo marker mới.)
+        const claimed = (this.initMode === InitModes.HYDRATE)
+            ? markerRegistry.claim('block', this.id)
+            : null;
+        if (claimed) {
+            this.openTag = claimed.open;
+            this.closeTag = claimed.close;
         }
         else {
             this.openTag = markerRegistry.createMarkerStart('block', this.id);
             this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
             this.markerKey = markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
-            this.marker = new MarkerModel({
-                tagName: "s:b",
-                name: "block",
-                markerID: this.id,
-                openTag: this.openTag,
-                closeTag: this.closeTag,
-                children: [],
-                attributes: {}
-            });
         }
+        this.marker = new MarkerModel({
+            tagName: "s:b",
+            name: "block",
+            markerID: this.id,
+            openTag: this.openTag,
+            closeTag: this.closeTag,
+            children: [],
+            attributes: {}
+        });
     }
     /** Initialize the block */
     init() {
@@ -110,7 +97,7 @@ export class Block {
         }
         // openTag/closeTag nay NẰM TRONG DOM (BlockManager.mountBlockIntoOutlet chèn
         // chúng quanh content). Bỏ lại comment mồ côi thì lần hydrate sau
-        // SaoMarker.first('block', id) có thể bắt trúng cặp cũ và claim nhầm vùng.
+        // markerRegistry.claim('block', id) có thể bắt trúng cặp cũ và claim nhầm vùng.
         this.openTag.remove();
         this.closeTag.remove();
     }

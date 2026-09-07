@@ -602,7 +602,10 @@ export class ViewController {
      */
     makeConfigThis() {
         return {
-            config: this.runtimeConfig,
+            // `?? {}` để khớp ViewConfigThis.config không nullable. Không phải
+            // che lỗi: runtimeConfig khởi tạo `{}` và không chỗ nào gán null, còn
+            // các hàm dùng `this.config` thì chỉ tới được khi nó đã tồn tại.
+            config: this.runtimeConfig ?? {},
             data: this.data,
             ctrl: this,
             view: this.view,

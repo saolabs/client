@@ -66,6 +66,37 @@ commitConstructorData() {
 - Sau `lockUpdateRealState()` → `false`
 - `updateVariableData()` gọi `unlockUpdateRealState()` trước, lock lại sau
 
+### `this` bên trong ba hàm này
+
+`commitConstructorData`, `updateVariableData` và `updateVariableItemData` KHÔNG
+được gọi với receiver là object chứa chúng. `ViewController` gọi bằng
+`fn.call(makeConfigThis(), …)`, nên `this` là:
+
+```ts
+interface ViewConfigThis {
+    config: ViewRuntimeConfig;   // chính config này — nơi ba hàm gọi lẫn nhau
+    data: Record<string, any>;
+    ctrl: ViewControllerInterface;
+    view: ViewInterface;
+}
+```
+
+Compiler PHẢI emit tham số `this` cho đầu ra `.ts`:
+
+```ts
+commitConstructorData: function(this: ViewConfigThis) { … }
+updateVariableData:    function(this: ViewConfigThis, data: any) { … }
+updateVariableItemData: function(this: ViewConfigThis, key: string, value: any) { … }
+```
+
+Không khai thì `tsc --strict` suy `this` = object literal chứa chúng và báo
+TS2339 ở `this.config`. Đầu ra `.js` KHÔNG có tham số này: tham số `this` là cú
+pháp chỉ có ở TypeScript, để lọt vào `.js` là lỗi cú pháp lúc trình duyệt nạp.
+
+`ViewConfigThis` được `@saolabs/client` export, và view `.ts` sinh ra kèm dòng
+`import type { ViewConfigThis } from '@saolabs/client';`. Trước 09/2026 chỗ này
+là `this: any` — đúng cú pháp nhưng tắt kiểm kiểu cho mọi thứ đi qua `this`.
+
 ### Contract test
 `tests/contract/counter.contract.test.ts` — "register(key) 1-arg: state slot..."
 

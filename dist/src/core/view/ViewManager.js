@@ -1344,6 +1344,9 @@ export class ViewManager {
             return this.mountView(name, data, route);
         }
         const navigationGeneration = ++this.navigationGeneration;
+        // HTML server của lượt này là nguồn duy nhất để claim marker — bỏ index
+        // của lượt hydrate trước (bfcache / test / re-hydrate) trước khi quét.
+        markerRegistry.invalidateIndex();
         const targetUrl = route?.$uri ?? route?.$urlPath ?? name;
         // Router only supplies route params and the SSR id. Seed the page from
         // the matching server instance before constructing data-derived states.

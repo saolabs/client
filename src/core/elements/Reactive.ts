@@ -123,25 +123,7 @@ export class Reactive implements ReactiveInterface {
      * (r = shortcut cho 'reactive').
      */
     private claimSSRMarkers(): { open: Comment; close: Comment } | null {
-        const searchRoot = this.parentElement?.element ?? document.body;
-        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
-
-        const openText = markerRegistry.openComment('reactive', this.id);
-        const closeText = markerRegistry.closeComment('reactive', this.id);
-        let openNode: Comment | null = null;
-
-        let node: Comment | null;
-        while ((node = walker.nextNode() as Comment | null)) {
-            const value = node.nodeValue?.trim() ?? '';
-            if (!openNode && value === openText) {
-                openNode = node;
-                continue;
-            }
-            if (openNode && value === closeText) {
-                return { open: openNode, close: node };
-            }
-        }
-        return null;
+        return markerRegistry.claim('reactive', this.id, this.parentElement?.element ?? null);
     }
 
     setParentElement(parent: HtmlInterface | null): void {

@@ -25,7 +25,7 @@ export declare class BlockOutlet implements BlockOutletInterface {
     /**
      * Tìm cặp marker outlet từ server-rendered HTML (format chuẩn §5.1):
      *   open:  s:bo:{id}-s   close: s:bo:{id}-e
-     * Quét trong parentElement (fallback document.body) bằng fresh TreeWalker.
+     * Tra index của MarkerRegistry, chặn trong parentElement nếu có.
      */
     private claimSSRMarkers;
     hydrate(): void;

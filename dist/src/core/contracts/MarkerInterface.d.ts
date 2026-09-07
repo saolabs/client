@@ -124,6 +124,13 @@ export interface MarkerRegistryInterface {
         id: string;
         isClose: boolean;
     } | null;
+    /** Claim cặp marker SSR theo O(1) qua index (null = server không render vùng này) */
+    claim(tag: string, id: string, scope?: Element | null): {
+        open: Comment;
+        close: Comment;
+    } | null;
+    /** Bỏ index marker — gọi đầu mỗi lượt hydrate */
+    invalidateIndex(): void;
 }
 export interface MarkerServiceInterface {
     createMarker(data: MarkerRecord): MarkerModelInterface;

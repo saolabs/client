@@ -6,7 +6,7 @@ import type {
 } from "../contracts/ElementInterface.js";
 import type { LoopContextInterface } from "../contracts/LoopContextInterface.js";
 import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface.js";
-import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo, ErrorBoundaryHandler } from "../contracts/ViewControllerInterface.js";
+import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ViewConfigThis, ErrorInfo, ErrorBoundaryHandler } from "../contracts/ViewControllerInterface.js";
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface.js";
 import type { ViewStateInterface } from "../contracts/ViewStateInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
@@ -712,9 +712,12 @@ export class ViewController implements ViewControllerInterface {
      * `this` context cho các hàm compiled config (updateVariableData dùng
      * this.config.updateVariableItemData và this.data).
      */
-    private makeConfigThis(): any {
+    private makeConfigThis(): ViewConfigThis {
         return {
-            config: this.runtimeConfig,
+            // `?? {}` để khớp ViewConfigThis.config không nullable. Không phải
+            // che lỗi: runtimeConfig khởi tạo `{}` và không chỗ nào gán null, còn
+            // các hàm dùng `this.config` thì chỉ tới được khi nó đã tồn tại.
+            config: this.runtimeConfig ?? {},
             data: this.data,
             ctrl: this,
             view: this.view,

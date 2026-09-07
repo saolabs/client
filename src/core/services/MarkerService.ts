@@ -156,6 +156,10 @@ export class MarkerService {
             this.refreshWalker();
         }
         const walker = this.walker;
+        // TreeWalker nhớ currentNode giữa các lần gọi. Không reset thì query
+        // thứ HAI trở đi nextNode() trả null ngay → mọi marker "biến mất"
+        // (đây là lý do chỉ @block đầu tiên hydrate được).
+        walker.currentNode = this.rootElement;
 
         const commentNodes: Comment[] = [];
         let comment: Comment | null;
@@ -164,6 +168,7 @@ export class MarkerService {
         }
 
         const tagShortcut = this.markerRegistry.shortcut(tagOrShortcut);
+        const fullTagName = this.markerRegistry.fullTag(tagShortcut);
         const stack: Array<{
             index: number;
             shortcut: string;
@@ -171,83 +176,65 @@ export class MarkerService {
             attributes: Record<string, any>;
         }> = [];
 
-        // Process comments with stack-based matching
+        // Parse bằng string ops của MarkerRegistry (trước đây dựng 2 RegExp MỚI
+        // cho MỖI comment node — chi phí lớn nhất của vòng lặp này).
         for (let i = 0; i < commentNodes.length; i++) {
-            const commentText = commentNodes[i].nodeValue?.trim() || '';
+            const parsed = this.markerRegistry.parseComment(commentNodes[i].nodeValue ?? '');
+            if (!parsed || parsed.tag !== fullTagName) continue;
 
-            // Check if open tag (format chuẩn §5.1): s:{shortcut}:{id}-s
-            const openMatch = commentText.match(
-                new RegExp(`^${this.prefix}${this.delimiter}([^${this.delimiter}]+)${this.delimiter}(.+)-s$`)
-            );
-            if (openMatch) {
-                const shortcut = openMatch[1];
-                const id = openMatch[2];
-
-                // Check if matches requested tag and registryID
-                if (shortcut === tagShortcut) {
-                    if (registryID && id !== registryID) {
-                        continue; // Skip if specific registryID requested
-                    }
-
-                    const attrs = this.getAttributesFromRegistry(tagOrShortcut, id);
-                    if (!this.attributesMatch(attrs, attributeFilter)) {
-                        continue; // Skip if attributes don't match
-                    }
-
-                    stack.push({
-                        index: i,
-                        shortcut,
-                        registryID: id,
-                        attributes: attrs
-                    });
+            // Open tag (format chuẩn §5.1): s:{shortcut}:{id}-s
+            if (!parsed.isClose) {
+                if (registryID && parsed.id !== registryID) {
+                    continue; // Skip if specific registryID requested
                 }
+
+                const attrs = this.getAttributesFromRegistry(tagOrShortcut, parsed.id);
+                if (!this.attributesMatch(attrs, attributeFilter)) {
+                    continue; // Skip if attributes don't match
+                }
+
+                stack.push({
+                    index: i,
+                    shortcut: tagShortcut,
+                    registryID: parsed.id,
+                    attributes: attrs
+                });
                 continue;
             }
 
-            // Check if close tag (format chuẩn §5.1): s:{shortcut}:{id}-e
-            const closeMatch = commentText.match(
-                new RegExp(`^${this.prefix}${this.delimiter}([^${this.delimiter}]+)${this.delimiter}(.+)-e$`)
-            );
-            if (closeMatch) {
-                const shortcut = closeMatch[1];
-                const id = closeMatch[2];
-
-                // Find matching open tag in stack (LIFO)
-                let foundIndex = -1;
-                for (let s = stack.length - 1; s >= 0; s--) {
-                    if (stack[s].shortcut === shortcut && stack[s].registryID === id) {
-                        foundIndex = s;
-                        break;
-                    }
-                }
-
-                if (foundIndex !== -1) {
-                    const openTag = stack[foundIndex];
-
-                    // Get children between open and close
-                    let currentNode: Node | null = commentNodes[openTag.index].nextSibling;
-                    const children: Node[] = [];
-
-                    while (currentNode && currentNode !== commentNodes[i]) {
-                        children.push(currentNode);
-                        currentNode = currentNode.nextSibling;
-                    }
-
-                    const fullTagName = this.resolveTagName(openTag.shortcut);
-
-                    results.push({
-                        name: fullTagName,
-                        tagName: openTag.shortcut,
-                        registryID: openTag.registryID,
-                        attributes: openTag.attributes,
-                        openTag: commentNodes[openTag.index],
-                        closeTag: commentNodes[i],
-                        children
-                    });
-
-                    stack.splice(foundIndex, 1);
+            // Close tag (format chuẩn §5.1): s:{shortcut}:{id}-e
+            // Tìm open tag khớp trong stack (LIFO)
+            let foundIndex = -1;
+            for (let sIdx = stack.length - 1; sIdx >= 0; sIdx--) {
+                if (stack[sIdx].registryID === parsed.id) {
+                    foundIndex = sIdx;
+                    break;
                 }
             }
+            if (foundIndex === -1) continue;
+
+            const openTag = stack[foundIndex];
+
+            // Get children between open and close
+            let currentNode: Node | null = commentNodes[openTag.index].nextSibling;
+            const children: Node[] = [];
+
+            while (currentNode && currentNode !== commentNodes[i]) {
+                children.push(currentNode);
+                currentNode = currentNode.nextSibling;
+            }
+
+            results.push({
+                name: fullTagName,
+                tagName: openTag.shortcut,
+                registryID: openTag.registryID,
+                attributes: openTag.attributes,
+                openTag: commentNodes[openTag.index],
+                closeTag: commentNodes[i],
+                children
+            });
+
+            stack.splice(foundIndex, 1);
         }
 
         return results;

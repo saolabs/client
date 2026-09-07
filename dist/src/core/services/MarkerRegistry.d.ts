@@ -80,6 +80,35 @@ export declare class MarkerRegistryService implements MarkerRegistryInterface {
     /** Total number of registered markers */
     get size(): number;
     /**
+     * Index text-comment → Comment node, dựng 1 lần cho mỗi lượt hydrate.
+     *
+     * Trước đây mỗi element (Reactive/Output/Component/Wrapper/BlockOutlet/Block)
+     * tự tạo TreeWalker quét toàn bộ comment trong parent để tìm đúng 2 chuỗi →
+     * O(số element × số comment). Với 400 row × 5 cột (~4000 marker) đo được
+     * ~210ms chỉ để claim. Index 1 lượt rồi Map.get đưa về O(N) tổng, ~1.5ms.
+     *
+     * null = chưa dựng (lazy — CSR không bao giờ chạm tới).
+     */
+    private index;
+    /** Đã dựng lại index vì miss trong lượt microtask hiện tại chưa? */
+    private rebuiltOnMiss;
+    /** Bỏ index — gọi khi có HTML server MỚI vào DOM (đầu mỗi lượt hydrate). */
+    invalidateIndex(): void;
+    private buildIndex;
+    /**
+     * Claim cặp marker SSR `<!--s:{tag}:{id}-s-->` … `<!--s:{tag}:{id}-e-->`.
+     *
+     * @param scope Nếu truyền, cặp tìm được PHẢI nằm trong scope — không thì
+     *              rơi về scan tuyến tính trong scope (giữ nguyên ngữ nghĩa cũ).
+     * @returns null khi server không render vùng này (partial hydration).
+     */
+    claim(tag: string, id: string, scope?: Element | null): {
+        open: Comment;
+        close: Comment;
+    } | null;
+    /** Fallback hiếm: quét tuyến tính trong scope (ngữ nghĩa scan cũ). */
+    private scanForPair;
+    /**
      * Create a comment string for a marker (open).
      * Format chuẩn: 's:r:abc123-s' cho <!--s:r:abc123-s-->
      */

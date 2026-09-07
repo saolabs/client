@@ -146,6 +146,10 @@ export interface MarkerRegistryInterface {
     openComment(tag: string, id?: string): string;
     closeComment(tag: string, id?: string): string;
     parseComment(text: string): { tag: string; id: string; isClose: boolean } | null
+    /** Claim cặp marker SSR theo O(1) qua index (null = server không render vùng này) */
+    claim(tag: string, id: string, scope?: Element | null): { open: Comment; close: Comment } | null;
+    /** Bỏ index marker — gọi đầu mỗi lượt hydrate */
+    invalidateIndex(): void;
 
 }
 

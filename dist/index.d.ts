@@ -50,6 +50,7 @@ export type { StorageServiceInterface } from './src/core/contracts/StorageServic
 export type { LoggerServiceInterface, LoggerConfig, LogLevel } from './src/core/contracts/LoggerServiceInterface.js';
 export type { ViewInterface } from './src/core/contracts/ViewInterface.js';
 export type { ViewControllerInterface } from './src/core/contracts/ViewControllerInterface.js';
+export type { ViewConfigThis, ViewRuntimeConfig } from './src/core/contracts/ViewControllerInterface.js';
 export type { ViewManagerInterface } from './src/core/contracts/ViewManagerInterface.js';
 export type { ReactiveInterface } from './src/core/contracts/ReactiveInterface.js';
 export type { RouterInterface } from './src/core/contracts/RouterInterface.js';

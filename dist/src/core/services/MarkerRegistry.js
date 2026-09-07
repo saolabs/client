@@ -71,6 +71,20 @@ export class MarkerRegistryService {
         this.closeSuffix = '-e';
         /** Auto-increment counter for generating unique IDs */
         this.counter = 0;
+        // ─── Marker Index (O(1) claim khi hydrate) ──────────────────
+        /**
+         * Index text-comment → Comment node, dựng 1 lần cho mỗi lượt hydrate.
+         *
+         * Trước đây mỗi element (Reactive/Output/Component/Wrapper/BlockOutlet/Block)
+         * tự tạo TreeWalker quét toàn bộ comment trong parent để tìm đúng 2 chuỗi →
+         * O(số element × số comment). Với 400 row × 5 cột (~4000 marker) đo được
+         * ~210ms chỉ để claim. Index 1 lượt rồi Map.get đưa về O(N) tổng, ~1.5ms.
+         *
+         * null = chưa dựng (lazy — CSR không bao giờ chạm tới).
+         */
+        this.index = null;
+        /** Đã dựng lại index vì miss trong lượt microtask hiện tại chưa? */
+        this.rebuiltOnMiss = false;
         this.buildReverseShortcuts();
     }
     // ─── Tag Shortcuts ──────────────────────────────────────────
@@ -153,10 +167,83 @@ export class MarkerRegistryService {
     clear() {
         this.records.clear();
         this.counter = 0;
+        this.index = null;
     }
     /** Total number of registered markers */
     get size() {
         return this.records.size;
+    }
+    /** Bỏ index — gọi khi có HTML server MỚI vào DOM (đầu mỗi lượt hydrate). */
+    invalidateIndex() {
+        this.index = null;
+    }
+    buildIndex() {
+        const idx = new Map();
+        const root = document.body ?? document.documentElement;
+        if (root) {
+            const head = this.prefix + this.delimiter; // "s:"
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
+            let node;
+            while ((node = walker.nextNode())) {
+                const value = (node.nodeValue ?? '').trim();
+                // Giữ node ĐẦU TIÊN theo document order — đúng thứ tự mà
+                // TreeWalker scan cũ trả về.
+                if (value.startsWith(head) && !idx.has(value))
+                    idx.set(value, node);
+            }
+        }
+        this.index = idx;
+        return idx;
+    }
+    /**
+     * Claim cặp marker SSR `<!--s:{tag}:{id}-s-->` … `<!--s:{tag}:{id}-e-->`.
+     *
+     * @param scope Nếu truyền, cặp tìm được PHẢI nằm trong scope — không thì
+     *              rơi về scan tuyến tính trong scope (giữ nguyên ngữ nghĩa cũ).
+     * @returns null khi server không render vùng này (partial hydration).
+     */
+    claim(tag, id, scope) {
+        const openText = this.openComment(tag, id);
+        const closeText = this.closeComment(tag, id);
+        let idx = this.index ?? this.buildIndex();
+        let open = idx.get(openText);
+        let close = idx.get(closeText);
+        // Miss có HAI nguyên nhân: (a) server không render vùng này — partial
+        // hydration, hợp lệ; (b) index cũ vì HTML server mới vào DOM sau lần
+        // dựng. Không phân biệt được trong O(1), nên dựng lại TỐI ĐA MỘT LẦN
+        // mỗi lượt microtask: burst hydrate đồng bộ chỉ tốn thêm 1 lượt quét,
+        // còn 499 miss thật sau đó vẫn O(1) (không quay lại O(N²)).
+        // Node rời DOM cũng là dấu hiệu index cũ → xử lý cùng nhánh.
+        const stale = (open && !open.isConnected) || (close && !close.isConnected);
+        if (stale || ((!open || !close) && !this.rebuiltOnMiss)) {
+            this.rebuiltOnMiss = true;
+            queueMicrotask(() => { this.rebuiltOnMiss = false; });
+            idx = this.buildIndex();
+            open = idx.get(openText);
+            close = idx.get(closeText);
+        }
+        if (!open || !close || !open.isConnected || !close.isConnected)
+            return null;
+        if (scope && !(scope.contains(open) && scope.contains(close))) {
+            return this.scanForPair(scope, openText, closeText);
+        }
+        return { open, close };
+    }
+    /** Fallback hiếm: quét tuyến tính trong scope (ngữ nghĩa scan cũ). */
+    scanForPair(scope, openText, closeText) {
+        const walker = document.createTreeWalker(scope, NodeFilter.SHOW_COMMENT);
+        let openNode = null;
+        let node;
+        while ((node = walker.nextNode())) {
+            const value = (node.nodeValue ?? '').trim();
+            if (!openNode && value === openText) {
+                openNode = node;
+                continue;
+            }
+            if (openNode && value === closeText)
+                return { open: openNode, close: node };
+        }
+        return null;
     }
     // ─── Comment Node Helpers ───────────────────────────────────
     /**

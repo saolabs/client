@@ -1591,6 +1591,10 @@ export class ViewManager implements ViewManagerInterface {
 
         const navigationGeneration = ++this.navigationGeneration;
 
+        // HTML server của lượt này là nguồn duy nhất để claim marker — bỏ index
+        // của lượt hydrate trước (bfcache / test / re-hydrate) trước khi quét.
+        markerRegistry.invalidateIndex();
+
         const targetUrl = (route as any)?.$uri ?? route?.$urlPath ?? name;
 
         // Router only supplies route params and the SSR id. Seed the page from

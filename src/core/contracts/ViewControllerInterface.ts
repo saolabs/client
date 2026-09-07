@@ -209,3 +209,29 @@ export type ErrorInfo = {
 
 export type ErrorBoundaryHandler = (err: unknown, info: ErrorInfo) => any;
 export type ViewControllerConfig = ViewConfig & ViewRuntimeConfig;
+
+/**
+ * `this` bên trong các hàm config do compiler sinh — `commitConstructorData`,
+ * `updateVariableData`, `updateVariableItemData`.
+ *
+ * Chúng được gọi bằng `fn.call(makeConfigThis(), …)`, tức receiver KHÔNG phải
+ * object chứa chúng. TypeScript mặc định suy `this` = chính object literal đó,
+ * nên `this.config` không tồn tại theo kiểu và `tsc --strict` báo TS2339.
+ *
+ * Compiler emit `function(this: ViewConfigThis)` cho đầu ra `.ts`; đầu ra `.js`
+ * không có tham số này vì tham số `this` là cú pháp chỉ có ở TypeScript và bị
+ * xoá khi emit — nó không bao giờ là đối số thật.
+ */
+export interface ViewConfigThis {
+    /**
+     * Config runtime của chính view — nơi các hàm sinh ra gọi lẫn nhau.
+     *
+     * KHÔNG nullable: các hàm này chỉ được gọi qua chính `runtimeConfig`
+     * (`this.runtimeConfig?.commitConstructorData`), nên khi thân hàm chạy thì
+     * object đó chắc chắn tồn tại — chính nó vừa cung cấp hàm đang chạy.
+     */
+    config: ViewRuntimeConfig;
+    data: Record<string, any>;
+    ctrl: ViewControllerInterface;
+    view: ViewInterface;
+}
