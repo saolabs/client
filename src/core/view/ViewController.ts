@@ -94,7 +94,7 @@ export class ViewController implements ViewControllerInterface {
     /** User-defined config from setup() */
     private config: ViewConfig = {};
     /** Typed runtime config from compiled $__setup__ */
-    private runtimeConfig: ViewRuntimeConfig | null = {};
+    private runtimeConfig: ViewRuntimeConfig = {};
     /** Track own properties to avoid conflicts when setting user config */
     private ownProperties: Set<string> = new Set(['__ctrl__']);
 
@@ -204,7 +204,7 @@ export class ViewController implements ViewControllerInterface {
      * CHƯA gọi commitConstructorData — đợi ViewManager gọi commitData().
      */
     setup(config: ViewRuntimeConfig): void {
-        this.runtimeConfig = config as ViewRuntimeConfig;
+        this.runtimeConfig = config;
 
         // Extract metadata
         if (config.viewId) this.viewId = config.viewId;
@@ -225,7 +225,7 @@ export class ViewController implements ViewControllerInterface {
 
     getConfig(key?: string, defaultValue?: any): ViewControllerConfig | any {
         if (key) {
-            return this.runtimeConfig?.[key] ?? (this.config[key] ?? defaultValue);
+            return this.runtimeConfig[key] ?? (this.config[key] ?? defaultValue);
         }
         return { ...this.runtimeConfig, ...this.config };
     }
@@ -714,10 +714,7 @@ export class ViewController implements ViewControllerInterface {
      */
     private makeConfigThis(): ViewConfigThis {
         return {
-            // `?? {}` để khớp ViewConfigThis.config không nullable. Không phải
-            // che lỗi: runtimeConfig khởi tạo `{}` và không chỗ nào gán null, còn
-            // các hàm dùng `this.config` thì chỉ tới được khi nó đã tồn tại.
-            config: this.runtimeConfig ?? {},
+            config: this.runtimeConfig,
             data: this.data,
             ctrl: this,
             view: this.view,
@@ -734,7 +731,7 @@ export class ViewController implements ViewControllerInterface {
      */
     commitData(): void {
         if (this._isDataCommitted || this._isDestroyed) return;
-        const fn = this.runtimeConfig?.commitConstructorData;
+        const fn = this.runtimeConfig.commitConstructorData;
         if (typeof fn === 'function') {
             try {
                 fn.call(this.makeConfigThis());
@@ -780,7 +777,7 @@ export class ViewController implements ViewControllerInterface {
             this.applyDataTrait(newData);
             return;
         }
-        const fn = this.runtimeConfig?.updateVariableData;
+        const fn = this.runtimeConfig.updateVariableData;
         if (typeof fn === 'function') {
             this.states.__.unlockUpdateRealState();
             try {
@@ -795,7 +792,7 @@ export class ViewController implements ViewControllerInterface {
 
     /** Áp data vào biến data (trait) từng key — không đụng state, không đụng lock */
     private applyDataTrait(newData: Record<string, any>): void {
-        const itemFn = this.runtimeConfig?.updateVariableItemData;
+        const itemFn = this.runtimeConfig.updateVariableItemData;
         if (typeof itemFn !== 'function') return;
         for (const key of Object.keys(newData)) {
             try {
@@ -816,7 +813,7 @@ export class ViewController implements ViewControllerInterface {
             this.applyDataTrait({ [key]: value });
             return;
         }
-        const fn = this.runtimeConfig?.updateVariableItemData;
+        const fn = this.runtimeConfig.updateVariableItemData;
         if (typeof fn === 'function') {
             this.states.__.unlockUpdateRealState();
             try {

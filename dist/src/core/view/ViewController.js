@@ -178,7 +178,7 @@ export class ViewController {
     }
     getConfig(key, defaultValue) {
         if (key) {
-            return this.runtimeConfig?.[key] ?? (this.config[key] ?? defaultValue);
+            return this.runtimeConfig[key] ?? (this.config[key] ?? defaultValue);
         }
         return { ...this.runtimeConfig, ...this.config };
     }
@@ -602,10 +602,7 @@ export class ViewController {
      */
     makeConfigThis() {
         return {
-            // `?? {}` để khớp ViewConfigThis.config không nullable. Không phải
-            // che lỗi: runtimeConfig khởi tạo `{}` và không chỗ nào gán null, còn
-            // các hàm dùng `this.config` thì chỉ tới được khi nó đã tồn tại.
-            config: this.runtimeConfig ?? {},
+            config: this.runtimeConfig,
             data: this.data,
             ctrl: this,
             view: this.view,
@@ -622,7 +619,7 @@ export class ViewController {
     commitData() {
         if (this._isDataCommitted || this._isDestroyed)
             return;
-        const fn = this.runtimeConfig?.commitConstructorData;
+        const fn = this.runtimeConfig.commitConstructorData;
         if (typeof fn === 'function') {
             try {
                 fn.call(this.makeConfigThis());
@@ -669,7 +666,7 @@ export class ViewController {
             this.applyDataTrait(newData);
             return;
         }
-        const fn = this.runtimeConfig?.updateVariableData;
+        const fn = this.runtimeConfig.updateVariableData;
         if (typeof fn === 'function') {
             this.states.__.unlockUpdateRealState();
             try {
@@ -685,7 +682,7 @@ export class ViewController {
     }
     /** Áp data vào biến data (trait) từng key — không đụng state, không đụng lock */
     applyDataTrait(newData) {
-        const itemFn = this.runtimeConfig?.updateVariableItemData;
+        const itemFn = this.runtimeConfig.updateVariableItemData;
         if (typeof itemFn !== 'function')
             return;
         for (const key of Object.keys(newData)) {
@@ -707,7 +704,7 @@ export class ViewController {
             this.applyDataTrait({ [key]: value });
             return;
         }
-        const fn = this.runtimeConfig?.updateVariableItemData;
+        const fn = this.runtimeConfig.updateVariableItemData;
         if (typeof fn === 'function') {
             this.states.__.unlockUpdateRealState();
             try {

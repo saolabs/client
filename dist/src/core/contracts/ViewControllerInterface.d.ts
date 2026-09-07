@@ -198,9 +198,10 @@ export interface ViewConfigThis {
     /**
      * Config runtime của chính view — nơi các hàm sinh ra gọi lẫn nhau.
      *
-     * KHÔNG nullable: các hàm này chỉ được gọi qua chính `runtimeConfig`
-     * (`this.runtimeConfig?.commitConstructorData`), nên khi thân hàm chạy thì
-     * object đó chắc chắn tồn tại — chính nó vừa cung cấp hàm đang chạy.
+     * KHÔNG nullable, và `ViewController.runtimeConfig` cũng vậy: nó khởi tạo
+     * `{}` rồi chỉ bị `setup()` ghi đè bằng config thật. Cái CÓ THỂ vắng là
+     * từng hàm trong đó (`commitConstructorData`… đều optional) — mỗi lời gọi
+     * đã tự canh bằng `typeof fn === 'function'`.
      */
     config: ViewRuntimeConfig;
     data: Record<string, any>;
