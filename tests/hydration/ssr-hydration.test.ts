@@ -55,6 +55,74 @@ function buildSSRHtml(viewId: string): HTMLElement {
 
 describe('Html constructor — SSR hydration', () => {
 
+    it('KHÔNG claim element nằm ngoài parentElement (chống bứng node của cây khác)', () => {
+        // Cùng một viewId nhưng hai cây: Component.hydrateChild ghi đè
+        // childCtrl.viewId = ssrViewId, nên hai nhánh có thể chung tiền tố class.
+        const viewId = 'v-cross01';
+        const container = document.createElement('div');
+        container.innerHTML =
+            `<div id="cay-A"></div>` +
+            `<div id="cay-B"><span class="${viewId}-el9">của cây B</span></div>`;
+        document.body.appendChild(container);
+
+        const cayA = container.querySelector('#cay-A') as HTMLElement;
+        const cayB = container.querySelector('#cay-B') as HTMLElement;
+        const nodeCuaB = cayB.firstElementChild as HTMLElement;
+
+        const mockCtx = {
+            viewId,
+            states: { __: { subscribe: () => () => {}, getStateByKey: () => null } },
+            addEventListener: () => {},
+        } as any;
+
+        const html = new Html({
+            ctx: mockCtx,
+            id: 'el9',
+            tagName: 'span',
+            parentElement: { element: cayA, getElement: () => cayA } as any,
+            initMode: InitModes.HYDRATE,
+            config: {},
+        });
+
+        // Không có trong parent → partial hydration: tạo element MỚI.
+        expect(html.element).not.toBe(nodeCuaB);
+        expect(html.element.isConnected).toBe(false);
+        expect(html.element.classList.contains(`${viewId}-el9`)).toBe(true);
+        // Node của cây B phải còn nguyên chỗ cũ.
+        expect(nodeCuaB.parentElement).toBe(cayB);
+        expect(nodeCuaB.textContent).toBe('của cây B');
+
+        document.body.removeChild(container);
+    });
+
+    it('element cấp gốc (không có parentElement) VẪN claim được qua document', () => {
+        const viewId = 'v-root01';
+        const container = document.createElement('div');
+        container.innerHTML = `<section class="${viewId}-goc">nội dung server</section>`;
+        document.body.appendChild(container);
+        const nodeServer = container.firstElementChild as HTMLElement;
+
+        const mockCtx = {
+            viewId,
+            states: { __: { subscribe: () => () => {}, getStateByKey: () => null } },
+            addEventListener: () => {},
+        } as any;
+
+        const html = new Html({
+            ctx: mockCtx,
+            id: 'goc',
+            tagName: 'section',
+            parentElement: null,
+            initMode: InitModes.HYDRATE,
+            config: {},
+        });
+
+        expect(html.element).toBe(nodeServer);
+
+        document.body.removeChild(container);
+    });
+
+
     it('claim server DOM node bằng class {viewId}-{id} trong parentElement', () => {
         const viewId = 'v-test01';
         const container = buildSSRHtml(viewId);

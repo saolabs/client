@@ -113,13 +113,18 @@ export class Html implements HtmlInterface {
                 // "6a3a...-32a9c14a" làm selector ".6a3a..." KHÔNG hợp lệ
                 // (querySelector ném SyntaxError). CSS.escape() escape ký tự đầu.
                 const selector = `${tagName}.${cssEscape(hydrateClass)}`;
-                // Tìm trong parent scope trước (top-down traversal)
                 const searchScope: Element | null = parentElement?.element ?? null;
                 if (searchScope) {
+                    // CÓ parent → chỉ tìm trong đó. KHÔNG hạ xuống quét cả tài
+                    // liệu: element không nằm dưới parent của nó thì cái tìm
+                    // thấy ở nơi khác là của cây khác — claim vào rồi mount sẽ
+                    // BỨNG node đó khỏi chỗ đúng, hỏng cả hai cây, không một
+                    // tiếng động. Server không render vùng này thì đường đúng là
+                    // partial hydration: tạo element mới ở dưới.
                     found = searchScope.querySelector(selector) as HTMLElement | null;
-                }
-                // Fallback: toàn bộ document (cho root-level elements)
-                if (!found) {
+                } else {
+                    // Không có parent để giới hạn (element cấp gốc) — chỉ khi ấy
+                    // quét cả tài liệu mới là cách duy nhất.
                     found = document.querySelector(selector) as HTMLElement | null;
                 }
             }
