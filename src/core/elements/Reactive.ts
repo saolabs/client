@@ -1,6 +1,5 @@
 import { InitMode, InitModes } from "../contracts/common.js";
 import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface.js";
-import type { MarkerModelInterface } from "../contracts/MarkerInterface.js";
 import type { ReactiveInterface, ReactiveChildrenFactory, ReactiveRenderFn } from "../contracts/ReactiveInterface.js";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import { generateUUID } from "../helpers/utils.js";
@@ -43,7 +42,6 @@ export class Reactive implements ReactiveInterface {
     public unsubscribe: () => void = () => { };
     private _isStarted = false;
     /** Marker model (hydration) — gán bởi BlockManager/SSR khi cần; mặc định null. */
-    marker: MarkerModelInterface | null = null;
     /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
     private markerKey: string | null = null;
 

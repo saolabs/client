@@ -11,7 +11,6 @@ export { ServiceProvider } from './src/core/bootstrap/providers/ServiceProvider.
 export { PROVIDER_NAMES, resolveProviderOrder } from './src/core/bootstrap/providers/provider-order.js';
 export type { NamedServiceProvider, ProviderName } from './src/core/bootstrap/providers/provider-order.js';
 export type { ServiceProviderInterface } from './src/core/contracts/ServiceProviderInterface.js';
-export { MarkerService } from './src/core/services/MarkerService.js';
 export { EventService } from './src/core/services/EventService.js';
 export { HttpService } from './src/core/services/HttpService.js';
 export { StoreService } from './src/core/services/StoreService.js';
@@ -55,6 +54,6 @@ export type { ViewManagerInterface } from './src/core/contracts/ViewManagerInter
 export type { ReactiveInterface } from './src/core/contracts/ReactiveInterface.js';
 export type { RouterInterface } from './src/core/contracts/RouterInterface.js';
 export type { RouteDefinition, Route, RouteMatch, RouterConfig } from './src/core/routers/Router.js';
-export type { MarkerRecord, MarkerTagName } from './src/core/contracts/MarkerInterface.js';
+export type { MarkerTagName } from './src/core/contracts/MarkerInterface.js';
 export type { APIEndpoints } from './src/core/helpers/ApiClient.js';
 //# sourceMappingURL=index.d.ts.map

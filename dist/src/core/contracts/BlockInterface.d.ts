@@ -2,7 +2,6 @@ import type { SaoObjectType } from "../types/utils.js";
 import type { ViewControllerInterface } from "./ViewControllerInterface.js";
 import type { HtmlInterface, FragmentInterface, SaoChildrenFactoryOutput, SaoNodeInterface } from "./ElementInterface.js";
 import { InitMode } from "./common.js";
-import { MarkerModelInterface } from "./MarkerInterface.js";
 export type BlockConstructorParams = {
     ctx: ViewControllerInterface;
     name: string;
@@ -26,7 +25,6 @@ export interface BlockInterface {
     isSaoElement: boolean;
     isOneBlock: boolean;
     initMode?: InitMode;
-    marker?: MarkerModelInterface | null;
     /** Initialize the block (e.g. during hydration) */
     init(): void;
     /** Render the block's content into the parent element */
@@ -55,7 +53,6 @@ export interface BlockOutletInterface extends SaoNodeInterface {
     initMode: InitMode;
     isSaoElement: boolean;
     isOneBlockOutlet: boolean;
-    marker?: MarkerModelInterface | null;
     /** Render the outlet's markers into the parent element */
     render(): any;
     hydrate(): any;

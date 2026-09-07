@@ -7,7 +7,6 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import MarkerRegistry from '../../src/core/services/MarkerRegistry';
-import { MarkerService } from '../../src/core/services/MarkerService';
 
 const pair = (tag: string, id: string, inner = 'x') =>
     `<!--${MarkerRegistry.openComment(tag, id)}-->${inner}<!--${MarkerRegistry.closeComment(tag, id)}-->`;
@@ -34,19 +33,16 @@ describe('MarkerRegistry.claim (marker index)', () => {
     });
 
     it('MỌI marker cùng loại đều claim được, không chỉ cái đầu tiên', () => {
-        // Regression: SaoMarker dùng chung một TreeWalker và không reset
-        // currentNode → từ lần query thứ hai trở đi mọi marker "biến mất",
-        // nên @block thứ 2 trở đi lặng lẽ tạo marker mới thay vì claim.
+        // Regression: bản cũ dùng chung một TreeWalker và không reset currentNode
+        // → từ lần tra thứ hai trở đi mọi marker "biến mất", nên @block thứ 2 trở
+        // đi lặng lẽ tạo marker mới thay vì claim của server.
         document.body.innerHTML =
             ['A', 'B', 'C'].map(id => pair('block', id)).join('');
 
         for (const id of ['A', 'B', 'C']) {
-            expect(MarkerRegistry.claim('block', id), `block ${id}`).not.toBeNull();
-        }
-
-        const svc = new MarkerService();
-        for (const id of ['A', 'B', 'C']) {
-            expect(svc.first('block', id), `MarkerService block ${id}`).not.toBeNull();
+            const claimed = MarkerRegistry.claim('block', id);
+            expect(claimed, `block ${id}`).not.toBeNull();
+            expect(claimed!.open.nodeValue).toBe(`s:b:${id}-s`);
         }
     });
 
@@ -59,26 +55,6 @@ describe('MarkerRegistry.claim (marker index)', () => {
 
         expect(MarkerRegistry.claim('view', 'new')).not.toBeNull();
         expect(MarkerRegistry.claim('view', 'old')).toBeNull(); // node đã rời DOM
-    });
-
-    it('query(tag, id) đi đường index cho kết quả TRÙNG đường quét', () => {
-        // query() có hai nhánh: tra index O(1) khi biết chính xác id, và quét
-        // tuyến tính khi root tuỳ biến. Hai nhánh phải trả cùng một record.
-        document.body.innerHTML =
-            `<div id="host">truoc${pair('yield', 'v1-y1', '<b>noi dung</b>')}sau</div>`;
-        const host = document.getElementById('host')!;
-
-        const viaIndex = new MarkerService().query('yield', 'v1-y1');   // root = document.body
-        const viaScan = new MarkerService(host).query('yield', 'v1-y1'); // root khác → quét
-
-        expect(viaIndex).toHaveLength(1);
-        expect(viaScan).toHaveLength(1);
-        expect(viaIndex[0].openTag).toBe(viaScan[0].openTag);
-        expect(viaIndex[0].closeTag).toBe(viaScan[0].closeTag);
-        expect(viaIndex[0].children).toEqual(viaScan[0].children);
-        expect(viaIndex[0].name).toBe(viaScan[0].name);
-        expect(viaIndex[0].tagName).toBe(viaScan[0].tagName);
-        expect(viaIndex[0].registryID).toBe(viaScan[0].registryID);
     });
 
     it('scope: không claim cặp nằm ngoài parent được truyền vào', () => {

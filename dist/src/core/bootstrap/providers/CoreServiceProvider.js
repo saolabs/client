@@ -1,8 +1,6 @@
-import { app } from "../../helpers/app.js";
 import { MarkerRegistry } from "../../services/index.js";
 import { EventService } from "../../services/EventService.js";
 import { HttpService } from "../../services/HttpService.js";
-import { MarkerService } from "../../services/MarkerService.js";
 import { StoreService } from "../../services/StoreService.js";
 import HeadService from "../../services/HeadService.js";
 import { Devtools } from "../../devtools/index.js";
@@ -14,7 +12,6 @@ export class CoreServiceProvider extends ServiceProvider {
         this.name = PROVIDER_NAMES.CORE;
     }
     register() {
-        this.app.set("Marker", app(MarkerService), true);
         this.app.set("Store", StoreService.instance(), true);
         this.app.set("Storage", StoreService.instance(), true);
         this.app.set("Event", EventService.instance(), true);

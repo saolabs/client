@@ -359,7 +359,7 @@ export declare class ViewManager implements ViewManagerInterface {
      *   3. Laravel truyền $__VIEW_ID__ về client qua page data (__SSR_VIEW_ID__)
      *   4. Client gọi hydrateView() — view được tạo với cùng viewId
      *   5. Html elements tìm server-rendered DOM nodes bằng class {viewId}-{elementId}
-     *   6. Reactive regions claim server markers via SaoMarker.first()
+     *   6. Reactive regions claim server markers via markerRegistry.claim()
      *   7. Event handlers và state subscriptions được gắn vào DOM đã có
      *
      * Lưu ý: Không gây layout shift vì cấu trúc DOM được reuse (Html claim),

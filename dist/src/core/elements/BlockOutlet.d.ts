@@ -1,7 +1,6 @@
 import type { BlockOutletInterface } from "../contracts/BlockInterface.js";
 import { InitMode } from "../contracts/common.js";
 import type { HtmlInterface } from "../contracts/ElementInterface.js";
-import { MarkerModelInterface } from "../contracts/MarkerInterface.js";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
 export declare class BlockOutlet implements BlockOutletInterface {
@@ -14,7 +13,6 @@ export declare class BlockOutlet implements BlockOutletInterface {
     parentElement: HtmlInterface | null;
     ctx: ViewControllerInterface;
     initMode: InitMode;
-    marker: MarkerModelInterface | null;
     constructor({ ctx, parentElement, name, id, initMode }: {
         ctx: ViewControllerInterface;
         parentElement?: HtmlInterface | null;

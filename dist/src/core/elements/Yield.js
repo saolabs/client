@@ -19,8 +19,7 @@ export class YieldElement {
         this.id = `${ctx.viewId}-${rawId}`;
         this.defaultValue = defaultValue;
         // Claim marker server qua index O(1) của MarkerRegistry — giống Reactive/
-        // Output/Component. Trước dùng SaoMarker.first(), tức duyệt TOÀN BỘ comment
-        // của tài liệu cho mỗi @yield.
+        // Output/Component. Bản cũ duyệt TOÀN BỘ comment của tài liệu cho mỗi @yield.
         const claimed = (this.initMode === InitModes.HYDRATE)
             ? markerRegistry.claim('yield', this.id)
             : null;

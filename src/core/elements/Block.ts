@@ -1,11 +1,9 @@
 import type { BlockInterface, BlockRenderFactory } from "../contracts/BlockInterface.js";
 import { InitMode, InitModes } from "../contracts/common.js";
 import type { FragmentInterface, HtmlInterface } from "../contracts/ElementInterface.js";
-import { MarkerModelInterface } from "../contracts/MarkerInterface.js";
 import type { ReactiveInterface } from "../contracts/ReactiveInterface.js";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import { generateUUID } from "../helpers/utils.js";
-import { MarkerModel } from "../services/MarkerModel.js";
 import markerRegistry from "../services/MarkerRegistry.js";
 import type { SaoObjectType } from "../types/utils.js";
 import { Fragment } from "./Fragment.js";
@@ -39,7 +37,6 @@ export class Block implements BlockInterface {
     contentRenderFactory: BlockRenderFactory | null = null;
     openTag: Comment;
     closeTag: Comment;
-    marker: MarkerModelInterface | null = null;
     domChildren: Node[] = [];
     initMode?: InitMode | undefined;
     parentElement: HtmlInterface | null = null;
@@ -69,8 +66,8 @@ export class Block implements BlockInterface {
         this.initMode = initMode;
         this.contentRenderFactory = contentRenderFactory || ((parentElement: HtmlInterface) => []);
         // Hydrate: claim cặp marker server qua index O(1) của MarkerRegistry.
-        // (Trước dùng SaoMarker.first() — walker dùng chung bị exhaust nên chỉ
-        // block ĐẦU TIÊN claim được, các block sau lặng lẽ tạo marker mới.)
+        // (Bản cũ dùng chung một TreeWalker không reset nên chỉ block ĐẦU TIÊN
+        // claim được, các block sau lặng lẽ tạo marker mới.)
         const claimed = (this.initMode === InitModes.HYDRATE)
             ? markerRegistry.claim('block', this.id)
             : null;
@@ -83,16 +80,6 @@ export class Block implements BlockInterface {
             this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
             this.markerKey = markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
         }
-
-        this.marker = new MarkerModel({
-            tagName: "s:b",
-            name: "block",
-            markerID: this.id,
-            openTag: this.openTag,
-            closeTag: this.closeTag,
-            children: [],
-            attributes: {}
-        });
 
     }
 

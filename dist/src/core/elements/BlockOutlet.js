@@ -1,6 +1,5 @@
 import { InitModes } from "../contracts/common.js";
 import { generateUUID } from "../helpers/utils.js";
-import { MarkerModel } from "../services/MarkerModel.js";
 import markerRegistry from "../services/MarkerRegistry.js";
 export class BlockOutlet {
     constructor({ ctx, parentElement = null, name, id = null, initMode = InitModes.CREATE }) {
@@ -8,7 +7,6 @@ export class BlockOutlet {
         this.parent = null;
         this.parentElement = null;
         this.initMode = InitModes.CREATE;
-        this.marker = null;
         /** Registry guard */
         this.__destroyed__ = false;
         /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
@@ -36,15 +34,6 @@ export class BlockOutlet {
             this.openTag = markerRegistry.createMarkerStart('blockoutlet', this.id);
             this.closeTag = markerRegistry.createMarkerEnd('blockoutlet', this.id);
             this.markerKey = markerRegistry.register('blockoutlet', this.id, { name, viewId: ctx.viewId }); // Register this outlet in the MarkerRegistry
-            this.marker = new MarkerModel({
-                tagName: "s:bo",
-                name: "blockoutlet",
-                markerID: this.id,
-                openTag: this.openTag,
-                closeTag: this.closeTag,
-                children: [],
-                attributes: {}
-            });
         }
     }
     /**

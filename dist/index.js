@@ -13,7 +13,6 @@ export { defineBundle, loadBundles, mergeBundles, bootBundles } from './src/core
 export { ServiceProvider } from './src/core/bootstrap/providers/ServiceProvider.js';
 export { PROVIDER_NAMES, resolveProviderOrder } from './src/core/bootstrap/providers/provider-order.js';
 // Services
-export { MarkerService } from './src/core/services/MarkerService.js';
 export { EventService } from './src/core/services/EventService.js';
 export { HttpService } from './src/core/services/HttpService.js';
 export { StoreService } from './src/core/services/StoreService.js';

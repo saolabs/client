@@ -1,6 +1,5 @@
 import { InitModes } from "../contracts/common.js";
 import { generateUUID } from "../helpers/utils.js";
-import { MarkerModel } from "../services/MarkerModel.js";
 import markerRegistry from "../services/MarkerRegistry.js";
 /**
  * Block — a named mounting slot used in layout views.
@@ -28,7 +27,6 @@ export class Block {
         this.markerKey = null;
         this.fragment = null;
         this.contentRenderFactory = null;
-        this.marker = null;
         this.domChildren = [];
         this.parentElement = null;
         this.isOneBlock = true;
@@ -40,8 +38,8 @@ export class Block {
         this.initMode = initMode;
         this.contentRenderFactory = contentRenderFactory || ((parentElement) => []);
         // Hydrate: claim cặp marker server qua index O(1) của MarkerRegistry.
-        // (Trước dùng SaoMarker.first() — walker dùng chung bị exhaust nên chỉ
-        // block ĐẦU TIÊN claim được, các block sau lặng lẽ tạo marker mới.)
+        // (Bản cũ dùng chung một TreeWalker không reset nên chỉ block ĐẦU TIÊN
+        // claim được, các block sau lặng lẽ tạo marker mới.)
         const claimed = (this.initMode === InitModes.HYDRATE)
             ? markerRegistry.claim('block', this.id)
             : null;
@@ -54,15 +52,6 @@ export class Block {
             this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
             this.markerKey = markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
         }
-        this.marker = new MarkerModel({
-            tagName: "s:b",
-            name: "block",
-            markerID: this.id,
-            openTag: this.openTag,
-            closeTag: this.closeTag,
-            children: [],
-            attributes: {}
-        });
     }
     /** Initialize the block */
     init() {

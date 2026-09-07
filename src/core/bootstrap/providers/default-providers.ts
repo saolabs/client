@@ -17,7 +17,7 @@ type ProviderClass = new (app?: ApplicationInterface) => ServiceProvider;
 const SYSTEM_PROVIDER_NAMES = new Set(Object.values(PROVIDER_NAMES));
 
 /** Tên system services — không cho phép ghi đè qua config.services */
-const SYSTEM_SERVICE_KEYS = new Set(['Marker', 'Store', 'Storage', 'Event', 'Http', 'View', 'Router', 'Helper', 'API']);
+const SYSTEM_SERVICE_KEYS = new Set(['Store', 'Storage', 'Event', 'Http', 'View', 'Router', 'Helper', 'API']);
 
 /**
  * Chuyển `config.services` dạng { name: Class } thành NamedServiceProvider[].

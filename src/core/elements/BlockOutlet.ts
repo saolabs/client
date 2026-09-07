@@ -1,10 +1,8 @@
 import type { BlockOutletInterface } from "../contracts/BlockInterface.js";
 import { InitMode, InitModes } from "../contracts/common.js";
 import type { HtmlInterface } from "../contracts/ElementInterface.js";
-import { MarkerModelInterface } from "../contracts/MarkerInterface.js";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import { generateUUID } from "../helpers/utils.js";
-import { MarkerModel } from "../services/MarkerModel.js";
 import markerRegistry from "../services/MarkerRegistry.js";
 import type { SaoObjectType } from "../types/utils.js";
 
@@ -18,7 +16,6 @@ export class BlockOutlet implements BlockOutletInterface {
     parentElement: HtmlInterface | null = null;
     ctx: ViewControllerInterface;
     initMode: InitMode = InitModes.CREATE;
-    marker: MarkerModelInterface | null = null;
     constructor({ ctx, parentElement = null, name, id = null, initMode = InitModes.CREATE }: { ctx: ViewControllerInterface, parentElement?: HtmlInterface | null, name: string, id?: string | null, initMode?: InitMode }) {
         this.id = id ?? generateUUID(10); // Unique ID for debugging
         this.ctx = ctx;
@@ -43,15 +40,6 @@ export class BlockOutlet implements BlockOutletInterface {
             this.openTag = markerRegistry.createMarkerStart('blockoutlet', this.id);
             this.closeTag = markerRegistry.createMarkerEnd('blockoutlet', this.id);
             this.markerKey = markerRegistry.register('blockoutlet', this.id, { name, viewId: ctx.viewId }); // Register this outlet in the MarkerRegistry
-            this.marker = new MarkerModel({
-                tagName: "s:bo",
-                name: "blockoutlet",
-                markerID: this.id,
-                openTag: this.openTag,
-                closeTag: this.closeTag,
-                children: [],
-                attributes: {}
-            });
         }
 
     }

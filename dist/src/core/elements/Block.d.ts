@@ -1,7 +1,6 @@
 import type { BlockInterface, BlockRenderFactory } from "../contracts/BlockInterface.js";
 import { InitMode } from "../contracts/common.js";
 import type { FragmentInterface, HtmlInterface } from "../contracts/ElementInterface.js";
-import { MarkerModelInterface } from "../contracts/MarkerInterface.js";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
 /**
@@ -34,7 +33,6 @@ export declare class Block implements BlockInterface {
     contentRenderFactory: BlockRenderFactory | null;
     openTag: Comment;
     closeTag: Comment;
-    marker: MarkerModelInterface | null;
     domChildren: Node[];
     initMode?: InitMode | undefined;
     parentElement: HtmlInterface | null;

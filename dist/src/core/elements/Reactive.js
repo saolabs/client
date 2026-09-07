@@ -27,7 +27,6 @@ export class Reactive {
         this.unsubscribe = () => { };
         this._isStarted = false;
         /** Marker model (hydration) — gán bởi BlockManager/SSR khi cần; mặc định null. */
-        this.marker = null;
         /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
         this.markerKey = null;
         this.domChildren = []; // For compatibility with HtmlInterface; Reactive itself doesn't have a single root element
