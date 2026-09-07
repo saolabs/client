@@ -1641,6 +1641,13 @@ export class ViewManager implements ViewManagerInterface {
             logger.error(`Error hydrating view "${name}":`, err);
             this.showError(`Error hydrating view "${name}".`, err instanceof Error ? err.message : err);
             return null;
+        } finally {
+            // Hết lượt hydrate thì KHÔNG ai đọc index nữa (claim chỉ có ở đường
+            // HYDRATE, mà mỗi lần nạp trang chỉ hydrate một lượt) — giữ lại chỉ
+            // để Map trỏ vào comment của trang đầu suốt phiên: đo trên /docs
+            // thấy 94/106 entry thành node rời DOM ngay sau lần SPA nav đầu.
+            // Claim đến muộn (@await hydrate sau) vẫn đúng: miss sẽ tự dựng lại.
+            markerRegistry.invalidateIndex();
         }
 
         return renderResult;
