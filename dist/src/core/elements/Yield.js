@@ -1,6 +1,6 @@
 import { InitModes } from "../contracts/common.js";
 import { generateUUID } from "../helpers/utils.js";
-import { SaoMarker } from "../services/MarkerService.js";
+import markerRegistry from "../services/MarkerRegistry.js";
 export class YieldElement {
     constructor({ ctx, name = '', initMode = InitModes.CREATE, id = null, defaultValue = '' }) {
         this.saoType = "Yield";
@@ -18,20 +18,27 @@ export class YieldElement {
         const rawId = id && id.length > 0 ? id : generateUUID();
         this.id = `${ctx.viewId}-${rawId}`;
         this.defaultValue = defaultValue;
-        const yeildMarker = (this.initMode === InitModes.HYDRATE) ? SaoMarker.first('yield', this.id) : null;
-        if (yeildMarker) {
-            this.openTag = yeildMarker.openTag;
-            this.closeTag = yeildMarker.closeTag;
-            this.domChildren = yeildMarker.nodes.map((el) => el);
+        // Claim marker server qua index O(1) của MarkerRegistry — giống Reactive/
+        // Output/Component. Trước dùng SaoMarker.first(), tức duyệt TOÀN BỘ comment
+        // của tài liệu cho mỗi @yield.
+        const claimed = (this.initMode === InitModes.HYDRATE)
+            ? markerRegistry.claim('yield', this.id)
+            : null;
+        if (claimed) {
+            this.openTag = claimed.open;
+            this.closeTag = claimed.close;
+            for (let node = claimed.open.nextSibling; node && node !== claimed.close; node = node.nextSibling) {
+                this.domChildren.push(node);
+            }
         }
         else {
             this.createMarkers();
         }
     }
     createMarkers() {
-        const key = SaoMarker.addRegistry('yield', this.id, { name: this.name });
-        this.openTag = SaoMarker.createOpenMarker('yield', this.id);
-        this.closeTag = SaoMarker.createCloseMarker('yield', this.id);
+        markerRegistry.register('yield', this.id, { name: this.name });
+        this.openTag = markerRegistry.createMarkerStart('yield', this.id);
+        this.closeTag = markerRegistry.createMarkerEnd('yield', this.id);
     }
     setParentElement(parent) {
         this.parent = parent;

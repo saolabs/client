@@ -151,6 +151,35 @@ export class MarkerService {
             where
         );
 
+        const tagShortcutEarly = this.markerRegistry.shortcut(tagOrShortcut);
+        const fullTagEarly = this.markerRegistry.fullTag(tagShortcutEarly);
+
+        // Biết chính xác (tag, id) → tra thẳng index của MarkerRegistry: O(1),
+        // không duyệt toàn bộ comment của tài liệu. Chỉ dùng khi root là
+        // document.body vì index dựng trên đó; root tuỳ biến đi đường quét.
+        if (registryID && this.rootElement === document.body) {
+            const pair = this.markerRegistry.claim(fullTagEarly, registryID);
+            if (!pair) return [];
+
+            const attrs = this.getAttributesFromRegistry(tagOrShortcut, registryID);
+            if (!this.attributesMatch(attrs, attributeFilter)) return [];
+
+            const children: Node[] = [];
+            for (let node = pair.open.nextSibling; node && node !== pair.close; node = node.nextSibling) {
+                children.push(node);
+            }
+
+            return [{
+                name: fullTagEarly,
+                tagName: tagShortcutEarly,
+                registryID,
+                attributes: attrs,
+                openTag: pair.open,
+                closeTag: pair.close,
+                children,
+            }];
+        }
+
         const results: MarkerRecord[] = [];
         if (!(useCache === true)) {
             this.refreshWalker();
@@ -167,8 +196,8 @@ export class MarkerService {
             commentNodes.push(comment);
         }
 
-        const tagShortcut = this.markerRegistry.shortcut(tagOrShortcut);
-        const fullTagName = this.markerRegistry.fullTag(tagShortcut);
+        const tagShortcut = tagShortcutEarly;
+        const fullTagName = fullTagEarly;
         const stack: Array<{
             index: number;
             shortcut: string;

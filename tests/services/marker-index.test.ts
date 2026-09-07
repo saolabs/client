@@ -61,6 +61,26 @@ describe('MarkerRegistry.claim (marker index)', () => {
         expect(MarkerRegistry.claim('view', 'old')).toBeNull(); // node đã rời DOM
     });
 
+    it('query(tag, id) đi đường index cho kết quả TRÙNG đường quét', () => {
+        // query() có hai nhánh: tra index O(1) khi biết chính xác id, và quét
+        // tuyến tính khi root tuỳ biến. Hai nhánh phải trả cùng một record.
+        document.body.innerHTML =
+            `<div id="host">truoc${pair('yield', 'v1-y1', '<b>noi dung</b>')}sau</div>`;
+        const host = document.getElementById('host')!;
+
+        const viaIndex = new MarkerService().query('yield', 'v1-y1');   // root = document.body
+        const viaScan = new MarkerService(host).query('yield', 'v1-y1'); // root khác → quét
+
+        expect(viaIndex).toHaveLength(1);
+        expect(viaScan).toHaveLength(1);
+        expect(viaIndex[0].openTag).toBe(viaScan[0].openTag);
+        expect(viaIndex[0].closeTag).toBe(viaScan[0].closeTag);
+        expect(viaIndex[0].children).toEqual(viaScan[0].children);
+        expect(viaIndex[0].name).toBe(viaScan[0].name);
+        expect(viaIndex[0].tagName).toBe(viaScan[0].tagName);
+        expect(viaIndex[0].registryID).toBe(viaScan[0].registryID);
+    });
+
     it('scope: không claim cặp nằm ngoài parent được truyền vào', () => {
         document.body.innerHTML =
             `<div id="a">${pair('reactive', 'dup')}</div><div id="b"></div>`;

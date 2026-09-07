@@ -1,10 +1,8 @@
 import { InitMode, InitModes } from "../contracts/common.js";
 import { HtmlInterface, YieldInterface } from "../contracts/ElementInterface.js";
-import { MarkerModelInterface } from "../contracts/MarkerInterface.js";
 import { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import { generateUUID } from "../helpers/utils.js";
-import { MarkerModel } from "../services/MarkerModel.js";
-import { SaoMarker } from "../services/MarkerService.js";
+import markerRegistry from "../services/MarkerRegistry.js";
 import { SaoObjectType } from "../types/utils.js";
 
 export class YieldElement implements YieldInterface{
@@ -30,20 +28,28 @@ export class YieldElement implements YieldInterface{
         this.id = `${ctx.viewId}-${rawId}`;
         this.defaultValue = defaultValue;
 
-        const yeildMarker: MarkerModelInterface | null = (this.initMode === InitModes.HYDRATE) ? SaoMarker.first('yield', this.id) : null;
-        if(yeildMarker){
-            this.openTag = yeildMarker.openTag;
-            this.closeTag = yeildMarker.closeTag;
-            this.domChildren = yeildMarker.nodes.map((el: Node) => el);
+        // Claim marker server qua index O(1) của MarkerRegistry — giống Reactive/
+        // Output/Component. Trước dùng SaoMarker.first(), tức duyệt TOÀN BỘ comment
+        // của tài liệu cho mỗi @yield.
+        const claimed = (this.initMode === InitModes.HYDRATE)
+            ? markerRegistry.claim('yield', this.id)
+            : null;
+
+        if (claimed) {
+            this.openTag = claimed.open;
+            this.closeTag = claimed.close;
+            for (let node = claimed.open.nextSibling; node && node !== claimed.close; node = node.nextSibling) {
+                this.domChildren.push(node);
+            }
         } else {
             this.createMarkers();
         }
         
     }
     private createMarkers(){
-        const key = SaoMarker.addRegistry('yield', this.id, {name: this.name});
-        this.openTag = SaoMarker.createOpenMarker('yield', this.id);
-        this.closeTag = SaoMarker.createCloseMarker('yield', this.id);
+        markerRegistry.register('yield', this.id, {name: this.name});
+        this.openTag = markerRegistry.createMarkerStart('yield', this.id);
+        this.closeTag = markerRegistry.createMarkerEnd('yield', this.id);
     }
 
     setParentElement(parent: HtmlInterface | null): void {
