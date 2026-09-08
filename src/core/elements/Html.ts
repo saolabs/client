@@ -25,6 +25,39 @@ function cssEscape(value: string): string {
         .replace(/[^a-zA-Z0-9_-]/g, ch => `\\${ch}`);
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * `document.createElement('svg')` ra HTMLUnknownElement — SVG dựng bằng CSR
+ * không vẽ gì. Phải dùng createElementNS.
+ *
+ * Chỉ cần nhận ra `<svg>`: mọi thứ bên trong kế thừa namespace từ cha, kể cả
+ * tag không liệt kê được hết (`filter`, cả họ `fe*`, `textPath`…). Danh sách
+ * tag SVG là thừa và luôn thiếu.
+ *
+ * `foreignObject` CẮT chuỗi kế thừa: con của nó là HTML thật (đó là toàn bộ lý
+ * do nó tồn tại), parser của trình duyệt cũng làm đúng như vậy khi đọc markup
+ * SSR — không cắt ở đây thì SSR và CSR ra hai cây khác nhau.
+ *
+ * Tên tag phải giữ đúng hoa/thường: createElementNS KHÔNG có bảng điều chỉnh
+ * như parser HTML, `'clippath'` ra SVGElement trơ. Compiler đã trả về đúng
+ * `clipPath` (xem Parser::SVG_TAG_ADJUST).
+ */
+function createDomElement(tagName: string, parentElement?: HtmlInterface | null): HTMLElement {
+    const parent = parentElement?.element;
+    const isSvg = tagName === 'svg'
+        || (parent?.namespaceURI === SVG_NS && parent.tagName !== 'foreignObject');
+
+    return isSvg
+        ? document.createElementNS(SVG_NS, tagName) as unknown as HTMLElement
+        : document.createElement(tagName);
+}
+
+/** SVG phân biệt hoa thường — hạ chữ thường sẽ hỏng `clipPath`, `feGaussianBlur`… */
+function domTagName(el: Element): string {
+    return el.namespaceURI === SVG_NS ? el.tagName : el.tagName.toLowerCase();
+}
+
 export class Html implements HtmlInterface {
     saoType: SaoObjectType = 'Html';
     public element: HTMLElement;
@@ -95,7 +128,7 @@ export class Html implements HtmlInterface {
 
         if (directElement) {
             this.element = directElement;
-            this.tagName = this.element.tagName.toLowerCase();
+            this.tagName = domTagName(this.element);
         } else if (initMode === InitModes.HYDRATE) {
             // ── SSR Hydration: claim server-rendered DOM node bằng class ID ──────
             //
@@ -131,15 +164,15 @@ export class Html implements HtmlInterface {
 
             if (found) {
                 this.element = found;
-                this.tagName = found.tagName.toLowerCase();
+                this.tagName = domTagName(found);
             } else {
                 // Partial hydration fallback: element không có trong SSR output
-                this.element = document.createElement(tagName);
+                this.element = createDomElement(tagName, parentElement);
                 if (hydrateClass) this.element.classList.add(hydrateClass);
             }
         } else {
             // ── CSR (create mode): tạo element mới ───────────────────────────────
-            this.element = document.createElement(this.tagName);
+            this.element = createDomElement(this.tagName, parentElement);
             if (hydrateClass) this.element.classList.add(hydrateClass);
         }
 
@@ -217,7 +250,7 @@ export class Html implements HtmlInterface {
         }
         this.managedStyleNames.clear();
 
-        const defaults = document.createElement(this.tagName) as any;
+        const defaults = createDomElement(this.tagName, this.parent) as any;
         const target = this.element as any;
         for (const propName of this.managedPropertyNames) {
             try {

@@ -144,3 +144,90 @@ describe('Html — events', () => {
         expect(called).toBe(0);
     });
 });
+
+const NS_SVG = 'http://www.w3.org/2000/svg';
+const NS_HTML = 'http://www.w3.org/1999/xhtml';
+
+describe('Html — svg namespace', () => {
+    it('tag camelCase phải ra đúng lớp SVG, không phải SVGElement trơ', () => {
+        // createElementNS KHÔNG có bảng điều chỉnh tên tag như parser HTML:
+        // 'clippath' ra SVGElement trơ (không cắt gì), 'clipPath' mới ra
+        // SVGClipPathElement. Compiler giữ đúng hoa/thường qua SVG_TAG_ADJUST.
+        h = mountView(function () {
+            return this.wrapper((p: any) => [
+                this.html('s1', 'svg', p, {}, (sp: any) => [
+                    this.html('c1', 'clipPath', sp, {}, () => []),
+                    this.html('g1', 'linearGradient', sp, {}, () => []),
+                    this.html('f1', 'feGaussianBlur', sp, {}, () => []),
+                ]),
+            ]);
+        });
+
+        const kids = h.container.querySelector('svg')!.children;
+        expect(kids[0].tagName).toBe('clipPath');
+        expect(kids[1].tagName).toBe('linearGradient');
+        // `feGaussianBlur` chưa từng nằm trong danh sách tag nào — nó đúng nhờ
+        // kế thừa namespace của cha, đó là lý do không cần liệt kê tag SVG.
+        expect(kids[2].tagName).toBe('feGaussianBlur');
+        for (const k of kids) expect(k.namespaceURI).toBe(NS_SVG);
+    });
+
+    it('foreignObject CẮT kế thừa: con của nó là HTML', () => {
+        // Đây là toàn bộ lý do foreignObject tồn tại. Parser của trình duyệt
+        // làm đúng khi đọc markup SSR — CSR sai là lệch SSR/CSR.
+        h = mountView(function () {
+            return this.wrapper((p: any) => [
+                this.html('s1', 'svg', p, {}, (sp: any) => [
+                    this.html('fo1', 'foreignObject', sp, {}, (fp: any) => [
+                        this.html('d1', 'div', fp, {}, () => []),
+                    ]),
+                ]),
+            ]);
+        });
+
+        const fo = h.container.querySelector('svg')!.children[0];
+        expect(fo.tagName).toBe('foreignObject');
+        expect(fo.namespaceURI).toBe(NS_SVG);
+        expect(fo.children[0].namespaceURI).toBe(NS_HTML);
+    });
+
+    it('tag trùng tên HTML nằm ngoài svg vẫn là HTML', () => {
+        // 'a', 'title', 'style', 'script', 'text', 'image' có ở cả hai bên —
+        // nhận diện theo danh sách tag sẽ kéo nhầm chúng sang SVG.
+        h = mountView(function () {
+            return this.wrapper((p: any) => [
+                this.html('a1', 'a', p, {}, () => []),
+                this.html('t1', 'title', p, {}, () => []),
+            ]);
+        });
+
+        expect(h.container.querySelector('a')!.namespaceURI).toBe(NS_HTML);
+        expect(h.container.querySelector('title')!.namespaceURI).toBe(NS_HTML);
+    });
+
+    it('creates svg and its children with SVG namespace', () => {
+        h = mountView(function () {
+            return this.wrapper((parent: any) => [
+                this.html('icon1', 'svg', parent, {
+                    attrs: { viewBox: { type: 'static', value: '0 0 24 24' } },
+                }, (svgParent: any) => [
+                    this.html('path1', 'path', svgParent, {
+                        attrs: { d: { type: 'static', value: 'M0 0' } },
+                    }, () => []),
+                    this.html('circle1', 'circle', svgParent, {
+                        attrs: { r: { type: 'static', value: '4' } },
+                    }, () => []),
+                ]),
+            ]);
+        });
+
+        const svg = h.container.querySelector('svg');
+        const path = h.container.querySelector('path');
+        const circle = h.container.querySelector('circle');
+
+        expect(svg).not.toBeNull();
+        expect(svg?.namespaceURI).toBe('http://www.w3.org/2000/svg');
+        expect(path?.namespaceURI).toBe('http://www.w3.org/2000/svg');
+        expect(circle?.namespaceURI).toBe('http://www.w3.org/2000/svg');
+    });
+});
