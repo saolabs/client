@@ -24,8 +24,20 @@ export declare class Component implements ComponentInterface {
     initMode: InitMode;
     subscribeFn: () => void;
     unsubscribeFn: () => void;
+    /**
+     * Listener khai báo tại thẻ cha: `<mycomp @edit(openEditor(event))>`.
+     *
+     * Con gọi `emit('edit', payload)` → ViewController.emit tra Ở ĐÂY, không đi
+     * qua event bus: không rò sang instance khác, không phải gỡ đăng ký.
+     *
+     * Đọc lúc phát chứ không copy vào data con: mỗi lần cha render lại,
+     * `ViewController.include()` thay bảng này bằng closure mới, nên handler
+     * luôn nhìn thấy biến vòng lặp / prop của LƯỢT RENDER hiện tại — kể cả khi
+     * component không có prop reactive nào để kích hoạt updateData.
+     */
+    listeners: Record<string, (...args: any[]) => any>;
     dataFactory: ((parentElement: HtmlInterface | null) => Record<string, any>) | null;
-    constructor({ ctx, parent, id, stateKeys, data, dataFactory, path, type, condition, initMode, }: {
+    constructor({ ctx, parent, id, stateKeys, data, dataFactory, path, type, condition, initMode, listeners, }: {
         ctx: ViewControllerInterface;
         parent?: HtmlInterface | null;
         id?: string | null;
@@ -39,6 +51,7 @@ export declare class Component implements ComponentInterface {
             checker: () => any;
         } | null;
         initMode?: InitMode;
+        listeners?: Record<string, (...args: any[]) => any>;
     });
     /**
      * Tìm cặp marker component từ server-rendered HTML (format chuẩn §5.1):
@@ -52,6 +65,7 @@ export declare class Component implements ComponentInterface {
         checker: () => any;
     }): void;
     setStateKeys(stateKeys: string[]): void;
+    setListeners(listeners: Record<string, (...args: any[]) => any>): void;
     setParentElement(parent: HtmlInterface | null): void;
     setView(view: ViewInterface): void;
     setParent(parent: HtmlInterface | null): void;

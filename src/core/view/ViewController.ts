@@ -91,6 +91,14 @@ export class ViewController implements ViewControllerInterface {
     // ─── Data & Config ──────────────────────────────────────────
     /** Raw input data from route/parent */
     public data: Record<string, any> = {};
+
+    /**
+     * Component (@include) đã dựng view này — null với view gốc của route.
+     *
+     * Đây là lớp trung gian cha↔con: cha khai báo listener tại thẻ, Component
+     * giữ bảng đó, con phát qua {@link emit}.
+     */
+    public ownerComponent: ComponentInterface | null = null;
     /** User-defined config from setup() */
     private config: ViewConfig = {};
     /** Typed runtime config from compiled $__setup__ */
@@ -790,6 +798,20 @@ export class ViewController implements ViewControllerInterface {
         }
     }
 
+    /**
+     * Con phát sự kiện lên ĐÚNG cha đã include nó: `emit('edit', card['id'])`.
+     *
+     * Kênh trực tiếp, không qua App.Event — hai instance cùng view không nghe
+     * nhầm của nhau, và không có gì để gỡ đăng ký lúc destroy. Không ai lắng
+     * nghe thì im lặng, đúng như một DOM event không listener.
+     *
+     * Trả về giá trị handler trả về, nên con hỏi cha được (`if (!emit('close'))`).
+     */
+    emit(event: string, ...args: any[]): any {
+        const fn = this.ownerComponent?.listeners?.[event];
+        return typeof fn === 'function' ? fn(...args) : undefined;
+    }
+
     /** Áp data vào biến data (trait) từng key — không đụng state, không đụng lock */
     private applyDataTrait(newData: Record<string, any>): void {
         const itemFn = this.runtimeConfig.updateVariableItemData;
@@ -1281,12 +1303,14 @@ export class ViewController implements ViewControllerInterface {
         path: string = '',
         parentElement: HtmlInterface | null,
         stateKeys: string[],
-        dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>
+        dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>,
+        listeners: Record<string, (...args: any[]) => any> = {}
     ): Component {
         id = this.resolveIncludeId(id, 'include', path);
         const existing = this.aliveFromRegistry(id, Component);
         if (existing) {
             existing.setDataFactory(dataFactory);
+            existing.setListeners(listeners);
             if (stateKeys) {
                 existing.setStateKeys(stateKeys);
             }
@@ -1301,17 +1325,19 @@ export class ViewController implements ViewControllerInterface {
             path,
             type: 'default',
             initMode: this.initMode,
+            listeners,
         });
         this.registerElement(id, component);
 
         return component;
     }
 
-    includeIf(id: string | null = null, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component {
+    includeIf(id: string | null = null, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>, listeners: Record<string, (...args: any[]) => any> = {}): Component {
         id = this.resolveIncludeId(id, 'includeIf', path);
         const existing = this.aliveFromRegistry(id, Component);
         if (existing) {
             existing.setDataFactory(dataFactory);
+            existing.setListeners(listeners);
             if (stateKeys) {
                 existing.setStateKeys(stateKeys);
             }
@@ -1326,12 +1352,13 @@ export class ViewController implements ViewControllerInterface {
             path,
             type: 'if',
             initMode: this.initMode,
+            listeners,
         });
         this.registerElement(id, component);
         return component;
     }
 
-    includeWhen(id: string | null, condition: { stateKeys: string[], checker: () => any }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component {
+    includeWhen(id: string | null, condition: { stateKeys: string[], checker: () => any }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>, listeners: Record<string, (...args: any[]) => any> = {}): Component {
         id = this.resolveIncludeId(id, 'includeWhen', path);
         const existing = this.aliveFromRegistry(id, Component);
         if (existing) {
@@ -1352,6 +1379,7 @@ export class ViewController implements ViewControllerInterface {
             type: 'when',
             condition,
             initMode: this.initMode,
+            listeners,
         });
         this.registerElement(id, component);
         return component;

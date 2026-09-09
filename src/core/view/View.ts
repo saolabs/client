@@ -94,6 +94,18 @@ export class View implements ViewInterface, ViewLifecycleHooks {
     onPause?(): void | Promise<void>;
     onResume?(): void | Promise<void>;
 
+    /**
+     * Phát sự kiện lên cha đã `@include` view này.
+     *
+     * Là method của View (không chỉ hàm trong scope compiled) để template gọi
+     * thẳng được: `@click(emit('edit', card['id']))` biên dịch thành
+     * `{ handler: 'emit' }`, và ViewController.addEventListener tra handler
+     * dạng chuỗi trên chính View.
+     */
+    emit(event: string, ...args: any[]): any {
+        return this.__ctrl__.emit(event, ...args);
+    }
+
     // ─── Convenience Accessors ──────────────────────────────────
 
     get path(): string {

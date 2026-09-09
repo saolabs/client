@@ -103,6 +103,19 @@ export declare class ViewManager implements ViewManagerInterface {
     /** Render counter for debugging */
     private renderCount;
     /** Invalidates fire-and-forget render work when a newer navigation begins. */
+    /**
+     * Số lượt render `@await` đang bay.
+     *
+     * Nhánh "có prerender" cố ý fire-and-forget: nó trả skeleton về NGAY rồi
+     * mới fetch, nên người gọi không có promise nào để đợi và không có cách
+     * nào biết nội dung thật đã vào chưa. Đếm ở đây để {@link isSettled} trả
+     * lời được câu đó — công cụ đo, chụp ảnh trang, hay test parity SSR↔CSR
+     * đều cần một tín hiệu THẬT thay vì đoán bằng "DOM đứng yên": trang đang
+     * chờ dữ liệu thì DOM cũng đứng yên y như đã xong.
+     */
+    private pendingAsyncRenders;
+    /** Không còn render `@await` nào đang bay — nội dung thật đã vào DOM. */
+    get isSettled(): boolean;
     private navigationGeneration;
     store: StoreService;
     blockManager: BlockManagerService;

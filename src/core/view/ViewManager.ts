@@ -141,6 +141,23 @@ export class ViewManager implements ViewManagerInterface {
     private renderCount = 0;
 
     /** Invalidates fire-and-forget render work when a newer navigation begins. */
+    /**
+     * Số lượt render `@await` đang bay.
+     *
+     * Nhánh "có prerender" cố ý fire-and-forget: nó trả skeleton về NGAY rồi
+     * mới fetch, nên người gọi không có promise nào để đợi và không có cách
+     * nào biết nội dung thật đã vào chưa. Đếm ở đây để {@link isSettled} trả
+     * lời được câu đó — công cụ đo, chụp ảnh trang, hay test parity SSR↔CSR
+     * đều cần một tín hiệu THẬT thay vì đoán bằng "DOM đứng yên": trang đang
+     * chờ dữ liệu thì DOM cũng đứng yên y như đã xong.
+     */
+    private pendingAsyncRenders = 0;
+
+    /** Không còn render `@await` nào đang bay — nội dung thật đã vào DOM. */
+    get isSettled(): boolean {
+        return this.pendingAsyncRenders === 0;
+    }
+
     private navigationGeneration = 0;
 
     public store: StoreService = StoreService.instance("ViewManager");
@@ -794,6 +811,7 @@ export class ViewManager implements ViewManagerInterface {
                 }
 
                 // Fire-and-forget: fetch data → re-render → swap skeleton → main
+                this.pendingAsyncRenders++;
                 Http.get(fetchUrl).then(async (response: any) => {
                     // Route mới hoặc manager teardown đã bắt đầu: tuyệt đối không
                     // render/mount kết quả cũ trở lại root DOM.
@@ -856,6 +874,14 @@ export class ViewManager implements ViewManagerInterface {
                     // để view tự hiện trạng thái lỗi.
                     const handled = ctrl.handleError(err, { phase: 'async', path: ctrl.path }).handled;
                     if (!handled) logger.error(`Error fetching async data for view "${ctrl.path}":`, err);
+                }).finally(() => {
+                    this.pendingAsyncRenders--;
+                    // Nội dung thật vừa thay chỗ skeleton. Ai đã trang trí DOM
+                    // trước đó (tô màu code, dựng mục lục…) phải được báo để
+                    // làm lại — bản trang trí cũ nằm trên node vừa bị thay.
+                    if (this.pendingAsyncRenders === 0) {
+                        (app() as ApplicationInterface).Event?.emit('view:settled');
+                    }
                 });
 
                 // Return prerender result ngay — mountView sẽ mount skeleton

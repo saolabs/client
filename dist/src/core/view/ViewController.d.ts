@@ -62,6 +62,13 @@ export declare class ViewController implements ViewControllerInterface {
     originView: ViewControllerInterface | null;
     /** Raw input data from route/parent */
     data: Record<string, any>;
+    /**
+     * Component (@include) đã dựng view này — null với view gốc của route.
+     *
+     * Đây là lớp trung gian cha↔con: cha khai báo listener tại thẻ, Component
+     * giữ bảng đó, con phát qua {@link emit}.
+     */
+    ownerComponent: ComponentInterface | null;
     /** User-defined config from setup() */
     private config;
     /** Typed runtime config from compiled $__setup__ */
@@ -265,6 +272,16 @@ export declare class ViewController implements ViewControllerInterface {
      * Khi paused: buffer lại, apply lúc resume (ROUTE_RENDER_FLOW §8.2).
      */
     updateData(newData: Record<string, any>): void;
+    /**
+     * Con phát sự kiện lên ĐÚNG cha đã include nó: `emit('edit', card['id'])`.
+     *
+     * Kênh trực tiếp, không qua App.Event — hai instance cùng view không nghe
+     * nhầm của nhau, và không có gì để gỡ đăng ký lúc destroy. Không ai lắng
+     * nghe thì im lặng, đúng như một DOM event không listener.
+     *
+     * Trả về giá trị handler trả về, nên con hỏi cha được (`if (!emit('close'))`).
+     */
+    emit(event: string, ...args: any[]): any;
     /** Áp data vào biến data (trait) từng key — không đụng state, không đụng lock */
     private applyDataTrait;
     /**
@@ -380,12 +397,12 @@ export declare class ViewController implements ViewControllerInterface {
      * so behaviour stays idempotent even in the broken case.
      */
     private resolveIncludeId;
-    include(id: string | null | undefined, path: string | undefined, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component;
-    includeIf(id: string | null | undefined, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component;
+    include(id: string | null | undefined, path: string | undefined, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>, listeners?: Record<string, (...args: any[]) => any>): Component;
+    includeIf(id: string | null | undefined, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>, listeners?: Record<string, (...args: any[]) => any>): Component;
     includeWhen(id: string | null, condition: {
         stateKeys: string[];
         checker: () => any;
-    }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component;
+    }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>, listeners?: Record<string, (...args: any[]) => any>): Component;
     extendView(path: string, data?: Record<string, any>): ViewInterface | null;
     /** Create and push a new LoopContext onto the stack */
     __setLoopContext(length: number): LoopContext;

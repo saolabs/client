@@ -3,7 +3,7 @@ import { generateUUID } from "../helpers/utils.js";
 import { activateView, claimHydratedView, commitView, mountChildrenBeforeAnchor } from "../helpers/view.js";
 import markerRegistry from "../services/MarkerRegistry.js";
 export class Component {
-    constructor({ ctx, parent = null, id = null, stateKeys = [], data = {}, dataFactory = null, path = null, type = 'default', condition = null, initMode = InitModes.CREATE, }) {
+    constructor({ ctx, parent = null, id = null, stateKeys = [], data = {}, dataFactory = null, path = null, type = 'default', condition = null, initMode = InitModes.CREATE, listeners = {}, }) {
         this.saoType = 'Component';
         this.domChildren = []; // For compatibility with HtmlInterface; Component itself doesn't have a single root element
         this.viewRef = null;
@@ -13,6 +13,18 @@ export class Component {
         this.initMode = InitModes.CREATE; // Default initialization mode
         this.subscribeFn = () => { };
         this.unsubscribeFn = () => { };
+        /**
+         * Listener khai báo tại thẻ cha: `<mycomp @edit(openEditor(event))>`.
+         *
+         * Con gọi `emit('edit', payload)` → ViewController.emit tra Ở ĐÂY, không đi
+         * qua event bus: không rò sang instance khác, không phải gỡ đăng ký.
+         *
+         * Đọc lúc phát chứ không copy vào data con: mỗi lần cha render lại,
+         * `ViewController.include()` thay bảng này bằng closure mới, nên handler
+         * luôn nhìn thấy biến vòng lặp / prop của LƯỢT RENDER hiện tại — kể cả khi
+         * component không có prop reactive nào để kích hoạt updateData.
+         */
+        this.listeners = {};
         this.dataFactory = null;
         /** Registry guard */
         this.__destroyed__ = false;
@@ -32,6 +44,7 @@ export class Component {
         this.path = path;
         this.type = type;
         this.condition = condition;
+        this.listeners = listeners || {};
         this.initMode = initMode ?? InitModes.CREATE;
         if (this.initMode === InitModes.HYDRATE) {
             // ── Hydrate: claim cặp marker component server đã render ─────
@@ -70,6 +83,9 @@ export class Component {
     }
     setStateKeys(stateKeys) {
         this.stateKeys = stateKeys;
+    }
+    setListeners(listeners) {
+        this.listeners = listeners || {};
     }
     setParentElement(parent) {
         this.parent = parent;
@@ -274,6 +290,7 @@ export class Component {
         }
         this.viewRef = childView;
         const childCtrl = childView.__ctrl__;
+        childCtrl.ownerComponent = this;
         childCtrl.setParent(this.ctx);
         this.ctx.addChild(childCtrl);
         childCtrl.setParentElement(this.parent);

@@ -56,6 +56,13 @@ export class ViewController {
         // ─── Data & Config ──────────────────────────────────────────
         /** Raw input data from route/parent */
         this.data = {};
+        /**
+         * Component (@include) đã dựng view này — null với view gốc của route.
+         *
+         * Đây là lớp trung gian cha↔con: cha khai báo listener tại thẻ, Component
+         * giữ bảng đó, con phát qua {@link emit}.
+         */
+        this.ownerComponent = null;
         /** User-defined config from setup() */
         this.config = {};
         /** Typed runtime config from compiled $__setup__ */
@@ -680,6 +687,19 @@ export class ViewController {
             }
         }
     }
+    /**
+     * Con phát sự kiện lên ĐÚNG cha đã include nó: `emit('edit', card['id'])`.
+     *
+     * Kênh trực tiếp, không qua App.Event — hai instance cùng view không nghe
+     * nhầm của nhau, và không có gì để gỡ đăng ký lúc destroy. Không ai lắng
+     * nghe thì im lặng, đúng như một DOM event không listener.
+     *
+     * Trả về giá trị handler trả về, nên con hỏi cha được (`if (!emit('close'))`).
+     */
+    emit(event, ...args) {
+        const fn = this.ownerComponent?.listeners?.[event];
+        return typeof fn === 'function' ? fn(...args) : undefined;
+    }
     /** Áp data vào biến data (trait) từng key — không đụng state, không đụng lock */
     applyDataTrait(newData) {
         const itemFn = this.runtimeConfig.updateVariableItemData;
@@ -1133,11 +1153,12 @@ export class ViewController {
             `pass a deterministic id — marker sync with the server is broken for this component.`);
         return `cpn-missing-${this._missingIncludeIdCounter++}`;
     }
-    include(id = null, path = '', parentElement, stateKeys, dataFactory) {
+    include(id = null, path = '', parentElement, stateKeys, dataFactory, listeners = {}) {
         id = this.resolveIncludeId(id, 'include', path);
         const existing = this.aliveFromRegistry(id, Component);
         if (existing) {
             existing.setDataFactory(dataFactory);
+            existing.setListeners(listeners);
             if (stateKeys) {
                 existing.setStateKeys(stateKeys);
             }
@@ -1152,15 +1173,17 @@ export class ViewController {
             path,
             type: 'default',
             initMode: this.initMode,
+            listeners,
         });
         this.registerElement(id, component);
         return component;
     }
-    includeIf(id = null, path, parentElement, stateKeys, dataFactory) {
+    includeIf(id = null, path, parentElement, stateKeys, dataFactory, listeners = {}) {
         id = this.resolveIncludeId(id, 'includeIf', path);
         const existing = this.aliveFromRegistry(id, Component);
         if (existing) {
             existing.setDataFactory(dataFactory);
+            existing.setListeners(listeners);
             if (stateKeys) {
                 existing.setStateKeys(stateKeys);
             }
@@ -1175,11 +1198,12 @@ export class ViewController {
             path,
             type: 'if',
             initMode: this.initMode,
+            listeners,
         });
         this.registerElement(id, component);
         return component;
     }
-    includeWhen(id, condition, path, parentElement, stateKeys, dataFactory) {
+    includeWhen(id, condition, path, parentElement, stateKeys, dataFactory, listeners = {}) {
         id = this.resolveIncludeId(id, 'includeWhen', path);
         const existing = this.aliveFromRegistry(id, Component);
         if (existing) {
@@ -1200,6 +1224,7 @@ export class ViewController {
             type: 'when',
             condition,
             initMode: this.initMode,
+            listeners,
         });
         this.registerElement(id, component);
         return component;

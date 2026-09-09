@@ -15,6 +15,7 @@ export interface ComponentInterface {
     openTag: Comment;
     closeTag: Comment;
     stateKeys: string[];
+    listeners: Record<string, (...args: any[]) => any>;
     subscribeFn: () => void;
     unsubscribeFn: () => void;
     render(): void;

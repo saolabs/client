@@ -25,6 +25,18 @@ export class Component implements ComponentInterface {
     initMode: InitMode = InitModes.CREATE; // Default initialization mode
     subscribeFn: () => void = () => {};
     unsubscribeFn: () => void = () => {};
+    /**
+     * Listener khai báo tại thẻ cha: `<mycomp @edit(openEditor(event))>`.
+     *
+     * Con gọi `emit('edit', payload)` → ViewController.emit tra Ở ĐÂY, không đi
+     * qua event bus: không rò sang instance khác, không phải gỡ đăng ký.
+     *
+     * Đọc lúc phát chứ không copy vào data con: mỗi lần cha render lại,
+     * `ViewController.include()` thay bảng này bằng closure mới, nên handler
+     * luôn nhìn thấy biến vòng lặp / prop của LƯỢT RENDER hiện tại — kể cả khi
+     * component không có prop reactive nào để kích hoạt updateData.
+     */
+    listeners: Record<string, (...args: any[]) => any> = {};
     dataFactory: ((parentElement: HtmlInterface | null) => Record<string, any>) | null = null; 
 
     constructor({
@@ -38,6 +50,7 @@ export class Component implements ComponentInterface {
         type = 'default',
         condition = null,
         initMode = InitModes.CREATE,
+        listeners = {},
     }: {
         ctx: ViewControllerInterface;
         parent?: HtmlInterface | null;
@@ -49,6 +62,7 @@ export class Component implements ComponentInterface {
         type?: 'default' | 'if' | 'when';
         condition?: {stateKeys: string[], checker: () => any} | null;
         initMode?: InitMode;
+        listeners?: Record<string, (...args: any[]) => any>;
     }) {
         this.ctx = ctx;
         this.parent = parent;
@@ -61,6 +75,7 @@ export class Component implements ComponentInterface {
         this.path = path;
         this.type = type;
         this.condition = condition;
+        this.listeners = listeners || {};
         this.initMode = initMode ?? InitModes.CREATE;
 
         if (this.initMode === InitModes.HYDRATE) {
@@ -101,6 +116,9 @@ export class Component implements ComponentInterface {
     }
     setStateKeys(stateKeys: string[]) {
         this.stateKeys = stateKeys;
+    }
+    setListeners(listeners: Record<string, (...args: any[]) => any>) {
+        this.listeners = listeners || {};
     }
     setParentElement(parent: HtmlInterface | null): void {
         this.parent = parent;
@@ -327,6 +345,7 @@ export class Component implements ComponentInterface {
 
         this.viewRef = childView;
         const childCtrl = childView.__ctrl__;
+        childCtrl.ownerComponent = this;
         childCtrl.setParent(this.ctx);
         this.ctx.addChild(childCtrl);
         childCtrl.setParentElement(this.parent);

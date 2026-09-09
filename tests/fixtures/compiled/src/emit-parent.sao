@@ -1,0 +1,34 @@
+@import('fixtures.emit-child' as emitchild)
+
+@states({
+    picked: 0,
+    num: 7
+})
+
+<template>
+    <div>
+        <span id="picked">{{ picked }}</span>
+
+        {{-- Thẻ component: listener viết như trên element --}}
+        <div id="viaTag">
+            <emitchild :num="num" @edit(setPicked(event)) @close(setPicked(event))
+                       @pair((a, b) => setPicked(a + b))
+                       @on('row:changed', ({id, extra}) => setPicked(id + extra)) />
+        </div>
+
+        {{-- @include viết tay: listener nằm CÙNG object data, khoá on$ --}}
+        <div id="viaInclude">
+            @include('fixtures.emit-child', {
+                num: num,
+                on$edit: takeOne,
+                on$close: (v) => setPicked(v + 1),
+                on$pair: (a, b) => { setPicked(a); setPicked(a + b) },
+                'on$row:changed': (...args) => setPicked(args[0]['id'] + args[0]['extra'])
+            })
+        </div>
+    </div>
+</template>
+
+<script setup>
+    function takeOne(v) { setPicked(v); }
+</script>
