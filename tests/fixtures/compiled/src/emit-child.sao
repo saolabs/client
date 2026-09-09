@@ -2,16 +2,16 @@
 
 <template>
     <div>
-        <button class="child-edit" type="button" @click(emit('edit', num))>A</button>
+        <button class="child-edit" type="button" @click($view.emit('edit', num))>A</button>
         <button class="child-close" type="button" @click(doClose())>B</button>
-        <button class="child-pair" type="button" @click(emit('pair', num, 100))>C</button>
-        <button class="child-ns" type="button" @click(emit('row:changed', {id: num, extra: 1}))>D</button>
+        <button class="child-pair" type="button" @click($view.emit('pair', num, 100))>C</button>
+        <button class="child-ns" type="button" @click($view.emit('row:changed', {id: num, extra: 1}))>D</button>
     </div>
 </template>
 
 <script setup>
     /** emit gọi được từ <script setup>, không chỉ từ biểu thức template. */
     function doClose() {
-        emit('close', num * 2);
+        $view.emit('close', num * 2);
     }
 </script>
