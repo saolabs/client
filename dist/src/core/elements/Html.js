@@ -198,7 +198,7 @@ export class Html {
         }
         this.managedAttributeNames.clear();
         for (const className of this.managedClassNames) {
-            this.element.classList.remove(className);
+            this.removeClass(className);
         }
         this.managedClassNames.clear();
         for (const prop of this.managedStyleNames) {
@@ -445,12 +445,12 @@ export class Html {
                             .split(/\s+/).filter(Boolean);
                         for (const prev of applied) {
                             if (next.indexOf(prev) === -1) {
-                                this.element.classList.remove(prev);
+                                this.removeClass(prev);
                                 this.managedClassNames.delete(prev);
                             }
                         }
                         for (const name of next) {
-                            this.element.classList.add(name);
+                            this.addClass(name);
                             this.managedClassNames.add(name);
                         }
                         applied = next;
@@ -468,19 +468,19 @@ export class Html {
                 const className = classConfig.value;
                 this.managedClassNames.add(className);
                 if (classConfig.type === 'static') {
-                    this.element.classList.add(className);
+                    this.addClass(className);
                     continue;
                 }
                 if (classConfig.type === 'binding') {
                     const generation = this.bindingGeneration;
                     const initialValue = classConfig.factory ? classConfig.factory() : false;
-                    this.element.classList.toggle(className, !!initialValue);
+                    this.toggleClass(className, !!initialValue);
                     if (classConfig.stateKeys?.length) {
                         const unsubscribe = this.ctx.states.__.subscribe(classConfig.stateKeys, () => {
                             if (!this.isBindingCurrent(generation))
                                 return;
                             const newValue = classConfig.factory ? classConfig.factory() : false;
-                            this.element.classList.toggle(className, !!newValue);
+                            this.toggleClass(className, !!newValue);
                         });
                         this.bindingUnsubscribes.push(unsubscribe);
                     }
@@ -492,26 +492,65 @@ export class Html {
             this.managedClassNames.add(className);
             if (classConfig.type === 'static') {
                 if (classConfig.value) {
-                    this.element.classList.add(className);
+                    this.addClass(className);
                 }
             }
             else if (classConfig.type === 'binding') {
                 const generation = this.bindingGeneration;
                 // Initial value
                 const initialValue = classConfig.factory ? classConfig.factory() : !!classConfig.value;
-                this.element.classList.toggle(className, !!initialValue);
+                this.toggleClass(className, !!initialValue);
                 // Subscribe for reactive updates
                 if (classConfig.stateKeys?.length) {
                     const unsubscribe = this.ctx.states.__.subscribe(classConfig.stateKeys, () => {
                         if (!this.isBindingCurrent(generation))
                             return;
                         const newValue = classConfig.factory ? classConfig.factory() : false;
-                        this.element.classList.toggle(className, !!newValue);
+                        this.toggleClass(className, !!newValue);
                     });
                     this.bindingUnsubscribes.push(unsubscribe);
                 }
             }
         }
+    }
+    addClass(className) {
+        if (!className)
+            return;
+        if (className.includes(' ')) {
+            const tokens = className.trim().split(/\s+/);
+            for (let i = 0; i < tokens.length; i++) {
+                if (tokens[i])
+                    this.element.classList.add(tokens[i]);
+            }
+            return;
+        }
+        this.element.classList.add(className);
+    }
+    removeClass(className) {
+        if (!className)
+            return;
+        if (className.includes(' ')) {
+            const tokens = className.trim().split(/\s+/);
+            for (let i = 0; i < tokens.length; i++) {
+                if (tokens[i])
+                    this.element.classList.remove(tokens[i]);
+            }
+            return;
+        }
+        this.element.classList.remove(className);
+    }
+    toggleClass(className, force) {
+        if (!className)
+            return;
+        if (className.includes(' ')) {
+            const tokens = className.trim().split(/\s+/);
+            for (let i = 0; i < tokens.length; i++) {
+                if (tokens[i])
+                    this.element.classList.toggle(tokens[i], force);
+            }
+            return;
+        }
+        this.element.classList.toggle(className, force);
     }
     initializeStyles() {
         if (!this.config.styles)

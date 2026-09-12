@@ -73,6 +73,9 @@ export declare class Html implements HtmlInterface {
      */
     private _applyAttr;
     private initializeClasses;
+    private addClass;
+    private removeClass;
+    private toggleClass;
     private initializeStyles;
     private initializeEvents;
     addEventListeners(): void;

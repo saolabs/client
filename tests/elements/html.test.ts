@@ -95,6 +95,32 @@ describe('Html — classes', () => {
         await nextFrame();
         expect(div.classList.contains('is-open')).toBe(true);
     });
+
+    it('hỗ trợ chuỗi nhiều class chứa khoảng trắng (multi-token classes) không lỗi DOMTokenList', async () => {
+        h = mountView(function () {
+            const manager: any = this.states.__;
+            return this.wrapper((parent: any) => [
+                this.html('btn', 'button', parent, {
+                    classes: {
+                        'button button-sm': {
+                            type: 'binding',
+                            factory: () => manager.states['active'].value,
+                            stateKeys: ['active'],
+                        },
+                    },
+                }, () => [this.text('Tab')]),
+            ]);
+        }, { states: { active: true } });
+
+        const btn = h.container.querySelector('button')!;
+        expect(btn.classList.contains('button')).toBe(true);
+        expect(btn.classList.contains('button-sm')).toBe(true);
+
+        h.setState('active', false);
+        await nextFrame();
+        expect(btn.classList.contains('button')).toBe(false);
+        expect(btn.classList.contains('button-sm')).toBe(false);
+    });
 });
 
 describe('Html — events', () => {
