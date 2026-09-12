@@ -319,8 +319,23 @@ export class SectionManagerService implements SectionManagerInterface {
             if (raw === undefined || raw === null) continue;
             const value = String(raw);
             const key = name.slice(HEAD_SECTION_PREFIX.length);
-            if (key === 'title') HeadService.setTitle(value);
-            else HeadService.setMeta(key, value);
+            if (key === 'title') {
+                HeadService.setTitle(value);
+                HeadService.setMetaProperty('og:title', value);
+                HeadService.setMeta('twitter:title', value);
+            } else if (key === 'description') {
+                HeadService.setMeta('description', value);
+                HeadService.setMetaProperty('og:description', value);
+                HeadService.setMeta('twitter:description', value);
+            } else if (key.startsWith('og:')) {
+                HeadService.setMetaProperty(key, value);
+            } else if (key.startsWith('twitter:')) {
+                HeadService.setMeta(key, value);
+            } else if (key === 'canonical') {
+                HeadService.setLink('canonical', value);
+            } else {
+                HeadService.setMeta(key, value);
+            }
         }
     }
 

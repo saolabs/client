@@ -332,10 +332,28 @@ export class SectionManagerService {
                 continue;
             const value = String(raw);
             const key = name.slice(HEAD_SECTION_PREFIX.length);
-            if (key === 'title')
+            if (key === 'title') {
                 HeadService.setTitle(value);
-            else
+                HeadService.setMetaProperty('og:title', value);
+                HeadService.setMeta('twitter:title', value);
+            }
+            else if (key === 'description') {
+                HeadService.setMeta('description', value);
+                HeadService.setMetaProperty('og:description', value);
+                HeadService.setMeta('twitter:description', value);
+            }
+            else if (key.startsWith('og:')) {
+                HeadService.setMetaProperty(key, value);
+            }
+            else if (key.startsWith('twitter:')) {
                 HeadService.setMeta(key, value);
+            }
+            else if (key === 'canonical') {
+                HeadService.setLink('canonical', value);
+            }
+            else {
+                HeadService.setMeta(key, value);
+            }
         }
     }
     /** Revert every page-scoped head tag before mounting a new page's chain. Call once per navigation. */

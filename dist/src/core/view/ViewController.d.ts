@@ -455,23 +455,6 @@ export declare class ViewController implements ViewControllerInterface {
      */
     __while(execute: (loop: LoopContext) => any, maxIterations?: number): any;
     /**
-     * __showBinding — tính CSS style string cho @show directive.
-     *
-     * Compiler emit (pre-process trước AST):
-     *   @show($isVisible)  →  style="${this.__showBinding(['isVisible'], isVisible)}"
-     *
-     * Hành vi:
-     *   - condition truthy  → '' (element hiện, style="" hoặc style bị remove)
-     *   - condition falsy   → 'display: none;' (element ẩn)
-     *
-     * Reactivity được xử lý bởi Html._applyAttr() — nó subscribe stateKeys
-     * và gọi lại factory khi state thay đổi. Method này chỉ compute giá trị hiện tại.
-     *
-     * @param _stateKeys - Danh sách state keys (đã được encode trong compiled config, không dùng ở đây)
-     * @param condition  - Điều kiện hiện/ẩn (truthy = show, falsy = hide)
-     */
-    __showBinding(_stateKeys: string[], condition: any): string;
-    /**
      * __styleBinding — tính inline CSS style string cho @style directive.
      *
      * Compiler emit (pre-process trước AST):

@@ -457,11 +457,13 @@ loop_id_expr = node.custom_key_js if node.custom_key_js else '__loopIndex'
 
 ### Kết luận thực tế
 
+Dạng viết trên thẻ `#foreach` hạ về đúng `@foreach` này ở preprocessor, nên mọi điều trong mục này áp dụng y hệt — `#key` cũng bắt buộc như `@key`.
+
 Dùng `@key` với `@foreach` là **bắt buộc** cho SSR hydration đúng. Compiler nên enforce hoặc warn khi thiếu `@key` trong foreach có SSR.
 
 ---
 
-## §15 — Directive Binding Helpers: `__showBinding`, `__styleBinding`, `__classBinding`
+## §15 — Directive Binding Helpers: `__styleBinding`, `__classBinding`
 
 ### Tổng quan
 
@@ -469,39 +471,19 @@ Compiler pre-process một số directives **trước** khi parse AST. Kết qu�
 
 | Directive | Pre-processor | Method được gọi |
 |---|---|---|
-| `@show($cond)` | `show_directive_handler.py` | `this.__showBinding(stateKeys, cond)` |
 | `@style(['prop' => $val])` | `style_directive_handler.py` | `this.__styleBinding(stateKeys, [['prop', val], ...])` |
 | `@class([...])` | `class_binding_handler.py` (legacy) | `this.__classBinding([{type, value, checker?}])` |
 
 ---
 
-### §15.1 — `__showBinding`
+### §15.1 — `@show` đã bị gỡ
 
-**Compiler emit (show_directive_handler.py):**
-```html
-<!-- Input .sao -->
-<div @show($isVisible)>
+`@show`/`@hide` (và `__showBinding` đi kèm) **không còn tồn tại**. Chúng hỏng ở
+cả hai nhánh biên dịch và sinh ra hai cây DOM khác nhau, nên hydrate không thể
+khớp. Compiler nay **báo lỗi** khi gặp `@show(`/`@hide(`.
 
-<!-- Sau pre-process (trước AST parse) -->
-<div style="${this.__showBinding(['isVisible'], isVisible)}">
-```
-
-**Compiled JS config:**
-```javascript
-attrs: {
-  style: {
-    type: 'binding',
-    factory: () => this.__showBinding(['isVisible'], isVisible),
-    stateKeys: ['isVisible'],
-  }
-}
-```
-
-**Runtime behavior:**
-- `condition` truthy → `''` (element hiện, style attribute bị xóa hoặc set rỗng)
-- `condition` falsy → `'display: none;'` (element ẩn)
-
-Reactivity: `Html._applyAttr()` subscribe `stateKeys` và gọi lại `factory()` khi state thay đổi.
+Thay thế: `@if(…)` để bỏ hẳn element, hoặc `@style(['display' => …])` khi cần
+giữ element trong DOM lúc ẩn. Xem `docs/SAO_ELEMENT_DIRECTIVES_RFC.md` §10.1.
 
 ---
 
@@ -565,7 +547,7 @@ classes: this.__classBinding([
 ViewController.render()
   └─ Html constructor (initMode = CREATE/HYDRATE)
        └─ Html._applyAttr()
-            └─ factory()  ← calls __showBinding / __styleBinding
+            └─ factory()  ← calls __styleBinding
        └─ Html.initializeClasses()
             └─ (new AST path: classes[] config trực tiếp)
             └─ (legacy path: __classBinding result đã được inline vào config)
@@ -574,7 +556,6 @@ ViewController.render()
 ### §15.5 — Tests
 
 `tests/directives/directive-bindings.test.ts`:
-- `__showBinding`: truthy/falsy conditions, stateKeys không ảnh hưởng
 - `__styleBinding`: filtering null/undefined/false/'', giữ 0, empty array, invalid input guard
 - `__classBinding`: static classes, binding classes với checker, no-checker guard, closure state, defensive guard cho non-array
 

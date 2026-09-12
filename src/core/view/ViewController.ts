@@ -1615,35 +1615,18 @@ export class ViewController implements ViewControllerInterface {
 
     // ─── Directive Binding Helpers ──────────────────────────────
     //
-    // Compiler pre-processes @show/@style/@class directives thành
-    // template literal calls trước khi tạo element config.
-    // Ví dụ: @show($isVisible) → style="${this.__showBinding(['isVisible'], isVisible)}"
-    //        @style([...])     → ${this.__styleBinding([...], [...])}
-    //        @class([...])     → ${this.__classBinding([...])}  (legacy path)
+    // Compiler pre-processes @style/@class directives thành template literal
+    // calls trước khi tạo element config.
+    // Ví dụ: @style([...]) → ${this.__styleBinding([...], [...])}
+    //        @class([...]) → ${this.__classBinding([...])}  (legacy path)
     //
     // Các method này được Html._applyAttr() gọi qua factory khi render và khi
     // state thay đổi (Html đã subscribe stateKeys từ compiled config).
+    //
+    // `__showBinding` từng ở đây, cho `@show`. Compiler đã gỡ `@show`/`@hide`
+    // (chúng hỏng ở CẢ HAI nhánh và ra hai cây DOM khác nhau) nên không còn ai
+    // gọi tới — xem docs/SAO_ELEMENT_DIRECTIVES_RFC.md §10.1.
     // ────────────────────────────────────────────────────────────
-
-    /**
-     * __showBinding — tính CSS style string cho @show directive.
-     *
-     * Compiler emit (pre-process trước AST):
-     *   @show($isVisible)  →  style="${this.__showBinding(['isVisible'], isVisible)}"
-     *
-     * Hành vi:
-     *   - condition truthy  → '' (element hiện, style="" hoặc style bị remove)
-     *   - condition falsy   → 'display: none;' (element ẩn)
-     *
-     * Reactivity được xử lý bởi Html._applyAttr() — nó subscribe stateKeys
-     * và gọi lại factory khi state thay đổi. Method này chỉ compute giá trị hiện tại.
-     *
-     * @param _stateKeys - Danh sách state keys (đã được encode trong compiled config, không dùng ở đây)
-     * @param condition  - Điều kiện hiện/ẩn (truthy = show, falsy = hide)
-     */
-    __showBinding(_stateKeys: string[], condition: any): string {
-        return condition ? '' : 'display: none;';
-    }
 
     /**
      * __styleBinding — tính inline CSS style string cho @style directive.
