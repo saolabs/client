@@ -5,7 +5,12 @@
 export { Application } from './src/core/app/Application.js';
 export { app } from './src/core/helpers/app.js';
 export { default as App } from './src/core/bootstrap/app.js';
-export { MarkerService } from './src/core/services/MarkerService.js';
+export { defineBundle, loadBundles, mergeBundles, bootBundles } from './src/core/bootstrap/bundle.js';
+export type { SaolaBundle, MergedBundles, ViewFactory } from './src/core/contracts/BundleInterface.js';
+export { ServiceProvider } from './src/core/bootstrap/providers/ServiceProvider.js';
+export { PROVIDER_NAMES, resolveProviderOrder } from './src/core/bootstrap/providers/provider-order.js';
+export type { NamedServiceProvider, ProviderName } from './src/core/bootstrap/providers/provider-order.js';
+export type { ServiceProviderInterface } from './src/core/contracts/ServiceProviderInterface.js';
 export { EventService } from './src/core/services/EventService.js';
 export { HttpService } from './src/core/services/HttpService.js';
 export { StoreService } from './src/core/services/StoreService.js';
@@ -21,6 +26,9 @@ export { HeadService } from './src/core/services/HeadService.js';
 export { Devtools, devtools, inspector } from './src/core/devtools/index.js';
 export type { DevtoolsEvent, DevtoolsEventType, DevtoolsViewNode } from './src/core/devtools/index.js';
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';
+export type { ViewUserConfig } from './src/core/view/View.js';
+export { ResourceScope } from './src/core/view/ResourceScope.js';
+export type { WatchCallback, WatchContext, WatchOptions, Cleanup } from './src/core/view/ResourceScope.js';
 export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
 export { Reactive } from './src/core/elements/Reactive.js';
 export { Block } from './src/core/elements/Block.js';
@@ -43,10 +51,11 @@ export type { StorageServiceInterface } from './src/core/contracts/StorageServic
 export type { LoggerServiceInterface, LoggerConfig, LogLevel } from './src/core/contracts/LoggerServiceInterface.js';
 export type { ViewInterface } from './src/core/contracts/ViewInterface.js';
 export type { ViewControllerInterface } from './src/core/contracts/ViewControllerInterface.js';
+export type { ViewConfigThis, ViewRuntimeConfig } from './src/core/contracts/ViewControllerInterface.js';
 export type { ViewManagerInterface } from './src/core/contracts/ViewManagerInterface.js';
 export type { ReactiveInterface } from './src/core/contracts/ReactiveInterface.js';
 export type { RouterInterface } from './src/core/contracts/RouterInterface.js';
 export type { RouteDefinition, Route, RouteMatch, RouterConfig } from './src/core/routers/Router.js';
-export type { MarkerRecord, MarkerTagName } from './src/core/contracts/MarkerInterface.js';
+export type { MarkerTagName } from './src/core/contracts/MarkerInterface.js';
 export type { APIEndpoints } from './src/core/helpers/ApiClient.js';
 //# sourceMappingURL=index.d.ts.map

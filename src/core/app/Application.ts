@@ -27,18 +27,18 @@
  * const router = app.make('router');
  */
 
-import type { ApplicationInterface, ServiceKey, ServiceFactory, ServiceBinding } from '../contracts/ApplicationInterface';
-import type { ServiceProviderInterface } from '../contracts/ServiceProviderInterface';
-import type { ViewManagerInterface, RouterInterface } from '../contracts/utils';
-import type { HelperInterface } from '../contracts/HelperInterface';
-import type { EventServiceInterface } from '../contracts/EventServiceInterface';
-import type { HttpServiceInterface } from '../contracts/HttpServiceInterface';
-import type { StoreServiceInterface } from '../contracts/StoreServiceInterface';
-import type { StorageServiceInterface } from '../contracts/StorageServiceInterface';
-import type { LoggerServiceInterface } from '../contracts/LoggerServiceInterface';
-import type { HeadServiceInterface } from '../contracts/HeadServiceInterface';
-import { APIClientInterface } from '../contracts/ApiInterface';
-import { SaoObjectType, OOTEnum } from '../types/utils';
+import type { ApplicationInterface, ServiceKey, ServiceFactory, ServiceBinding } from '../contracts/ApplicationInterface.js';
+import type { ServiceProviderInterface } from '../contracts/ServiceProviderInterface.js';
+import type { ViewManagerInterface, RouterInterface } from '../contracts/utils.js';
+import type { HelperInterface } from '../contracts/HelperInterface.js';
+import type { EventServiceInterface } from '../contracts/EventServiceInterface.js';
+import type { HttpServiceInterface } from '../contracts/HttpServiceInterface.js';
+import type { StoreServiceInterface } from '../contracts/StoreServiceInterface.js';
+import type { StorageServiceInterface } from '../contracts/StorageServiceInterface.js';
+import type { LoggerServiceInterface } from '../contracts/LoggerServiceInterface.js';
+import type { HeadServiceInterface } from '../contracts/HeadServiceInterface.js';
+import { APIClientInterface } from '../contracts/ApiInterface.js';
+import { SaoObjectType, OOTEnum } from '../types/utils.js';
 
 // ─── Application ────────────────────────────────────────────────
 
@@ -303,6 +303,15 @@ export class Application implements ApplicationInterface {
             (provider as any).initApplication();
         }
         provider.register();
+
+        // Đăng ký SAU khi app đã boot — plugin nạp muộn qua App.push(), hoặc
+        // provider của theme cắm vào giữa phiên. boot() vòng lặp chính đã chạy
+        // xong và có cờ chặn, nên nếu không gọi ở đây thì provider chỉ chạy nửa
+        // vòng đời: register() có, boot() không, và KHÔNG có lỗi nào phát ra.
+        if (this.booted && typeof provider.boot === 'function') {
+            provider.boot();
+        }
+
         return this;
     }
 

@@ -1,9 +1,8 @@
-import { InitMode } from "../contracts/common";
-import type { HtmlInterface, SaoElementChildren } from "../contracts/ElementInterface";
-import type { MarkerModelInterface } from "../contracts/MarkerInterface";
-import type { ReactiveInterface, ReactiveChildrenFactory } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { SaoObjectType } from "../types/utils";
+import { InitMode } from "../contracts/common.js";
+import type { HtmlInterface, SaoElementChildren } from "../contracts/ElementInterface.js";
+import type { ReactiveInterface, ReactiveChildrenFactory } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import type { SaoObjectType } from "../types/utils.js";
 /**
  * Reactive — a region in the DOM bounded by comment markers that
  * can re-render its content when reactive dependencies change.
@@ -36,7 +35,6 @@ export declare class Reactive implements ReactiveInterface {
     unsubscribe: () => void;
     private _isStarted;
     /** Marker model (hydration) — gán bởi BlockManager/SSR khi cần; mặc định null. */
-    marker: MarkerModelInterface | null;
     /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
     private markerKey;
     domChildren: Node[];
@@ -120,11 +118,6 @@ export declare class Reactive implements ReactiveInterface {
      *   cho unchanged items.
      */
     private renderForeach;
-    /**
-     * Di chuyển một khối marker-based (openTag ... closeTag) đến trước closeTag của Reactive.
-     * Dùng khi reuse một slot đã có trong DOM nhưng cần thay đổi vị trí (reorder).
-     */
-    private _moveMarkerBlock;
     /**
      * Xoá các DOM nodes "mồ côi" giữa openTag và closeTag của Reactive.
      * Orphan = nodes không thuộc bất kỳ child nào trong newChildren.

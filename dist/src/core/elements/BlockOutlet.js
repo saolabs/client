@@ -1,14 +1,12 @@
-import { InitModes } from "../contracts/common";
-import { generateUUID } from "../helpers/utils";
-import { MarkerModel } from "../services/MarkerModel";
-import markerRegistry from "../services/MarkerRegistry";
+import { InitModes } from "../contracts/common.js";
+import { generateUUID } from "../helpers/utils.js";
+import markerRegistry from "../services/MarkerRegistry.js";
 export class BlockOutlet {
     constructor({ ctx, parentElement = null, name, id = null, initMode = InitModes.CREATE }) {
         this.saoType = 'BlockOutlet';
         this.parent = null;
         this.parentElement = null;
         this.initMode = InitModes.CREATE;
-        this.marker = null;
         /** Registry guard */
         this.__destroyed__ = false;
         /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
@@ -21,7 +19,6 @@ export class BlockOutlet {
         this.initMode = initMode;
         if (this.initMode === InitModes.HYDRATE) {
             // Claim cặp marker server <!--s:bo:{id}-s--> ... <!--s:bo:{id}-e-->
-            // bằng fresh TreeWalker (tránh exhaust walker dùng chung của SaoMarker).
             const claimed = this.claimSSRMarkers();
             if (claimed) {
                 this.openTag = claimed.open;
@@ -37,40 +34,15 @@ export class BlockOutlet {
             this.openTag = markerRegistry.createMarkerStart('blockoutlet', this.id);
             this.closeTag = markerRegistry.createMarkerEnd('blockoutlet', this.id);
             this.markerKey = markerRegistry.register('blockoutlet', this.id, { name, viewId: ctx.viewId }); // Register this outlet in the MarkerRegistry
-            this.marker = new MarkerModel({
-                tagName: "s:bo",
-                name: "blockoutlet",
-                markerID: this.id,
-                openTag: this.openTag,
-                closeTag: this.closeTag,
-                children: [],
-                attributes: {}
-            });
         }
     }
     /**
      * Tìm cặp marker outlet từ server-rendered HTML (format chuẩn §5.1):
      *   open:  s:bo:{id}-s   close: s:bo:{id}-e
-     * Quét trong parentElement (fallback document.body) bằng fresh TreeWalker.
+     * Tra index của MarkerRegistry, chặn trong parentElement nếu có.
      */
     claimSSRMarkers() {
-        const searchRoot = this.parentElement?.element ?? document.body;
-        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
-        const openText = markerRegistry.openComment('blockoutlet', this.id);
-        const closeText = markerRegistry.closeComment('blockoutlet', this.id);
-        let openNode = null;
-        let node;
-        while ((node = walker.nextNode())) {
-            const value = node.nodeValue?.trim() ?? '';
-            if (!openNode && value === openText) {
-                openNode = node;
-                continue;
-            }
-            if (openNode && value === closeText) {
-                return { open: openNode, close: node };
-            }
-        }
-        return null;
+        return markerRegistry.claim('blockoutlet', this.id, this.parentElement?.element ?? null);
     }
     hydrate() {
         // Hydration logic if needed (e.g. reattach event listeners)

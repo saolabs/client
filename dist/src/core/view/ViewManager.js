@@ -16,24 +16,28 @@
  *   - Element tree rendering → ViewController.render()
  *   - Section system → Block/BlockOutlet
  */
-import { BlockManager } from "../services/BlockManager";
-import { SectionManager } from "../services/SectionManager";
-import devtools from "../devtools/hook";
-import { BlockOutlet } from "../elements/BlockOutlet";
-import { PageCacheService, detachWrapperDOM } from "../services/PageCache";
-import { Html } from "../elements/Html";
-import { hasData } from "../helpers/utils";
-import { activateView, claimHydratedView, commitView } from "../helpers/view";
-import markerRegistry from "../services/MarkerRegistry";
-import logger from "../services/LoggerService";
-import { StoreService } from "../services/StoreService";
-import { InitModes } from "../contracts/common";
-import { OOTEnum } from "../types/utils";
-import { app } from "../helpers/app";
+import { BlockManager } from "../services/BlockManager.js";
+import { SectionManager } from "../services/SectionManager.js";
+import devtools from "../devtools/hook.js";
+import { BlockOutlet } from "../elements/BlockOutlet.js";
+import { PageCacheService, detachWrapperDOM } from "../services/PageCache.js";
+import { Html } from "../elements/Html.js";
+import { hasData } from "../helpers/utils.js";
+import { activateView, claimHydratedView, commitView } from "../helpers/view.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import logger from "../services/LoggerService.js";
+import { StoreService } from "../services/StoreService.js";
+import { InitModes } from "../contracts/common.js";
+import { OOTEnum } from "../types/utils.js";
+import { app } from "../helpers/app.js";
 function isRenderableObject(result) {
     return typeof result === 'object' && result !== null && 'saoType' in result;
 }
 export class ViewManager {
+    /** Không còn render `@await` nào đang bay — nội dung thật đã vào DOM. */
+    get isSettled() {
+        return this.pendingAsyncRenders === 0;
+    }
     constructor(app) {
         /** DI container */
         this.App = null;
@@ -72,6 +76,17 @@ export class ViewManager {
         /** Render counter for debugging */
         this.renderCount = 0;
         /** Invalidates fire-and-forget render work when a newer navigation begins. */
+        /**
+         * Số lượt render `@await` đang bay.
+         *
+         * Nhánh "có prerender" cố ý fire-and-forget: nó trả skeleton về NGAY rồi
+         * mới fetch, nên người gọi không có promise nào để đợi và không có cách
+         * nào biết nội dung thật đã vào chưa. Đếm ở đây để {@link isSettled} trả
+         * lời được câu đó — công cụ đo, chụp ảnh trang, hay test parity SSR↔CSR
+         * đều cần một tín hiệu THẬT thay vì đoán bằng "DOM đứng yên": trang đang
+         * chờ dữ liệu thì DOM cũng đứng yên y như đã xong.
+         */
+        this.pendingAsyncRenders = 0;
         this.navigationGeneration = 0;
         this.store = StoreService.instance("ViewManager");
         this.blockManager = BlockManager;
@@ -311,10 +326,19 @@ export class ViewManager {
      */
     async view(name, data, cache) {
         try {
-            const cached = this.viewFromStore(name, data, cache);
+            // Khoá store phải là khoá registry ĐÃ RESOLVE, không phải tên được
+            // yêu cầu. Khi theme đang bật, `__layout__` là tiền tố của cả context
+            // nên tên yêu cầu là `themes.{slug}.layouts.docs` còn view thật lấy
+            // từ base: `ctrl.path` = `web.layouts.docs`. Hai chỗ dọn store
+            // (`pageCache.onEvict` và `destroyLayoutView`) đều xoá theo
+            // `ctrl.path`, nên lưu theo tên yêu cầu là instance ĐÃ DESTROY nằm
+            // lại trong store vĩnh viễn — lần điều hướng sau `extendView` trả về
+            // nó và `render()` trả rỗng. Không bật theme thì hai khoá trùng nhau
+            // nên bug này ẩn hoàn toàn.
+            const key = this.resolveRegistryKey(name);
+            const cached = this.viewFromStore(key, data, cache);
             if (cached)
                 return cached;
-            const key = this.resolveRegistryKey(name);
             const factory = this.resolvedFactories.get(key) ?? this.viewRegistry[key];
             if (!factory || typeof factory !== 'function') {
                 logger.error(`View "${name}" not found in registry.`);
@@ -330,10 +354,12 @@ export class ViewManager {
                     logger.error(`Lazy view "${name}" did not resolve to a factory or View.`);
                     return null;
                 }
-                this.resolvedFactories.set(name, lazyFactory);
+                // Cache theo `key` cho khớp chỗ đọc ở trên; theo `name` thì
+                // lần sau luôn trượt cache khi theme đang bật.
+                this.resolvedFactories.set(key, lazyFactory);
                 view = lazyFactory(data ?? {}, systemData);
             }
-            return this.finalizeView(name, view, cache);
+            return this.finalizeView(key, view, cache);
         }
         catch (err) {
             // Gồm cả chunk 404 / mạng lỗi khi import() — không để throw ra Router.
@@ -348,10 +374,11 @@ export class ViewManager {
      */
     resolveViewSync(name, data, cache) {
         try {
-            const cached = this.viewFromStore(name, data, cache);
+            // Xem ghi chú ở view(): khoá store bám khoá registry đã resolve.
+            const key = this.resolveRegistryKey(name);
+            const cached = this.viewFromStore(key, data, cache);
             if (cached)
                 return cached;
-            const key = this.resolveRegistryKey(name);
             const factory = this.resolvedFactories.get(key) ?? this.viewRegistry[key];
             if (!factory || typeof factory !== 'function') {
                 logger.error(`View "${name}" not found in registry.`);
@@ -363,7 +390,7 @@ export class ViewManager {
                     `không await được. Gọi App.View.preloadView("${name}") trước, hoặc để view này eager trong registry.`);
                 return null;
             }
-            return this.finalizeView(name, view, cache);
+            return this.finalizeView(key, view, cache);
         }
         catch (err) {
             logger.error(`Error loading view ${name}:`, err);
@@ -621,6 +648,7 @@ export class ViewManager {
                     return this.callViewRenderFactory(view, 'render', data, mountRoot, initMode, cache, renderLevel, navigationGeneration);
                 }
                 // Fire-and-forget: fetch data → re-render → swap skeleton → main
+                this.pendingAsyncRenders++;
                 Http.get(fetchUrl).then(async (response) => {
                     // Route mới hoặc manager teardown đã bắt đầu: tuyệt đối không
                     // render/mount kết quả cũ trở lại root DOM.
@@ -649,8 +677,10 @@ export class ViewManager {
                         // this.block(...) call; push the new content into it the same
                         // way the initial mount does (mountViewBlocks clears the old
                         // content first, so the placeholder is removed as part of this).
+                        // Block tìm outlet THEO TÊN nên viewId của page là đủ;
+                        // section thì không — xem mountSectionsAcrossChain().
                         this.blockManager.mountViewBlocks(ctrl.viewId);
-                        this.sectionManager.mountViewSections(ctrl.viewId);
+                        this.mountSectionsAcrossChain(ctrl.viewId, this.currentLayoutChain);
                         commitView(ctrl);
                         this.blockManager.startAll();
                         this.sectionManager.startAll();
@@ -681,6 +711,14 @@ export class ViewManager {
                     const handled = ctrl.handleError(err, { phase: 'async', path: ctrl.path }).handled;
                     if (!handled)
                         logger.error(`Error fetching async data for view "${ctrl.path}":`, err);
+                }).finally(() => {
+                    this.pendingAsyncRenders--;
+                    // Nội dung thật vừa thay chỗ skeleton. Ai đã trang trí DOM
+                    // trước đó (tô màu code, dựng mục lục…) phải được báo để
+                    // làm lại — bản trang trí cũ nằm trên node vừa bị thay.
+                    if (this.pendingAsyncRenders === 0) {
+                        app().Event?.emit('view:settled');
+                    }
                 });
                 // Return prerender result ngay — mountView sẽ mount skeleton
                 return prerenderResult;
@@ -898,7 +936,7 @@ export class ViewManager {
             }
         }
         this.blockManager.mountViewBlocks(pageCtrl.viewId);
-        this.sectionManager.mountViewSections(pageCtrl.viewId);
+        this.mountSectionsAcrossChain(pageCtrl.viewId, layoutChain);
         pageCtrl.mount();
         for (const layout of newLayouts)
             commitView(layout.__ctrl__);
@@ -908,6 +946,28 @@ export class ViewManager {
         this.blockManager.startAll();
         this.sectionManager.startAll();
         activateView(pageCtrl);
+    }
+    /**
+     * Đưa `@section` của page tới `@yield` của layout.
+     *
+     * `mountViewSections` lọc yield theo `yieldEl.ctx.viewId`, mà YIELD THUỘC
+     * LAYOUT khai báo nó chứ không thuộc page — nên gọi riêng với viewId của
+     * page thì không yield nào khớp. Chỉ quét các layout MỚI cũng không đủ:
+     * điều hướng giữa hai trang dùng chung một layout thì `common` phủ hết
+     * chuỗi, vòng lặp mount layout không chạy lần nào, và section của trang mới
+     * không bao giờ tới nơi.
+     *
+     * Quét cả chuỗi là an toàn: mountViewSections chỉ áp lại `activeSections`
+     * hiện hành vào từng yield, gọi thừa không đổi kết quả.
+     */
+    mountSectionsAcrossChain(pageViewId, layoutChain) {
+        this.sectionManager.mountViewSections(pageViewId);
+        for (const layout of layoutChain) {
+            const layoutId = layout?.__ctrl__?.viewId;
+            if (layoutId && layoutId !== pageViewId) {
+                this.sectionManager.mountViewSections(layoutId);
+            }
+        }
     }
     /** Hydration strategy: claim Blade DOM without insert/clear mutations. */
     activateHydratedChain(pageView, layoutChain) {
@@ -1227,8 +1287,26 @@ export class ViewManager {
      * Apply an atomic context update received from a JSON response before the
      * Router retries navigation with the newly materialized route table.
      */
+    requiresReloadForViewContext(state) {
+        const revision = typeof state?.revision === 'string' ? state.revision : null;
+        if (!revision || revision === this.contextRevision)
+            return false;
+        const nextViews = typeof state?.views === 'string' && state.views !== ''
+            ? state.views
+            : this.contextViews;
+        // The current registry was built for one namespace. Changing only its
+        // string prefix cannot materialize the new theme factories/CSS and can
+        // mix new Blade names with old JavaScript. Until a staged registry swap
+        // exists, a document load is the only coherent transition.
+        return nextViews !== this.contextViews;
+    }
     applyViewContext(state) {
         var _a;
+        if (this.requiresReloadForViewContext(state)) {
+            // Router owns the document transition. A direct caller must not
+            // mutate revision/systemData while the matching registry is absent.
+            return false;
+        }
         const revision = typeof state?.revision === 'string' ? state.revision : null;
         if (!revision || revision === this.contextRevision)
             return false;
@@ -1273,7 +1351,7 @@ export class ViewManager {
      *   3. Laravel truyền $__VIEW_ID__ về client qua page data (__SSR_VIEW_ID__)
      *   4. Client gọi hydrateView() — view được tạo với cùng viewId
      *   5. Html elements tìm server-rendered DOM nodes bằng class {viewId}-{elementId}
-     *   6. Reactive regions claim server markers via SaoMarker.first()
+     *   6. Reactive regions claim server markers via markerRegistry.claim()
      *   7. Event handlers và state subscriptions được gắn vào DOM đã có
      *
      * Lưu ý: Không gây layout shift vì cấu trúc DOM được reuse (Html claim),
@@ -1308,12 +1386,22 @@ export class ViewManager {
             return this.mountView(name, data, route);
         }
         const navigationGeneration = ++this.navigationGeneration;
+        // HTML server của lượt này là nguồn duy nhất để claim marker — bỏ index
+        // của lượt hydrate trước (bfcache / test / re-hydrate) trước khi quét.
+        markerRegistry.invalidateIndex();
         const targetUrl = route?.$uri ?? route?.$urlPath ?? name;
-        // Tách __SSR_VIEW_ID__ khỏi data TRƯỚC khi tạo view — đây là key nội bộ
-        // hydration, không phải view data. Tạo factory với viewData PHẲNG đã sạch
-        // → ctrl.data không lẫn __SSR_VIEW_ID__, và (data flat) factory đọc đúng.
-        const { __SSR_VIEW_ID__: ssrViewId, ...viewData } = data;
-        const view = await this.view(name, viewData, false);
+        // Router only supplies route params and the SSR id. Seed the page from
+        // the matching server instance before constructing data-derived states.
+        const { __SSR_VIEW_ID__: ssrViewId, ...routeData } = data;
+        const key = this.resolveRegistryKey(name);
+        const serverData = this.ssrViewData[key]?.instances?.[ssrViewId]?.data ?? {};
+        const viewData = { ...serverData, ...routeData };
+        // Compiled factories capture this id in their render closures; assigning
+        // ctrl.viewId afterwards alone cannot update those closures.
+        const constructorData = { ...viewData, __SSR_VIEW_ID__: ssrViewId };
+        const view = await this.view(name, constructorData, false);
+        // Keep the internal id out of application data after factory setup.
+        delete constructorData.__SSR_VIEW_ID__;
         if (!view) {
             this.showError(`hydrateView: View "${name}" không tìm thấy.`);
             return null;
@@ -1342,6 +1430,14 @@ export class ViewManager {
             logger.error(`Error hydrating view "${name}":`, err);
             this.showError(`Error hydrating view "${name}".`, err instanceof Error ? err.message : err);
             return null;
+        }
+        finally {
+            // Hết lượt hydrate thì KHÔNG ai đọc index nữa (claim chỉ có ở đường
+            // HYDRATE, mà mỗi lần nạp trang chỉ hydrate một lượt) — giữ lại chỉ
+            // để Map trỏ vào comment của trang đầu suốt phiên: đo trên /docs
+            // thấy 94/106 entry thành node rời DOM ngay sau lần SPA nav đầu.
+            // Claim đến muộn (@await hydrate sau) vẫn đúng: miss sẽ tự dựng lại.
+            markerRegistry.invalidateIndex();
         }
         return renderResult;
     }

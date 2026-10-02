@@ -1,4 +1,4 @@
-import type { ServiceProviderInterface } from "../../contracts/ServiceProviderInterface";
+import type { ServiceProviderInterface } from "../../contracts/ServiceProviderInterface.js";
 
 /**
  * Tên các provider mặc định — dùng constant thay vì magic string.

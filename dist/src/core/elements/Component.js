@@ -1,9 +1,9 @@
-import { InitModes } from "../contracts/common";
-import { generateUUID } from "../helpers/utils";
-import { activateView, claimHydratedView, commitView, mountChildrenBeforeAnchor } from "../helpers/view";
-import markerRegistry from "../services/MarkerRegistry";
+import { InitModes } from "../contracts/common.js";
+import { generateUUID } from "../helpers/utils.js";
+import { activateView, claimHydratedView, commitView, mountChildrenBeforeAnchor } from "../helpers/view.js";
+import markerRegistry from "../services/MarkerRegistry.js";
 export class Component {
-    constructor({ ctx, parent = null, id = null, stateKeys = [], data = {}, dataFactory = null, path = null, type = 'default', condition = null, initMode = InitModes.CREATE, }) {
+    constructor({ ctx, parent = null, id = null, stateKeys = [], data = {}, dataFactory = null, path = null, type = 'default', condition = null, initMode = InitModes.CREATE, listeners = {}, }) {
         this.saoType = 'Component';
         this.domChildren = []; // For compatibility with HtmlInterface; Component itself doesn't have a single root element
         this.viewRef = null;
@@ -13,6 +13,18 @@ export class Component {
         this.initMode = InitModes.CREATE; // Default initialization mode
         this.subscribeFn = () => { };
         this.unsubscribeFn = () => { };
+        /**
+         * Listener khai báo tại thẻ cha: `<mycomp @edit(openEditor(event))>`.
+         *
+         * Con gọi `emit('edit', payload)` → ViewController.emit tra Ở ĐÂY, không đi
+         * qua event bus: không rò sang instance khác, không phải gỡ đăng ký.
+         *
+         * Đọc lúc phát chứ không copy vào data con: mỗi lần cha render lại,
+         * `ViewController.include()` thay bảng này bằng closure mới, nên handler
+         * luôn nhìn thấy biến vòng lặp / prop của LƯỢT RENDER hiện tại — kể cả khi
+         * component không có prop reactive nào để kích hoạt updateData.
+         */
+        this.listeners = {};
         this.dataFactory = null;
         /** Registry guard */
         this.__destroyed__ = false;
@@ -32,6 +44,7 @@ export class Component {
         this.path = path;
         this.type = type;
         this.condition = condition;
+        this.listeners = listeners || {};
         this.initMode = initMode ?? InitModes.CREATE;
         if (this.initMode === InitModes.HYDRATE) {
             // ── Hydrate: claim cặp marker component server đã render ─────
@@ -57,23 +70,7 @@ export class Component {
      *   open: s:c:{id}-s   close: s:c:{id}-e
      */
     claimSSRMarkers() {
-        const searchRoot = this.parent?.element ?? document.body;
-        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
-        const openText = markerRegistry.openComment('component', this.id);
-        const closeText = markerRegistry.closeComment('component', this.id);
-        let openNode = null;
-        let node;
-        while ((node = walker.nextNode())) {
-            const value = node.nodeValue?.trim() ?? '';
-            if (!openNode && value === openText) {
-                openNode = node;
-                continue;
-            }
-            if (openNode && value === closeText) {
-                return { open: openNode, close: node };
-            }
-        }
-        return null;
+        return markerRegistry.claim('component', this.id, this.parent?.element ?? null);
     }
     mergeData(newData) {
         this.data = { ...this.data, ...newData };
@@ -86,6 +83,9 @@ export class Component {
     }
     setStateKeys(stateKeys) {
         this.stateKeys = stateKeys;
+    }
+    setListeners(listeners) {
+        this.listeners = listeners || {};
     }
     setParentElement(parent) {
         this.parent = parent;
@@ -220,16 +220,25 @@ export class Component {
     hydrateChild() {
         if (this._childMounted && this.viewRef)
             return;
+        // Không có marker view của server giữa cặp marker component → server
+        // KHÔNG render view con ở đây. Hydrate tiếp thì child giữ viewId do
+        // client sinh ('c…'), rồi đi tìm class "{c…}-{id}" và marker
+        // "s:v:c…" không tồn tại → dựng cây mới CẠNH cây server, tức nhân đôi
+        // DOM. Dọn phần server bỏ lại rồi đi đường CSR — giống nhánh
+        // "partial hydration fallback" ở render() khi marker component vắng.
+        const ssrViewId = this.discoverChildViewId();
+        if (!ssrViewId) {
+            this.unmountChild();
+            this.mountChild();
+            return;
+        }
         const childView = this.resolveChildView();
         if (!childView)
             return;
         const childCtrl = childView.__ctrl__;
         // Ghi đè viewId = viewId server (trước render — Wrapper/Html/Output của
         // child claim theo marker/class prefix bằng viewId này)
-        const ssrViewId = this.discoverChildViewId();
-        if (ssrViewId) {
-            childCtrl.viewId = ssrViewId;
-        }
+        childCtrl.viewId = ssrViewId;
         // Commit state TRƯỚC render (factory @if/@foreach sinh đúng cây khớp SSR);
         // flush ngay khi chưa subscribe → discard pending, không phá DOM claim.
         childCtrl.initMode = InitModes.HYDRATE;
@@ -243,8 +252,14 @@ export class Component {
     }
     /** Tạo + mount child view giữa markers (nếu chưa có) */
     mountChild() {
-        if (this._childMounted && this.viewRef)
+        if (this._childMounted && this.viewRef) {
+            if (this.dataFactory) {
+                const ctrl = this.viewRef.__ctrl__;
+                ctrl.updateData(this.dataFactory(this.parent));
+                ctrl.states.__.flushNow();
+            }
             return;
+        }
         const childView = this.resolveChildView();
         if (!childView)
             return;
@@ -281,6 +296,7 @@ export class Component {
         }
         this.viewRef = childView;
         const childCtrl = childView.__ctrl__;
+        childCtrl.ownerComponent = this;
         childCtrl.setParent(this.ctx);
         this.ctx.addChild(childCtrl);
         childCtrl.setParentElement(this.parent);

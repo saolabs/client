@@ -1,14 +1,14 @@
-import { InitMode, InitModes } from "../contracts/common";
-import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface";
-import type { MarkerModelInterface } from "../contracts/MarkerInterface";
-import type { ReactiveInterface, ReactiveChildrenFactory, ReactiveRenderFn } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../helpers/utils";
-import { mountChildrenBeforeAnchor } from "../helpers/view";
-import markerRegistry from "../services/MarkerRegistry";
-import type { SaoObjectType } from "../types/utils";
-import { ForeachSlotCache } from "./ForeachSlotCache";
-import { isLeaving } from "../helpers/transition";
+import { reconcileChildren } from './reconcileChildren.js';
+import { InitMode, InitModes } from "../contracts/common.js";
+import type { HtmlInterface, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface.js";
+import type { ReactiveInterface, ReactiveChildrenFactory, ReactiveRenderFn } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { generateUUID } from "../helpers/utils.js";
+import { mountChildrenBeforeAnchor } from "../helpers/view.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { ForeachSlotCache } from "./ForeachSlotCache.js";
+import { isLeaving } from "../helpers/transition.js";
 
 /**
  * Reactive — a region in the DOM bounded by comment markers that 
@@ -43,7 +43,6 @@ export class Reactive implements ReactiveInterface {
     public unsubscribe: () => void = () => { };
     private _isStarted = false;
     /** Marker model (hydration) — gán bởi BlockManager/SSR khi cần; mặc định null. */
-    marker: MarkerModelInterface | null = null;
     /** Key trả về bởi markerRegistry.register — destroy() dùng để gỡ lại */
     private markerKey: string | null = null;
 
@@ -123,25 +122,7 @@ export class Reactive implements ReactiveInterface {
      * (r = shortcut cho 'reactive').
      */
     private claimSSRMarkers(): { open: Comment; close: Comment } | null {
-        const searchRoot = this.parentElement?.element ?? document.body;
-        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
-
-        const openText = markerRegistry.openComment('reactive', this.id);
-        const closeText = markerRegistry.closeComment('reactive', this.id);
-        let openNode: Comment | null = null;
-
-        let node: Comment | null;
-        while ((node = walker.nextNode() as Comment | null)) {
-            const value = node.nodeValue?.trim() ?? '';
-            if (!openNode && value === openText) {
-                openNode = node;
-                continue;
-            }
-            if (openNode && value === closeText) {
-                return { open: openNode, close: node };
-            }
-        }
-        return null;
+        return markerRegistry.claim('reactive', this.id, this.parentElement?.element ?? null);
     }
 
     setParentElement(parent: HtmlInterface | null): void {
@@ -232,9 +213,16 @@ export class Reactive implements ReactiveInterface {
             this.renderForeach();
         } else {
             // ── Re-render các type khác: clear + factory ──────────────────────
-            this.clearContent();
-            this._renderChildren();
+            const output = this._runFactoryWithCache();
+            const next = output.filter(child => child != null).map(child =>
+                typeof child === 'string' || typeof child === 'number' ? document.createTextNode(String(child)) : child);
+            const parent = this.closeTag.parentNode;
+            if (parent) reconcileChildren(parent, this.children, next, this.closeTag);
+            this.children = next as any;
+            this._cleanOrphanNodes(next);
+            if (this._isStarted) for (const child of next) (child as any).start?.();
         }
+        this.mounted = true;
     }
 
     /**
@@ -379,74 +367,14 @@ export class Reactive implements ReactiveInterface {
             }
         });
 
-        // ── Step 4: Reorder DOM ───────────────────────────────────────────────
-        // insertBefore(closeTag) cho từng element mới:
-        //   - Cached elements: DOM MOVE (đã có trong DOM, di chuyển đến vị trí đúng)
-        //   - New elements: chạy render() + insert
-        const trulyNew: any[] = [];
-        for (const child of newChildren) {
-            if ('element' in child && (child as any).element) {
-                if (prevChildren.has(child)) {
-                    // Reused — chỉ move DOM
-                    this.insertBeforeClose((child as any).element);
-                } else {
-                    // New — render + insert
-                    this.insertBeforeClose((child as any).element);
-                    child.render();
-                    trulyNew.push(child);
-                }
-            } else if ('openTag' in child) {
-                if (prevChildren.has(child)) {
-                    // Reused marker-based: move openTag + closeTag + nội dung giữa
-                    this._moveMarkerBlock(child as any);
-                } else {
-                    // New marker-based: insert markers, render
-                    this.insertBeforeClose((child as any).openTag);
-                    this.insertBeforeClose((child as any).closeTag);
-                    child.render();
-                    trulyNew.push(child);
-                }
-            }
-        }
-
-        // ── Step 5: Cleanup orphan DOM nodes ──────────────────────────────────
-        // Sau khi reorder, các DOM nodes của items đã destroyed còn "trôi nổi"
-        // giữa openTag và đầu tiên của new children → phải xoá.
-        this._cleanOrphanNodes(newChildren);
-
-        // ── Step 6: Cập nhật children list ────────────────────────────────────
-        this.children = newChildren;
-
-        // ── Step 7: Start new elements nếu vùng đang active ──────────────────
-        if (this._isStarted) {
-            for (const child of trulyNew) {
-                if (typeof child.start === 'function') {
-                    child.start();
-                }
-            }
-        }
-    }
-
-    /**
-     * Di chuyển một khối marker-based (openTag ... closeTag) đến trước closeTag của Reactive.
-     * Dùng khi reuse một slot đã có trong DOM nhưng cần thay đổi vị trí (reorder).
-     */
-    private _moveMarkerBlock(child: { openTag: Comment; closeTag: Comment }): void {
+        const trulyNew = newChildren.filter(child => !prevChildren.has(child));
         const parent = this.closeTag.parentNode;
-        if (!parent) return;
-
-        // Thu thập tất cả nodes từ child.openTag → child.closeTag (inclusive)
-        const nodes: Node[] = [];
-        let current: Node | null = child.openTag;
-        while (current && current !== child.closeTag) {
-            nodes.push(current);
-            current = current.nextSibling;
-        }
-        if (current) nodes.push(current); // closeTag
-
-        // Move toàn bộ block về vị trí mới (trước this.closeTag)
-        for (const node of nodes) {
-            parent.insertBefore(node, this.closeTag);
+        if (parent) reconcileChildren(parent, this.children, newChildren, this.closeTag,
+            child => cache.refreshedElements.has(child));
+        this._cleanOrphanNodes(newChildren);
+        this.children = newChildren;
+        if (this._isStarted) {
+            for (const child of trulyNew) child.start?.();
         }
     }
 

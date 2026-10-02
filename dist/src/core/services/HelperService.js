@@ -1,4 +1,4 @@
-import { app } from "../helpers/app";
+import { app } from "../helpers/app.js";
 /**
  * HelperService — PHP-compatible helper functions for SaoView runtime.
  *

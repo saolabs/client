@@ -43,6 +43,9 @@ export interface ForeachSlot {
     item: any;
     /** Saola elements sinh ra bởi item factory — Html, Output, Reactive, ... */
     elements: any[];
+    /** Compiler opt-in: closures are refreshed within this occurrence's scope. */
+    registry?: Map<string, any>;
+    identity?: number;
 }
 /** Kết quả claim: slot khi reuse được, occ để store khi phải tạo mới. */
 export interface ForeachClaim {
@@ -50,6 +53,10 @@ export interface ForeachClaim {
     occ: number;
 }
 export declare class ForeachSlotCache {
+    readonly refreshedElements: Set<any>;
+    private nextIdentity;
+    /** Initial SSR indexes, then monotonically allocated identities for new rows. */
+    allocateIdentity(index: number): number;
     /** Map key → danh sách slot theo occurrence (duplicate keys) */
     private _map;
     /** Occurrence counter của pass hiện tại */
@@ -67,13 +74,13 @@ export declare class ForeachSlotCache {
      * Trả slot khi reuse được (key khớp + ref không đổi); ngược lại slot=null
      * và caller phải store(key, occ, ...) sau khi tạo elements.
      */
-    claim(key: any, item: any): ForeachClaim;
+    claim(key: any, item: any, reconcile?: boolean): ForeachClaim;
     /**
      * Lưu slot mới tại (key, occ) — ghi đè slot cũ nếu ref đã đổi.
      * Slot bị ghi đè KHÔNG còn nằm trong `_map` nên prunePass duyệt `_map` sẽ
      * không thấy nó nữa → phải chuyển sang `_evicted` để vẫn được destroy.
      */
-    store(key: any, occ: number, item: any, elements: any[]): ForeachSlot;
+    store(key: any, occ: number, item: any, elements: any[], registry?: Map<string, any>): ForeachSlot;
     /**
      * Kết thúc pass: mọi slot không được touch = item đã rời list (hoặc bị
      * thay bằng ref mới) → gọi onRemove(slot) để destroy elements, gỡ khỏi cache.

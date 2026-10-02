@@ -10,9 +10,9 @@
  * Không phụ thuộc test runner nào (không import vitest/jest) — chạy được với
  * bất kỳ runner nào miễn là môi trường có DOM.
  */
-import { View } from '../core/view/View';
-import { ViewController } from '../core/view/ViewController';
-import { Html } from '../core/elements/Html';
+import { View } from '../core/view/View.js';
+import { ViewController } from '../core/view/ViewController.js';
+import { Html } from '../core/elements/Html.js';
 /**
  * Chờ qua batch RAF flush (state → DOM).
  * State update được gom theo requestAnimationFrame nên sau khi set state phải

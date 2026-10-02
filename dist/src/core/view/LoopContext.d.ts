@@ -1,4 +1,4 @@
-import type { LoopContextInterface } from "../contracts/LoopContextInterface";
+import type { LoopContextInterface } from "../contracts/LoopContextInterface.js";
 /**
  * LoopContext — provides loop metadata for @foreach, @for, @while directives.
  *

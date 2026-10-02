@@ -1,4 +1,4 @@
-import type { BlockInterface, BlockManagerInterface, BlockOutletInterface } from "../contracts/BlockInterface";
+import type { BlockInterface, BlockManagerInterface, BlockOutletInterface } from "../contracts/BlockInterface.js";
 /**
  * BlockManager — manages all block slots in a layout view.
  *

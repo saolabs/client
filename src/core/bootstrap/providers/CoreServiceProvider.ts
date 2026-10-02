@@ -1,21 +1,19 @@
-import { MarkerRegistryInterface, MarkerServiceInterface } from "../../contracts/MarkerInterface";
-import { app } from "../../helpers/app";
-import { MarkerRegistry, MarkerRegistryService } from "../../services";
-import { EventService } from "../../services/EventService";
-import { HttpService } from "../../services/HttpService";
-import { MarkerService } from "../../services/MarkerService";
-import { StoreService } from "../../services/StoreService";
-import HeadService from "../../services/HeadService";
-import { Devtools } from "../../devtools";
-import type { HeadServiceInterface } from "../../contracts/HeadServiceInterface";
-import { PROVIDER_NAMES } from "./provider-order";
-import { ServiceProvider } from "./ServiceProvider";
+import { MarkerRegistryInterface } from "../../contracts/MarkerInterface.js";
+import { app } from "../../helpers/app.js";
+import { MarkerRegistry, MarkerRegistryService } from "../../services/index.js";
+import { EventService } from "../../services/EventService.js";
+import { HttpService } from "../../services/HttpService.js";
+import { StoreService } from "../../services/StoreService.js";
+import HeadService from "../../services/HeadService.js";
+import { Devtools } from "../../devtools/index.js";
+import type { HeadServiceInterface } from "../../contracts/HeadServiceInterface.js";
+import { PROVIDER_NAMES } from "./provider-order.js";
+import { ServiceProvider } from "./ServiceProvider.js";
 
 export class CoreServiceProvider extends ServiceProvider {
     readonly name = PROVIDER_NAMES.CORE;
 
     register(): void {
-        this.app.set<MarkerService>("Marker", app<MarkerService>(MarkerService), true);
         this.app.set<StoreService>("Store", StoreService.instance(), true);
         this.app.set<StoreService>("Storage", StoreService.instance(), true);
         this.app.set<EventService>("Event", EventService.instance(), true);

@@ -63,7 +63,7 @@ describe('Html.updateConfig reconciliation', () => {
         });
 
         expect(html.element).toBe(element);
-        expect(element.classList.contains('stable-node')).toBe(true);
+        expect(element.classList.contains(`${controller.viewId}-stable-node`)).toBe(true);
         expect(element.getAttribute('title')).toBe('new title');
         expect(element.hasAttribute('data-count')).toBe(false);
         expect(element.classList.contains('old')).toBe(false);

@@ -1,20 +1,17 @@
-import { app } from "../../helpers/app";
-import { MarkerRegistry } from "../../services";
-import { EventService } from "../../services/EventService";
-import { HttpService } from "../../services/HttpService";
-import { MarkerService } from "../../services/MarkerService";
-import { StoreService } from "../../services/StoreService";
-import HeadService from "../../services/HeadService";
-import { Devtools } from "../../devtools";
-import { PROVIDER_NAMES } from "./provider-order";
-import { ServiceProvider } from "./ServiceProvider";
+import { MarkerRegistry } from "../../services/index.js";
+import { EventService } from "../../services/EventService.js";
+import { HttpService } from "../../services/HttpService.js";
+import { StoreService } from "../../services/StoreService.js";
+import HeadService from "../../services/HeadService.js";
+import { Devtools } from "../../devtools/index.js";
+import { PROVIDER_NAMES } from "./provider-order.js";
+import { ServiceProvider } from "./ServiceProvider.js";
 export class CoreServiceProvider extends ServiceProvider {
     constructor() {
         super(...arguments);
         this.name = PROVIDER_NAMES.CORE;
     }
     register() {
-        this.app.set("Marker", app(MarkerService), true);
         this.app.set("Store", StoreService.instance(), true);
         this.app.set("Storage", StoreService.instance(), true);
         this.app.set("Event", EventService.instance(), true);

@@ -14,7 +14,7 @@
  *   - Browser back/forward handling
  */
 
-import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
+import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -176,7 +176,15 @@ export class Router {
 
     /** Navigation guards */
     private _beforeEach: NavigationGuard | null = null;
-    private _afterEach: AfterNavigationHook | null = null;
+    /**
+     * NHIỀU hook, không phải một.
+     *
+     * Trước đây đây là một slot duy nhất, và mỗi layout muốn biết "đã điều hướng
+     * xong" đều phải giành lấy nó: layout mới đăng ký đè hook của layout cũ, rồi
+     * layout cũ destroy lại xoá hook của layout mới → không còn hook nào. Đúng
+     * chuỗi docs → demo → docs. Hook giờ là tập hợp, `afterEach()` trả về hàm huỷ.
+     */
+    private afterHooks = new Set<AfterNavigationHook>();
 
     /** Caches */
     private routeCache: Map<string, RouteMatch | null> = new Map();
@@ -370,7 +378,7 @@ export class Router {
         const routes = config.routes ?? config.allRoutes;
         if (routes) this.addRoutes(routes);
         if (config.beforeEach) this._beforeEach = config.beforeEach;
-        if (config.afterEach) this._afterEach = config.afterEach;
+        if (config.afterEach) this.afterEach(config.afterEach);
         return this;
     }
 
@@ -381,9 +389,10 @@ export class Router {
         return this;
     }
 
-    afterEach(hook: AfterNavigationHook): this {
-        this._afterEach = hook;
-        return this;
+    /** Đăng ký hook chạy sau mỗi lần điều hướng. Trả về hàm HUỶ đăng ký. */
+    afterEach(hook: AfterNavigationHook): () => void {
+        this.afterHooks.add(hook);
+        return () => { this.afterHooks.delete(hook); };
     }
 
     // ─── Navigation ─────────────────────────────────────────────
@@ -574,6 +583,17 @@ export class Router {
         if (!state || state.changed !== true) return;
 
         const vm = this.viewManager ?? this.App?.View;
+        const target = this.activeNavigationUrl || this.currentUri
+            || (typeof window !== 'undefined'
+                ? window.location.pathname + window.location.search + window.location.hash
+                : '/');
+
+        if (vm?.requiresReloadForViewContext?.(state)) {
+            vm.cancelNavigation?.();
+            this.reloadForViewContext(target, state);
+            return;
+        }
+
         const applied = vm?.applyViewContext?.(state) ?? false;
         if (!applied) return;
 
@@ -583,8 +603,44 @@ export class Router {
 
         // If a fetch discovered the change mid-navigation, requestNavigation
         // queues the same target and invalidates the old render generation.
-        const target = this.activeNavigationUrl || this.currentUri;
         if (target) this.requestNavigation(target, 'replace');
+    }
+
+    /**
+     * Switch to a coherent server-rendered document when the view namespace
+     * changes. A short-lived token prevents a bad deployment from reloading the
+     * same URL/revision forever.
+     */
+    private reloadForViewContext(target: string, state: Record<string, any>): void {
+        if (typeof window === 'undefined') return;
+
+        const url = new URL(target || '/', window.location.href);
+        const revision = typeof state.revision === 'string' ? state.revision : 'unknown';
+        const token = `${revision}:${url.pathname}${url.search}`;
+        const storageKey = 'saola:view-context-reload';
+        const now = Date.now();
+
+        try {
+            const previousRaw = window.sessionStorage.getItem(storageKey);
+            const previous = previousRaw ? JSON.parse(previousRaw) : null;
+            if (previous?.token === token && typeof previous.at === 'number' && now - previous.at < 15_000) {
+                const message = 'Không thể đồng bộ view context sau khi tải lại. Vui lòng kiểm tra revision và asset đã triển khai.';
+                console.error(`[Router] ${message}`, { revision, target: url.href });
+                (this.viewManager ?? this.App?.View)?.showError?.(message, {
+                    revision,
+                    target: url.href,
+                });
+                return;
+            }
+            window.sessionStorage.setItem(storageKey, JSON.stringify({ token, at: now }));
+        } catch {
+            // Storage có thể bị chặn; coherence vẫn quan trọng hơn loop guard.
+        }
+
+        window.dispatchEvent(new CustomEvent('saola:view-context-reload', {
+            detail: { ...state, target: url.href },
+        }));
+        window.location.replace(url.href);
     }
 
     /**
@@ -600,7 +656,7 @@ export class Router {
         this.routeConfigs = {};
         this.routeCache.clear();
         this._beforeEach = null;
-        this._afterEach = null;
+        this.afterHooks.clear();
         this.currentRoute = null;
         this.liveRegion?.remove();
         this.liveRegion = null;
@@ -752,9 +808,15 @@ export class Router {
             this.applyScroll(type, fragment);
             this.announceNavigation(type);
 
-            // After hook
-            if (this._afterEach) {
-                this._afterEach({ ...route, path: normalizedPath }, from);
+            // After hook — chạy trên BẢN SAO: hook được phép tự huỷ đăng ký trong
+            // lúc chạy. Bọc try/catch từng hook: một hook hỏng (view đã destroy
+            // chẳng hạn) không được phép làm chết điều hướng của tất cả phần còn lại.
+            for (const hook of [...this.afterHooks]) {
+                try {
+                    hook({ ...route, path: normalizedPath }, from);
+                } catch (error) {
+                    console.error('[Router] afterEach hook lỗi:', error);
+                }
             }
         } catch (error) {
             console.error('[Router] Navigation error:', error);

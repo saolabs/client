@@ -1,6 +1,6 @@
-import { ApiClient } from "../../helpers/ApiClient";
-import { PROVIDER_NAMES } from "./provider-order";
-import { ServiceProvider } from "./ServiceProvider";
+import { ApiClient } from "../../helpers/ApiClient.js";
+import { PROVIDER_NAMES } from "./provider-order.js";
+import { ServiceProvider } from "./ServiceProvider.js";
 export class ApiServiceProvider extends ServiceProvider {
     constructor() {
         super(...arguments);

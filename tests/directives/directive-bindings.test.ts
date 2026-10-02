@@ -1,13 +1,11 @@
 /**
  * Phase 9 — Directive Binding Helpers tests
  *
- * Test ba method trên ViewController được gọi bởi compiled @show/@style/@class directives:
- *   - __showBinding(stateKeys, condition)   → CSS display string
+ * Test hai method trên ViewController được gọi bởi compiled @style/@class directives:
  *   - __styleBinding(stateKeys, styles)     → inline CSS string
  *   - __classBinding(configs)               → CSS class string (legacy path)
  *
  * Flow trong compiled code:
- *   @show($isOpen)  →  style="${this.__showBinding(['isOpen'], isOpen)}"
  *   @style(...)     →  ${this.__styleBinding([...], [['color', val], ...])}
  *   @class(...)     →  ${this.__classBinding([{type, value, checker?}])}
  *
@@ -23,34 +21,6 @@ import { app } from '../../src/core/helpers/app';
 function makeCtrl(): ViewController {
     return new ViewController({ app: app() as any } as any);
 }
-
-// ─── __showBinding ────────────────────────────────────────────────────────────
-
-describe('ViewController.__showBinding', () => {
-    it('condition truthy → chuỗi rỗng (element hiện)', () => {
-        const ctrl = makeCtrl();
-        expect(ctrl.__showBinding(['isVisible'], true)).toBe('');
-        expect(ctrl.__showBinding(['isVisible'], 1)).toBe('');
-        expect(ctrl.__showBinding(['isVisible'], 'yes')).toBe('');
-        expect(ctrl.__showBinding(['isVisible'], [])).toBe(''); // truthy object
-    });
-
-    it('condition falsy → "display: none;"', () => {
-        const ctrl = makeCtrl();
-        expect(ctrl.__showBinding(['isVisible'], false)).toBe('display: none;');
-        expect(ctrl.__showBinding(['isVisible'], 0)).toBe('display: none;');
-        expect(ctrl.__showBinding(['isVisible'], null)).toBe('display: none;');
-        expect(ctrl.__showBinding(['isVisible'], undefined)).toBe('display: none;');
-        expect(ctrl.__showBinding(['isVisible'], '')).toBe('display: none;');
-    });
-
-    it('stateKeys không ảnh hưởng đến kết quả', () => {
-        const ctrl = makeCtrl();
-        // stateKeys chỉ để Html.ts biết subscribe; __showBinding không dùng nó
-        expect(ctrl.__showBinding([], true)).toBe('');
-        expect(ctrl.__showBinding(['a', 'b', 'c'], false)).toBe('display: none;');
-    });
-});
 
 // ─── __styleBinding ───────────────────────────────────────────────────────────
 

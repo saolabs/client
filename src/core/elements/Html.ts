@@ -1,12 +1,13 @@
-import { ESK, InitMode, InitModes } from "../contracts/common";
-import type { DOMElement, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElement, SaoElementChildren, SaoElementConfig } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
-import { mountElementList, hydrateElementList } from "../helpers/view";
-import type { SaoObjectType } from "../types/utils";
-import { TextElement } from "./TextElement";
-import SectionManager from "../services/SectionManager";
-import { runEnter, runLeave } from "../helpers/transition";
+import { reconcileChildren, reuseStaticText } from './reconcileChildren.js';
+import { ESK, InitMode, InitModes } from "../contracts/common.js";
+import type { DOMElement, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElement, SaoElementChildren, SaoElementConfig } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
+import { mountElementList, hydrateElementList } from "../helpers/view.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { TextElement } from "./TextElement.js";
+import SectionManager from "../services/SectionManager.js";
+import { runEnter, runLeave } from "../helpers/transition.js";
 
 /**
  * Escape một chuỗi để dùng làm CSS class/id selector. Class hydrate dạng
@@ -23,6 +24,39 @@ function cssEscape(value: string): string {
     return value
         .replace(/^[0-9]/, ch => `\\3${ch} `)
         .replace(/[^a-zA-Z0-9_-]/g, ch => `\\${ch}`);
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * `document.createElement('svg')` ra HTMLUnknownElement — SVG dựng bằng CSR
+ * không vẽ gì. Phải dùng createElementNS.
+ *
+ * Chỉ cần nhận ra `<svg>`: mọi thứ bên trong kế thừa namespace từ cha, kể cả
+ * tag không liệt kê được hết (`filter`, cả họ `fe*`, `textPath`…). Danh sách
+ * tag SVG là thừa và luôn thiếu.
+ *
+ * `foreignObject` CẮT chuỗi kế thừa: con của nó là HTML thật (đó là toàn bộ lý
+ * do nó tồn tại), parser của trình duyệt cũng làm đúng như vậy khi đọc markup
+ * SSR — không cắt ở đây thì SSR và CSR ra hai cây khác nhau.
+ *
+ * Tên tag phải giữ đúng hoa/thường: createElementNS KHÔNG có bảng điều chỉnh
+ * như parser HTML, `'clippath'` ra SVGElement trơ. Compiler đã trả về đúng
+ * `clipPath` (xem Parser::SVG_TAG_ADJUST).
+ */
+function createDomElement(tagName: string, parentElement?: HtmlInterface | null): HTMLElement {
+    const parent = parentElement?.element;
+    const isSvg = tagName === 'svg'
+        || (parent?.namespaceURI === SVG_NS && parent.tagName !== 'foreignObject');
+
+    return isSvg
+        ? document.createElementNS(SVG_NS, tagName) as unknown as HTMLElement
+        : document.createElement(tagName);
+}
+
+/** SVG phân biệt hoa thường — hạ chữ thường sẽ hỏng `clipPath`, `feGaussianBlur`… */
+function domTagName(el: Element): string {
+    return el.namespaceURI === SVG_NS ? el.tagName : el.tagName.toLowerCase();
 }
 
 export class Html implements HtmlInterface {
@@ -42,6 +76,7 @@ export class Html implements HtmlInterface {
     private bindingUnsubscribes: (() => void)[] = [];
     /** Invalidates deferred/stale binding callbacks after a config reconciliation. */
     private bindingGeneration = 0;
+    private contentUnsubscribe: (() => void) | null = null;
     /** DOM state owned by this Html config, used for exact cleanup before reuse. */
     private managedAttributeNames = new Set<string>();
     private managedClassNames = new Set<string>();
@@ -50,6 +85,7 @@ export class Html implements HtmlInterface {
     /** Events actually registered through ViewController, independent of current config. */
     private registeredEventNames = new Set<string>();
     public initMode: InitMode = InitModes.CREATE;
+    private adoptedSSR = false;
 
     constructor({
         ctx,
@@ -85,9 +121,18 @@ export class Html implements HtmlInterface {
             ? element
             : (config.element instanceof HTMLElement ? config.element : null);
 
+        // ── Class hydrate = "{viewId}-{id}" ────────────────────────────────────
+        // Blade emit `$__VIEW_ID__ . '-' . $id` cho MỌI element, nên CSR phải gắn
+        // đúng class đó. Trước đây nhánh create dùng id THÔ ('e1') → cùng một view
+        // render bởi server và bởi client ra hai DOM khác nhau, và mọi element CSR
+        // dùng chung vài chục tên class ('e1', 'e13'...) trên toàn tài liệu.
+        const viewId = (ctx as any).viewId ?? null;
+        const hydrateClass = id ? (viewId ? `${viewId}-${id}` : id) : null;
+
         if (directElement) {
             this.element = directElement;
-            this.tagName = this.element.tagName.toLowerCase();
+            this.tagName = domTagName(this.element);
+            this.adoptedSSR = initMode === InitModes.HYDRATE;
         } else if (initMode === InitModes.HYDRATE) {
             // ── SSR Hydration: claim server-rendered DOM node bằng class ID ──────
             //
@@ -95,42 +140,45 @@ export class Html implements HtmlInterface {
             // Tham chiếu: COMPILER_CONTRACT.md §hydration, docs/FOREACH_RECONCILIATION_DESIGN.md
             //
             // Thuật toán (top-down):
-            //   1. Xây dựng hydrateClass = "{viewId}-{id}"
-            //   2. Tìm trong parentElement.element trước (để tránh cross-view collision)
-            //   3. Fallback: document.querySelector nếu không có parentElement
-            //   4. Không tìm thấy → tạo element mới (partial hydration)
-            const viewId = (ctx as any).viewId ?? null;
+            //   1. Tìm trong parentElement.element trước (để tránh cross-view collision)
+            //   2. Fallback: document.querySelector nếu không có parentElement
+            //   3. Không tìm thấy → tạo element mới (partial hydration)
             let found: HTMLElement | null = null;
 
-            if (id) {
-                const hydrateClass = viewId ? `${viewId}-${id}` : id;
+            if (hydrateClass) {
                 // viewId (server uniqid) là hex CÓ THỂ bắt đầu bằng chữ số → class
                 // "6a3a...-32a9c14a" làm selector ".6a3a..." KHÔNG hợp lệ
                 // (querySelector ném SyntaxError). CSS.escape() escape ký tự đầu.
                 const selector = `${tagName}.${cssEscape(hydrateClass)}`;
-                // Tìm trong parent scope trước (top-down traversal)
                 const searchScope: Element | null = parentElement?.element ?? null;
                 if (searchScope) {
+                    // CÓ parent → chỉ tìm trong đó. KHÔNG hạ xuống quét cả tài
+                    // liệu: element không nằm dưới parent của nó thì cái tìm
+                    // thấy ở nơi khác là của cây khác — claim vào rồi mount sẽ
+                    // BỨNG node đó khỏi chỗ đúng, hỏng cả hai cây, không một
+                    // tiếng động. Server không render vùng này thì đường đúng là
+                    // partial hydration: tạo element mới ở dưới.
                     found = searchScope.querySelector(selector) as HTMLElement | null;
-                }
-                // Fallback: toàn bộ document (cho root-level elements)
-                if (!found) {
+                } else {
+                    // Không có parent để giới hạn (element cấp gốc) — chỉ khi ấy
+                    // quét cả tài liệu mới là cách duy nhất.
                     found = document.querySelector(selector) as HTMLElement | null;
                 }
             }
 
             if (found) {
                 this.element = found;
-                this.tagName = found.tagName.toLowerCase();
+                this.tagName = domTagName(found);
+                this.adoptedSSR = true;
             } else {
                 // Partial hydration fallback: element không có trong SSR output
-                this.element = document.createElement(tagName);
-                if (id) this.element.classList.add(id);
+                this.element = createDomElement(tagName, parentElement);
+                if (hydrateClass) this.element.classList.add(hydrateClass);
             }
         } else {
             // ── CSR (create mode): tạo element mới ───────────────────────────────
-            this.element = document.createElement(this.tagName);
-            if (id) this.element.classList.add(id);
+            this.element = createDomElement(this.tagName, parentElement);
+            if (hydrateClass) this.element.classList.add(hydrateClass);
         }
 
 
@@ -148,7 +196,7 @@ export class Html implements HtmlInterface {
         // duplicate events, and state subscriptions retaining old closures.
         this.removeEventListeners();
         this.cleanupBindingResources();
-        this.clearManagedDomState();
+        this.clearManagedDomState(newConfig);
 
         this.config = {
             ...this.config,
@@ -159,6 +207,7 @@ export class Html implements HtmlInterface {
             classes: newConfig.classes,
             styles: newConfig.styles,
             bind: newConfig.bind,
+            content: newConfig.content,
         };
         this.initialize();
     }
@@ -176,6 +225,8 @@ export class Html implements HtmlInterface {
 
     private cleanupBindingResources(renewAbortController: boolean = true): void {
         this.bindingGeneration++;
+        this.contentUnsubscribe?.();
+        this.contentUnsubscribe = null;
         this.abortController.abort();
         if (renewAbortController) {
             this.abortController = new AbortController();
@@ -191,25 +242,35 @@ export class Html implements HtmlInterface {
         this.bindingUnsubscribes = [];
     }
 
-    private clearManagedDomState(): void {
+    private clearManagedDomState(next: Partial<SaoElementConfig> = {}): void {
+        const attrs = new Set(Object.keys(next.attrs ?? {}).map(name => this.normalizeAttrName(name)));
+        const classes = new Set<string>();
+        if (Array.isArray(next.classes)) {
+            for (const item of next.classes) if (item && item.type !== 'dynamic' && item.value) classes.add(String(item.value));
+        } else {
+            for (const [name, item] of Object.entries(next.classes ?? {})) {
+                if (item.type === 'binding' || item.value) classes.add(name);
+            }
+        }
         for (const attrName of this.managedAttributeNames) {
-            this.element.removeAttribute(attrName);
+            if (!attrs.has(attrName)) this.element.removeAttribute(attrName);
         }
         this.managedAttributeNames.clear();
 
         for (const className of this.managedClassNames) {
-            this.element.classList.remove(className);
+            if (!classes.has(className)) this.removeClass(className);
         }
         this.managedClassNames.clear();
 
         for (const prop of this.managedStyleNames) {
-            this.element.style.removeProperty(prop);
+            if (!(prop in (next.styles ?? {}))) this.element.style.removeProperty(prop);
         }
         this.managedStyleNames.clear();
 
-        const defaults = document.createElement(this.tagName) as any;
+        const removedProps = [...this.managedPropertyNames].filter(name => !(name in (next.props ?? {})));
+        const defaults = removedProps.length ? createDomElement(this.tagName, this.parent) as any : {};
         const target = this.element as any;
-        for (const propName of this.managedPropertyNames) {
+        for (const propName of removedProps) {
             try {
                 if (propName in defaults) {
                     target[propName] = defaults[propName];
@@ -264,69 +325,68 @@ export class Html implements HtmlInterface {
         const el = this.element as HTMLInputElement;
         const generation = this.bindingGeneration;
         const isSelect = el.tagName === 'SELECT';
+        const isMultiple = isSelect && (el as unknown as HTMLSelectElement).multiple;
         const isCheckbox = el.type === 'checkbox';
         const isRadio = el.type === 'radio';
         const isNumber = el.type === 'number' || el.type === 'range';
 
-        // state → element (dùng cho cả khởi tạo lẫn reactive update)
-        const applyState = (val: any) => {
-            if (isCheckbox) {
-                el.checked = !!val;
-            } else if (isRadio) {
-                // Radio group: checked khi state trùng value của radio này
-                el.checked = val !== null && val !== undefined && String(val) === el.value;
-            } else {
-                el.value = val !== null && val !== undefined ? String(val) : '';
-            }
-        };
-
-        // 1. Khởi tạo từ state hiện tại (nếu có)
-        const initial = manager.getStateByKey(stateKey);
-        if (initial !== null && initial !== undefined) {
-            if (isSelect) {
-                // <option> children chưa được append lúc constructor chạy —
-                // set .value trước khi có options là no-op, nên defer 1 microtask.
-                queueMicrotask(() => {
-                    if (this.isBindingCurrent(generation)) {
-                        applyState(manager.getStateByKey(stateKey));
-                    }
-                });
-            } else {
-                applyState(initial);
-            }
-        }
-
-        // 2. element → state
         const readValue = (): any => {
+            if (isMultiple) return Array.from((el as unknown as HTMLSelectElement).selectedOptions).map(option => option.value);
             if (isCheckbox) return el.checked;
-            if (isNumber) {
-                // Giữ number cho state; input dở dang ('1e', rỗng) → giữ string thô
-                const n = el.valueAsNumber;
-                return Number.isNaN(n) ? el.value : n;
-            }
-            // radio chỉ fire change khi được chọn → value là giá trị đã chọn
+            if (isNumber) return Number.isNaN(el.valueAsNumber) ? el.value : el.valueAsNumber;
             return el.value;
         };
-        const inputHandler = () => {
-            if (!this.isBindingCurrent(generation)) return;
+        const commitInput = () => {
+            if (!this.isBindingCurrent(generation) || (isRadio && !el.checked)) return;
             const setter = manager.setters[stateKey];
-            if (typeof setter === 'function') {
-                setter(readValue());
+            if (typeof setter === 'function') setter(readValue());
+            else manager.updateStateByKey(stateKey, readValue());
+        };
+        const applyState = (value: any) => {
+            if (!this.isBindingCurrent(generation) || this.composing) return;
+            if (isMultiple) {
+                const selected = new Set(Array.isArray(value) ? value.map(String) : []);
+                for (const option of (el as unknown as HTMLSelectElement).options) {
+                    const next = selected.has(option.value);
+                    if (option.selected !== next) option.selected = next;
+                }
+            } else if (isCheckbox) {
+                if (el.checked !== !!value) el.checked = !!value;
+            } else if (isRadio) {
+                const checked = value != null && String(value) === el.value;
+                if (el.checked !== checked) el.checked = checked;
             } else {
-                // Fallback: updateStateByKey trực tiếp
-                manager.updateStateByKey(stateKey, readValue());
+                const next = value == null ? '' : String(value);
+                if (el.value !== next) el.value = next; // preserve caret on no-op patches
             }
         };
+        const initial = manager.getStateByKey(stateKey);
+        // Adopt user edits made while SSR HTML was visible before JS arrived.
+        const editedSSR = !this.bindingInitialized && this.adoptedSSR && (isSelect
+            ? Array.from((el as unknown as HTMLSelectElement).options).some(option => option.selected !== option.defaultSelected)
+            : isCheckbox || isRadio ? el.checked !== el.defaultChecked
+            : el.value !== (el as unknown as HTMLTextAreaElement).defaultValue);
+        this.bindingInitialized = true;
+        if (editedSSR) commitInput();
+        else if (initial != null) {
+            if (isSelect) queueMicrotask(() => applyState(manager.getStateByKey(stateKey)));
+            else applyState(initial);
+        }
+        const signal = this.abortController.signal;
+        const inputHandler = (event: Event) => {
+            if (this.composing || (event as InputEvent).isComposing) return;
+            commitInput();
+        };
         const eventType = isCheckbox || isRadio || isSelect ? 'change' : 'input';
-        this.element.addEventListener(eventType, inputHandler, { signal: this.abortController.signal });
-
-        // 3. state → element (reactive update)
-        const unsubscribe = manager.subscribe([stateKey], () => {
-            if (this.isBindingCurrent(generation)) {
-                applyState(manager.getStateByKey(stateKey));
-            }
-        });
-        this.bindingUnsubscribes.push(unsubscribe);
+        this.element.addEventListener(eventType, inputHandler, { signal });
+        if (!isSelect && !isCheckbox && !isRadio) {
+            this.element.addEventListener('compositionstart', () => { this.composing = true; }, { signal });
+            this.element.addEventListener('compositionend', () => {
+                this.composing = false;
+                commitInput();
+            }, { signal });
+        }
+        this.bindingUnsubscribes.push(manager.subscribe([stateKey], () => applyState(manager.getStateByKey(stateKey))));
     }
 
     private initializeAttributes() {
@@ -351,12 +411,12 @@ export class Html implements HtmlInterface {
             for (const [propName, propConfig] of Object.entries(this.config.props)) {
                 this.managedPropertyNames.add(propName);
                 if (propConfig.type === 'static' || propConfig.type === 'value') {
-                    (this.element as any)[propName] = propConfig.value;
+                    if ((this.element as any)[propName] !== propConfig.value) (this.element as any)[propName] = propConfig.value;
                 } else if (propConfig.type === 'binding') {
                     const generation = this.bindingGeneration;
                     const value = propConfig.factory ? propConfig.factory() : '';
                     if (value !== undefined && value !== null && value !== false) {
-                        (this.element as any)[propName] = value;
+                        if ((this.element as any)[propName] !== value) (this.element as any)[propName] = value;
                     } else {
                         (this.element as any)[propName] = false;
                         delete (this.element as any)[propName];
@@ -370,7 +430,7 @@ export class Html implements HtmlInterface {
                                 if (!this.isBindingCurrent(generation)) return;
                                 const newValue = propConfig.factory ? propConfig.factory() : '';
                                 if (newValue !== undefined && newValue !== null && newValue !== false) {
-                                    (this.element as any)[propName] = newValue;
+                                    if ((this.element as any)[propName] !== newValue) (this.element as any)[propName] = newValue;
                                 } else {
                                     (this.element as any)[propName] = false;
                                     delete (this.element as any)[propName];
@@ -397,7 +457,7 @@ export class Html implements HtmlInterface {
         // FIX(baseline#1): contract chuẩn là 'static' (compiler emit); 'value' giữ làm legacy alias
         if (attrConfig.type === 'static' || attrConfig.type === 'value') {
             if (attrConfig.value !== undefined && attrConfig.value !== null && attrConfig.value !== false) {
-                this.element.setAttribute(normalizedName, String(attrConfig.value));
+                if (this.element.getAttribute(normalizedName) !== String(attrConfig.value)) this.element.setAttribute(normalizedName, String(attrConfig.value));
             } else {
                 this.element.removeAttribute(normalizedName);
             }
@@ -406,7 +466,7 @@ export class Html implements HtmlInterface {
             const applyValue = () => {
                 const newValue = attrConfig.factory ? attrConfig.factory() : '';
                 if (newValue !== undefined && newValue !== null && newValue !== false) {
-                    this.element.setAttribute(normalizedName, String(newValue));
+                    if (this.element.getAttribute(normalizedName) !== String(newValue)) this.element.setAttribute(normalizedName, String(newValue));
                 } else {
                     this.element.removeAttribute(normalizedName);
                 }
@@ -453,12 +513,12 @@ export class Html implements HtmlInterface {
                             .split(/\s+/).filter(Boolean);
                         for (const prev of applied) {
                             if (next.indexOf(prev) === -1) {
-                                this.element.classList.remove(prev);
+                                this.removeClass(prev);
                                 this.managedClassNames.delete(prev);
                             }
                         }
                         for (const name of next) {
-                            this.element.classList.add(name);
+                            this.addClass(name);
                             this.managedClassNames.add(name);
                         }
                         applied = next;
@@ -479,14 +539,14 @@ export class Html implements HtmlInterface {
                 this.managedClassNames.add(className);
 
                 if (classConfig.type === 'static') {
-                    this.element.classList.add(className);
+                    this.addClass(className);
                     continue;
                 }
 
                 if (classConfig.type === 'binding') {
                     const generation = this.bindingGeneration;
                     const initialValue = classConfig.factory ? classConfig.factory() : false;
-                    this.element.classList.toggle(className, !!initialValue);
+                    this.toggleClass(className, !!initialValue);
 
                     if (classConfig.stateKeys?.length) {
                         const unsubscribe = this.ctx.states.__.subscribe(
@@ -494,7 +554,7 @@ export class Html implements HtmlInterface {
                             () => {
                                 if (!this.isBindingCurrent(generation)) return;
                                 const newValue = classConfig.factory ? classConfig.factory() : false;
-                                this.element.classList.toggle(className, !!newValue);
+                                this.toggleClass(className, !!newValue);
                             }
                         );
                         this.bindingUnsubscribes.push(unsubscribe);
@@ -508,13 +568,13 @@ export class Html implements HtmlInterface {
             this.managedClassNames.add(className);
             if (classConfig.type === 'static') {
                 if (classConfig.value) {
-                    this.element.classList.add(className);
+                    this.addClass(className);
                 }
             } else if (classConfig.type === 'binding') {
                 const generation = this.bindingGeneration;
                 // Initial value
                 const initialValue = classConfig.factory ? classConfig.factory() : !!classConfig.value;
-                this.element.classList.toggle(className, !!initialValue);
+                this.toggleClass(className, !!initialValue);
 
                 // Subscribe for reactive updates
                 if (classConfig.stateKeys?.length) {
@@ -523,7 +583,7 @@ export class Html implements HtmlInterface {
                         () => {
                             if (!this.isBindingCurrent(generation)) return;
                             const newValue = classConfig.factory ? classConfig.factory() : false;
-                            this.element.classList.toggle(className, !!newValue);
+                            this.toggleClass(className, !!newValue);
                         }
                     );
                     this.bindingUnsubscribes.push(unsubscribe);
@@ -532,18 +592,59 @@ export class Html implements HtmlInterface {
         }
     }
 
+    private addClass(className: string): void {
+        if (!className) return;
+        if (className.includes(' ')) {
+            const tokens = className.trim().split(/\s+/);
+            for (let i = 0; i < tokens.length; i++) {
+                if (tokens[i]) if (!this.element.classList.contains(tokens[i])) this.element.classList.add(tokens[i]);
+            }
+            return;
+        }
+        if (!this.element.classList.contains(className)) this.element.classList.add(className);
+    }
+
+    private removeClass(className: string): void {
+        if (!className) return;
+        if (className.includes(' ')) {
+            const tokens = className.trim().split(/\s+/);
+            for (let i = 0; i < tokens.length; i++) {
+                if (tokens[i]) if (this.element.classList.contains(tokens[i])) this.element.classList.remove(tokens[i]);
+            }
+            return;
+        }
+        if (this.element.classList.contains(className)) this.element.classList.remove(className);
+    }
+
+    private toggleClass(className: string, force: boolean): void {
+        if (!className) return;
+        if (className.includes(' ')) {
+            const tokens = className.trim().split(/\s+/);
+            for (let i = 0; i < tokens.length; i++) {
+                if (tokens[i]) if (this.element.classList.contains(tokens[i]) !== force) this.element.classList.toggle(tokens[i], force);
+            }
+            return;
+        }
+        if (this.element.classList.contains(className) !== force) this.element.classList.toggle(className, force);
+    }
+
+    private applyStyle(prop: string, value: any): void {
+        const text = String(value ?? '');
+        if (this.element.style.getPropertyValue(prop) !== text) this.element.style.setProperty(prop, text);
+    }
+
     private initializeStyles(): void {
         if (!this.config.styles) return;
 
         for (const [prop, styleConfig] of Object.entries(this.config.styles)) {
             this.managedStyleNames.add(prop);
             if (styleConfig.type === 'static' || styleConfig.type === 'value') {
-                this.element.style.setProperty(prop, styleConfig.value ?? '');
+                this.applyStyle(prop, styleConfig.value ?? '');
             } else if (styleConfig.type === 'binding') {
                 const generation = this.bindingGeneration;
                 // Initial value
                 const initialValue = styleConfig.factory ? styleConfig.factory() : (styleConfig.value ?? '');
-                this.element.style.setProperty(prop, initialValue);
+                this.applyStyle(prop, initialValue);
 
                 // Subscribe for reactive updates
                 if (styleConfig.stateKeys?.length) {
@@ -552,7 +653,7 @@ export class Html implements HtmlInterface {
                         () => {
                             if (!this.isBindingCurrent(generation)) return;
                             const newValue = styleConfig.factory ? styleConfig.factory() : '';
-                            this.element.style.setProperty(prop, newValue);
+                            this.applyStyle(prop, newValue);
                         }
                     );
                     this.bindingUnsubscribes.push(unsubscribe);
@@ -621,14 +722,25 @@ export class Html implements HtmlInterface {
         return this.children;
     }
 
+    private contentRendered = false;
+    private bindingInitialized = false;
+    private composing = false;
+    private isStarted = false;
+
     render(): HTMLElement {
+        const previous = this.children;
         if (this.isSingleElement()) {
+            return this.element;
+        }
+        if (this.config.content) {
+            this.renderTextContent();
             return this.element;
         }
         let children: SaoElementChildren = [];
         if (this.childrenFactory) {
             children = this.renderChildren();
         }
+        children = this.children = reuseStaticText(previous, children) as SaoElementChildren;
 
         if (this.initMode === InitModes.HYDRATE) {
             // ── Hydrate mode: DOM đã có từ server ────────────────────────
@@ -638,16 +750,64 @@ export class Html implements HtmlInterface {
             if (children && children.length > 0) {
                 hydrateElementList(this, children);
             }
+            this.initMode = InitModes.CREATE;
             return this.element;
         }
 
-        this.element.innerHTML = '';
-
-        if (children && children.length > 0) {
-            mountElementList(this, children);
+        reconcileChildren(this.element, previous, children);
+        // Drop unmanaged nodes left by previous renders, retaining marker ranges.
+        const keep = new Set<Node>();
+        for (const child of children as any[]) {
+            const first: Node | undefined = child.element ?? child.openTag;
+            const last: Node | undefined = child.element ?? child.closeTag;
+            let current = first;
+            while (current) {
+                keep.add(current);
+                if (current === last) break;
+                current = current.nextSibling ?? undefined;
+            }
         }
+        for (const node of Array.from(this.element.childNodes)) if (!keep.has(node)) node.remove();
+        if (this.isStarted) for (const child of children as any[]) child.start?.();
         this.maybeRunEnter();
         return this.element;
+    }
+
+    private renderTextContent(): void {
+        this.contentUnsubscribe?.();
+        this.contentUnsubscribe = null;
+        const content = this.config.content!;
+        const isTextarea = this.tagName.toLowerCase() === 'textarea';
+        const generation = this.bindingGeneration;
+        const apply = () => {
+            if (!this.isBindingCurrent(generation)) return;
+            const value = String(content.factory() ?? '');
+            if (isTextarea) {
+                const textarea = this.element as HTMLTextAreaElement;
+                // @bind owns the live value when both forms are declared.
+                if (!this.config.bind && textarea.value !== value) textarea.value = value;
+            } else if (this.element.textContent !== value) {
+                this.element.textContent = value;
+            }
+        };
+        if (this.contentRendered) apply();
+        else if (!this.adoptedSSR) {
+            const value = String(content.factory() ?? '');
+            if (isTextarea) {
+                const textarea = this.element as HTMLTextAreaElement;
+                // Match HTML parsing: one initial LF after <textarea> is ignored.
+                textarea.defaultValue = value.replace(/^\n/, '');
+                if (!this.config.bind) textarea.value = textarea.defaultValue;
+            } else {
+                this.element.textContent = value;
+            }
+        }
+        this.contentRendered = true;
+        // Hydration adopts SSR content, including input typed before JS loaded.
+        // Future state changes patch the property, preserving the node itself.
+        if (content.stateKeys?.length && !(isTextarea && this.config.bind)) {
+            this.contentUnsubscribe = this.ctx.states.__.subscribe(content.stateKeys, apply);
+        }
     }
 
     /** Đã chạy enter rồi — re-render không được chạy lại. */
@@ -674,6 +834,7 @@ export class Html implements HtmlInterface {
 
     /** Start reactive bindings + children (Phase 2 lifecycle) */
     start(): void {
+        this.isStarted = true;
         for (const child of this.children) {
             if ('start' in child && typeof (child as any).start === 'function') {
                 (child as any).start();
@@ -683,6 +844,7 @@ export class Html implements HtmlInterface {
 
     /** Stop reactive bindings + children */
     stop(): void {
+        this.isStarted = false;
         for (const child of this.children) {
             if ('stop' in child && typeof (child as any).stop === 'function') {
                 (child as any).stop();

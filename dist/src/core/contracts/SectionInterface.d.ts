@@ -1,6 +1,6 @@
-import type { SaoElementChildren } from "../types/utils";
-import type { ViewControllerInterface } from "./ViewControllerInterface";
-import type { HtmlInterface } from "./ElementInterface";
+import type { SaoElementChildren } from "../types/utils.js";
+import type { ViewControllerInterface } from "./ViewControllerInterface.js";
+import type { HtmlInterface } from "./ElementInterface.js";
 export type SectionItemType = 'static' | 'dynamic' | 'async' | 'reactive';
 export type SectionContentType = 'text' | 'html';
 export type SectionContentRenderer = (parentElement?: HtmlInterface | null | undefined) => string | SaoElementChildren;

@@ -1,6 +1,6 @@
-import { CollectionProxyInterface, HelperInterface } from "../contracts/HelperInterface";
-import { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { app } from "../helpers/app";
+import { CollectionProxyInterface, HelperInterface } from "../contracts/HelperInterface.js";
+import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import { app } from "../helpers/app.js";
 
 /**
  * HelperService — PHP-compatible helper functions for SaoView runtime.

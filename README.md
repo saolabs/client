@@ -1,221 +1,78 @@
-# Saola Client
+# @saolabs/client
 
-> Modern TypeScript Framework for Laravel - Reactive SPAs with TypeScript-first approach
+Runtime TypeScript phía trình duyệt của Saola: hydration HTML do Laravel render,
+state, component, điều hướng SPA và vòng đời tài nguyên.
 
-[![npm version](https://badge.fury.io/js/%40saolabs%2Fclient.svg)](https://www.npmjs.com/package/@saolabs/client)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-Saola Client is the TypeScript runtime library for building reactive single-page applications that integrate seamlessly with Laravel backends. The package is published on npm as `@saolabs/client`.
-
-## Features
-
-- ⚡ **TypeScript First**: Full TypeScript support with excellent type safety
-- 🎨 **Reactive Views**: Built-in reactive view system with automatic state management
-- 📦 **Modular Architecture**: Component-based architecture for scalable applications
-- 🔄 **Hot Module Replacement**: Development watch mode with automatic compilation
-- 🚀 **Laravel Integration**: Seamless integration with Laravel backends
-- 📱 **SSR Support**: Server-side rendering capabilities
-- 🎯 **Lightweight**: Minimal bundle size with tree-shaking support
-- 🔧 **Developer Friendly**: Excellent DX with CLI tools and build utilities
-
-## Installation
+## Bắt đầu
 
 ```bash
 npm install @saolabs/client
-# or
-yarn add @saolabs/client
-# or
-pnpm add @saolabs/client
+npm install --save-dev @saolabs/builder typescript
+composer require saola/core saola/compiler
 ```
 
-## Quick Start
+Viết giao diện bằng `.sao`, để compiler sinh class View và registry. Bắt đầu với
+[hướng dẫn component](../saola/docs/SAO_FILE.md) trong workspace hệ sinh thái.
+Compiler PHP sinh Blade SSR; client nhận DOM và xử lý tương tác trong browser.
 
-### Basic Setup
+## Module và tương thích
 
-```typescript
-import { Application, app, appContainer } from '@saolabs/client';
-import { ViewController } from '@saolabs/client';
+Package phát hành **ESM**. Các entry công khai:
 
-// Initialize your app
-const app = new Application({
-  el: '#app',
-  debug: true
-});
+- `@saolabs/client`: runtime, services và kiểu dữ liệu.
+- `@saolabs/client/plugins`: `createPlugin`, `pluginManager`.
+- `@saolabs/client/testing`: `mount`, `mountView`, `nextFrame` và `Harness`.
 
-await app.init();
+```ts
+import { HttpService } from '@saolabs/client';
+import { createPlugin, pluginManager } from '@saolabs/client/plugins';
+
+const http = new HttpService();
+pluginManager.register(createPlugin('example', () => {
+    http.setTimeout(5000);
+})).install('example');
 ```
 
-### Creating a View
+Các công cụ CommonJS dùng `await import('@saolabs/client')`; package không cam kết
+`require()` đồng bộ. Runtime cần DOM (browser hoặc jsdom trong test), không phải
+renderer SSR chạy trong Node. Dùng PHP compiler cho SSR Laravel.
+Các import tương đối có đuôi `.js`; build và declaration được kiểm với NodeNext.
 
-```typescript
-import { ViewBase, ViewController } from '@saolabs/client';
+## Test component đã compile
 
-export class HomeView extends ViewBase {
-  constructor() {
-    super('home', 'home-template');
-  }
+```ts
+import { mount, nextFrame } from '@saolabs/client/testing';
+import Counter from './compiled/counter.js';
 
-  onMount() {
-    // Initialize view logic
-  }
-}
-
-export class HomeController extends ViewController {
-  view = HomeView;
-
-  onLoad() {
-    // Handle view data loading
-  }
-}
+const counter = mount(Counter, {initial: 3});
+counter.container.querySelector('button')?.click();
+await nextFrame();
+console.log(counter.text());
+counter.destroy();
 ```
 
-### Routing
+Chạy trong môi trường DOM. Với theme nạp rời, externalize `@saolabs/client` để
+app và theme dùng cùng một runtime; xem [bootstrap](docs/BOOTSTRAP_PROVIDER_GUIDE.md).
 
-```typescript
-import { Router } from '@saolabs/client';
-
-const router = new Router();
-
-router.register('home', HomeController);
-router.register('about', AboutController);
-
-router.navigate('home');
-```
-
-### State Management
-
-```typescript
-import { ViewState, StateManager } from '@saolabs/client';
-
-const state = new ViewState({
-  count: 0,
-  user: null
-});
-
-state.count = 5; // Trigger reactive updates
-state.subscribe(newState => {
-  console.log('State updated:', newState);
-});
-```
-
-## API Reference
-
-### Core Classes
-
-#### Application
-
-The main application class that manages the lifecycle of your Saola app.
-
-```typescript
-import { Application } from '@saolabs/client';
-
-const app = new Application({
-  el: '#app',           // Mount element
-  debug: true,          // Enable debug mode
-  baseUrl: '/app'       // Base URL for routing
-});
-```
-
-#### View System
-
-```typescript
-import { View, ViewController, ViewManager } from '@saolabs/client';
-
-// Create a view
-class MyView extends View {
-  template = '<div>Hello World</div>';
-
-  onMount() {
-    console.log('View mounted');
-  }
-}
-
-// Create a controller
-class MyController extends ViewController {
-  view = MyView;
-
-  onLoad() {
-    // Load data
-  }
-}
-```
-
-#### Router
-
-```typescript
-import { Router } from '@saolabs/client';
-
-const router = new Router();
-
-// Register routes
-router.register('home', HomeController);
-router.register('user/:id', UserController);
-
-// Navigate
-router.navigate('home');
-router.navigate('user/123');
-```
-
-## Plugins
-
-Extend Saola Client with plugins:
-
-```typescript
-import { PluginManager } from '@saolabs/client/plugins';
-
-const pluginManager = new PluginManager();
-
-// Register and install plugins
-pluginManager
-  .register(myPlugin)
-  .install('myPlugin', { option: 'value' });
-```
-
-## Development
-
-### Building
+## Phát triển và kiểm chứng
 
 ```bash
-npm run build    # Build for production
-npm run dev      # Watch mode for development
-npm run clean    # Clean build artifacts
+npm run build          # ESM JS và declarations
+npm run typecheck      # Kiểm source, không emit
+npm test               # Runtime + compile-to-mount contract tests
+npm run check-exports  # Pack thật; kiểm 3 entry và types trong consumer tạm
 ```
 
-### Testing
+`check-exports` không publish. Nó kiểm native ESM, dynamic import từ CommonJS,
+mount view qua package đã đóng và TypeScript NodeNext, không dùng alias source.
+Bộ test compile fixture cần sibling `builder/`, `compiler/`, `saola/` trong
+workspace hệ sinh thái. Thiếu builder là lỗi kiểm tra, không tự bỏ qua test.
 
-```bash
-npm test
-```
+## Tài liệu
 
-## Integration with Saola Compiler
+- [Runtime API](docs/RUNTIME_API_SPEC.md)
+- [Compiler contract](docs/COMPILER_CONTRACT.md)
+- [Testing](docs/TESTING.md)
+- [Devtools](docs/DEVTOOLS.md)
 
-Saola Client works seamlessly with [Saola Compiler](https://github.com/saolabs/saola-compiler) to compile `.one` files into Blade templates and JavaScript.
-
-```bash
-# Install both packages
-npm install @saolabs/client saola-compiler
-
-# Use in your Laravel project
-# The compiler will generate files that use @saolabs/client
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Related Projects
-
-- [Saola Compiler](https://github.com/saolabs/saola-compiler) - Template compiler for .one files
-- [Saola Language Support](https://github.com/saolabs/saola-language-support) - VS Code extension for .one files
-
----
-
-**Built with ❤️ by SaoLabs**
+MIT.

@@ -1,4 +1,4 @@
-import { ViewController } from "./ViewController";
+import { ViewController } from "./ViewController.js";
 /**
  * View — the base class for all views in SaoView.
  *
@@ -48,6 +48,24 @@ export class View {
     $__setup__(__data__ = {}, systemData = {}) {
         // Override in subclass
     }
+    /**
+     * Phát sự kiện lên cha đã `@include` view này.
+     *
+     * Là method của View (không chỉ hàm trong scope compiled) để template gọi
+     * thẳng được: `@click(emit('edit', card['id']))` biên dịch thành
+     * `{ handler: 'emit' }`, và ViewController.addEventListener tra handler
+     * dạng chuỗi trên chính View.
+     */
+    emit(event, ...args) {
+        return this.__ctrl__.emit(event, ...args);
+    }
+    watch(keys, callback, options) {
+        return this.__ctrl__.scope.watch(keys, callback, options);
+    }
+    afterDom(callback) {
+        return this.__ctrl__.afterDom(callback);
+    }
+    get $scope() { return this.__ctrl__.scope; }
     // ─── Convenience Accessors ──────────────────────────────────
     get path() {
         return this.__ctrl__.path;

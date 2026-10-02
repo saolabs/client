@@ -19,11 +19,11 @@ export declare enum OOTEnum {
     UNKNOWN = "Unknown",
     YIELD = "Yield"
 }
-export type { SaoElementConfig, HtmlElementConfig, SaoElementEventHandler, SaoElementChildren, SaoChildrenFactoryOutput, SaoChildrenFactory } from "../contracts/ElementInterface";
-export type { ReactiveRenderFn, ReactiveChildrenFactory, ReactiveConfig } from "../contracts/ReactiveInterface";
-export type { BlockRenderFactory } from "../contracts/BlockInterface";
-export type { ViewRenderFactory, ViewConstructor, ViewLifecycleHooks } from "../contracts/ViewInterface";
-export type { StateListener, MultiKeyStateListener, StateItem } from "../contracts/ViewStateInterface";
-export type { ServiceKey, ServiceFactory, ServiceBinding } from "../contracts/ApplicationInterface";
-export type { ViewConfig, ViewRuntimeConfig } from "../contracts/ViewControllerInterface";
+export type { SaoElementConfig, HtmlElementConfig, SaoElementEventHandler, SaoElementChildren, SaoChildrenFactoryOutput, SaoChildrenFactory } from "../contracts/ElementInterface.js";
+export type { ReactiveRenderFn, ReactiveChildrenFactory, ReactiveConfig } from "../contracts/ReactiveInterface.js";
+export type { BlockRenderFactory } from "../contracts/BlockInterface.js";
+export type { ViewRenderFactory, ViewConstructor, ViewLifecycleHooks } from "../contracts/ViewInterface.js";
+export type { StateListener, MultiKeyStateListener, StateItem } from "../contracts/ViewStateInterface.js";
+export type { ServiceKey, ServiceFactory, ServiceBinding } from "../contracts/ApplicationInterface.js";
+export type { ViewConfig, ViewRuntimeConfig } from "../contracts/ViewControllerInterface.js";
 //# sourceMappingURL=utils.d.ts.map

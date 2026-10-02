@@ -1,5 +1,5 @@
-import type { SectionInterface, SectionManagerInterface } from "../contracts/SectionInterface";
-import type { YieldInterface } from "../contracts/ElementInterface";
+import type { SectionInterface, SectionManagerInterface } from "../contracts/SectionInterface.js";
+import type { YieldInterface } from "../contracts/ElementInterface.js";
 /**
  * SectionManager — connects `@section(name, ...)` declarations to `@yield(name, ...)`
  * markers, cross-controller (a page declares a section, a layout — or nothing —
@@ -33,6 +33,8 @@ export declare class SectionManagerService implements SectionManagerInterface {
     private unsubscribers;
     /** yield id -> tracked nodes/elements mounted between its markers (for clear/start/stop) */
     private mounted;
+    /** Owners in the current route chain; cached pages retain their sections. */
+    private headViewIds;
     add(section: SectionInterface): void;
     active(name: string, viewId: string): void;
     subscribe(name: string, callback: (section: SectionInterface) => void): () => void;
@@ -87,6 +89,7 @@ export declare class SectionManagerService implements SectionManagerInterface {
      * `app('Head')` directly (e.g. from an async data callback) — both end up
      * writing through the same service, so they never fight each other.
      */
+    private activateHeadSections;
     private syncHeadSections;
     /** Revert every page-scoped head tag before mounting a new page's chain. Call once per navigation. */
     resetPageHead(): void;

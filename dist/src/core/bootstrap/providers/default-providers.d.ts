@@ -1,4 +1,4 @@
-import { NamedServiceProvider } from "./provider-order";
+import { NamedServiceProvider } from "./provider-order.js";
 /**
  * Tạo danh sách providers mặc định.
  *

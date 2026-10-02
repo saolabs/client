@@ -1,0 +1,38 @@
+<template>
+<div>
+    <span id="active">{{ activeCount }}</span>
+    <span id="roles">{{ totalRoles }}</span>
+    <span id="total">{{ total }}</span>
+    <span id="doubled">{{ doubled }}</span>
+    <span id="observed">{{ observed }}</span>
+    <button id="inc" @click(increment())>+</button>
+</div>
+</template>
+<script setup>
+@vars(settings: Record<string, number> = {})
+@props({price: 5}: {price: number})
+@state(qty: number = 2, observed: number = 0)
+@states({users: [{active: true, roles: ['admin']}, {active: false, roles: []}]}: {users: Array<{active: boolean; roles: string[]}>})
+@computed(activeCount: number = users.filter(u => u.active).length)
+@computed(totalRoles: number = users.reduce((n, u) => n + u.roles.length, 0))
+@computed(total: number = price * qty, doubled: number = total * 2)
+
+export default {
+    calls: 0,
+    literal() { return '@state(count = 0) @await @fetch("sample")'; },
+    record(step: number) {
+        this.calls += step;
+        return this.path;
+    },
+    async owner() {
+        await Promise.resolve();
+        return this.__ctrl__.view;
+    },
+    increment() {
+        this.record(1);
+        setUsers([...users, {active: true, roles: ['dev', 'reviewer']}]);
+        setQty(qty + 1);
+        setObserved(get$doubled());
+    }
+}
+</script>

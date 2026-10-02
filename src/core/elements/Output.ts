@@ -1,9 +1,9 @@
-import { InitMode, InitModes } from "../contracts/common";
-import type { HtmlInterface, OutputInterface } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../helpers/utils";
-import markerRegistry from "../services/MarkerRegistry";
-import type { SaoObjectType } from "../types/utils";
+import { InitMode, InitModes } from "../contracts/common.js";
+import type { HtmlInterface, OutputInterface } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { generateUUID } from "../helpers/utils.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import type { SaoObjectType } from "../types/utils.js";
 
 /**
  * Output — reactive text output between comment markers.
@@ -88,36 +88,20 @@ export class Output implements OutputInterface {
      * Nếu có text node giữa 2 markers → claim luôn để không tạo thừa.
      */
     private claimSSRMarkers(): { open: Comment; close: Comment; textNode: Text | null } | null {
-        const searchRoot = this.parent?.element ?? document.body;
-        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
+        const pair = markerRegistry.claim('output', this.id, this.parent?.element ?? null);
+        if (!pair) return null;
 
-        const openText = markerRegistry.openComment('output', this.id);
-        const closeText = markerRegistry.closeComment('output', this.id);
-        let openNode: Comment | null = null;
-
-        let node: Comment | null;
-        while ((node = walker.nextNode() as Comment | null)) {
-            const value = node.nodeValue?.trim() ?? '';
-
-            if (!openNode && value === openText) {
-                openNode = node;
-                continue;
+        // Text node giữa 2 marker — claim luôn để không tạo thừa.
+        let textNode: Text | null = null;
+        let sibling = pair.open.nextSibling;
+        while (sibling && sibling !== pair.close) {
+            if (sibling.nodeType === Node.TEXT_NODE) {
+                textNode = sibling as Text;
+                break;
             }
-            if (openNode && value === closeText) {
-                // Tìm text node giữa open và close markers
-                let textNode: Text | null = null;
-                let sibling = openNode.nextSibling;
-                while (sibling && sibling !== node) {
-                    if (sibling.nodeType === Node.TEXT_NODE) {
-                        textNode = sibling as Text;
-                        break;
-                    }
-                    sibling = sibling.nextSibling;
-                }
-                return { open: openNode, close: node, textNode };
-            }
+            sibling = sibling.nextSibling;
         }
-        return null;
+        return { open: pair.open, close: pair.close, textNode };
     }
 
     setParentElement(parent: HtmlInterface | null): void {
@@ -155,6 +139,10 @@ export class Output implements OutputInterface {
             return;
         }
 
+        if (this.openTag.parentNode && this.textNode) {
+            this.update();
+            return;
+        }
         if (!this.openTag.parentNode) {
             const parentEl = this.parent?.element;
             if (!parentEl) return;

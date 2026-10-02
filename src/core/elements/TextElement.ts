@@ -1,6 +1,6 @@
-import type { HtmlInterface, TextInterface } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { SaoObjectType } from "../types/utils";
+import type { HtmlInterface, TextInterface } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { SaoObjectType } from "../types/utils.js";
 
 /**
  * TextElement — wraps a DOM Text node.
@@ -21,6 +21,7 @@ export class TextElement implements TextInterface {
     public shouldEscapeHTML: boolean = true; // Whether to escape HTML in text content
 
     public isStarted: boolean = false;
+    readonly isStatic: boolean;
 
 
     domChildren: Node[] = []; // For compatibility with HtmlInterface; Text itself doesn't have a single root element
@@ -29,6 +30,7 @@ export class TextElement implements TextInterface {
         this.generateText = generateText;
         this.parent = parent;
         this.statekeys = stateKeys;
+        this.isStatic = stateKeys.length === 0;
         this.shouldEscapeHTML = isEscapeHTML;
         // FIX(baseline#3): KHÔNG escapeHTML khi ghi vào Text node — text node tự an toàn,
         // escape thủ công gây double-escape. shouldEscapeHTML chỉ dùng cho SSR string path.
@@ -68,9 +70,13 @@ export class TextElement implements TextInterface {
 
     render(): HTMLElement | Text | Comment {
         const text = this.generateText();
-        this._text = text;
-        this.element.textContent = text;
+        this.update(text);
         return this.element;
+    }
+
+    replaceStaticText(text: string): void {
+        this.generateText = () => text;
+        this.update(text);
     }
 
     remove(): void {

@@ -1,7 +1,7 @@
-import { InitModes } from "../contracts/common";
-import { app } from "../helpers/app";
-import { mountElementList } from "../helpers/view";
-import { TextElement } from "./TextElement";
+import { InitModes } from "../contracts/common.js";
+import { app } from "../helpers/app.js";
+import { mountElementList } from "../helpers/view.js";
+import { TextElement } from "./TextElement.js";
 /**
  * Wrapper — renders multiple root nodes into a parent without a wrapping tag.
  *
@@ -55,23 +55,7 @@ export class Wrapper {
      * Quét comment nodes trong parent element (fallback document.body).
      */
     claimSSRMarkers(registry) {
-        const searchRoot = this.parent?.element ?? document.body;
-        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
-        const openText = registry.openComment('view', this.id);
-        const closeText = registry.closeComment('view', this.id);
-        let openNode = null;
-        let node;
-        while ((node = walker.nextNode())) {
-            const value = node.nodeValue?.trim() ?? '';
-            if (!openNode && value === openText) {
-                openNode = node;
-                continue;
-            }
-            if (openNode && value === closeText) {
-                return { open: openNode, close: node };
-            }
-        }
-        return null;
+        return registry.claim('view', this.id, this.parent?.element ?? null);
     }
     init() {
     }

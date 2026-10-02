@@ -1,6 +1,6 @@
-import type { ViewInterface } from "./ViewInterface";
-import type { ApplicationInterface } from "./ApplicationInterface";
-import { RouterNavigationType } from "./RouterInterface";
+import type { ViewInterface } from "./ViewInterface.js";
+import type { ApplicationInterface } from "./ApplicationInterface.js";
+import { RouterNavigationType } from "./RouterInterface.js";
 
 
 // ─── ViewManager Interface ───────────────────────────────────────
@@ -28,6 +28,8 @@ export interface ViewManagerInterface {
     init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; systemData?: Record<string, any>; revision?: string; contextViews?: string }): void;
     /** Apply a newer server-authoritative view context. Returns true when changed. */
     applyViewContext?(state: Record<string, any>): boolean;
+    /** A changed view namespace needs a full document load before it can be applied safely. */
+    requiresReloadForViewContext?(state: Record<string, any>): boolean;
     /** Current server view-context fingerprint. */
     getContextRevision?(): string | null;
     /** Mount a view by name — main entry point */

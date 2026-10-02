@@ -280,4 +280,72 @@ describe('subscribe với key chưa register', () => {
         expect(one.length).toBe(1);
         expect(many.length).toBe(1);   // trước đây: 0
     });
+
+    it('numeric key được chuẩn hoá nhất quán qua setter/subscribe/unsubscribe', () => {
+        const s = makeState('view.numeric-key');
+        const set = s.__.register(1, 0);
+        const seen: any[] = [];
+        const listener = (value: any) => seen.push(value);
+        s.__.subscribe(1, listener);
+
+        set(1);
+        s.__.flushNow();
+        s.__.unsubscribe(1, listener);
+        set(2);
+        s.__.flushNow();
+
+        expect(seen).toEqual([1]);
+        expect(s.__.getStateByKey(1)).toBe(2);
+    });
+
+    it('auto key không đè explicit numeric key đã tồn tại', () => {
+        const s = makeState('view.auto-key');
+        s.__.register(0, 'explicit');
+        const [, setAuto, autoKey] = s.__.useState('auto');
+
+        expect(autoKey).toBe('1');
+        setAuto('updated');
+        expect(s.__.getStateByKey(0)).toBe('explicit');
+        expect(s.__.getStateByKey(1)).toBe('updated');
+    });
+
+    it('listener tự unsubscribe không làm mất listener kế tiếp', () => {
+        const s = makeState('view.listener-snapshot');
+        const set = s.__.register('value', 0);
+        const calls: string[] = [];
+        let offFirst = () => {};
+        offFirst = s.__.subscribe('value', () => {
+            calls.push('first');
+            offFirst();
+        });
+        s.__.subscribe('value', () => calls.push('second'));
+
+        set(1);
+        s.__.flushNow();
+        set(2);
+        s.__.flushNow();
+
+        expect(calls).toEqual(['first', 'second', 'second']);
+    });
+
+    it('listener được thêm trong lúc notify chỉ chạy từ batch kế tiếp', () => {
+        const s = makeState('view.listener-add');
+        const set = s.__.register('value', 0);
+        const calls: string[] = [];
+        let added = false;
+        s.__.subscribe('value', () => {
+            calls.push('first');
+            if (!added) {
+                added = true;
+                s.__.subscribe('value', () => calls.push('late'));
+            }
+        });
+
+        set(1);
+        s.__.flushNow();
+        expect(calls).toEqual(['first']);
+        set(2);
+        s.__.flushNow();
+        expect(calls).toEqual(['first', 'first', 'late']);
+    });
 });

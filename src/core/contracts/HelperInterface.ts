@@ -1,6 +1,6 @@
 // ─── Collection Proxy Interface ─────────────────────────────────
 
-import { ApplicationInterface } from "./ApplicationInterface";
+import { ApplicationInterface } from "./ApplicationInterface.js";
 
 export interface CollectionProxyInterface {
     all(): any[];

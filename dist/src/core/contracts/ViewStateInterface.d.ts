@@ -15,11 +15,12 @@ export interface StateManagerInterface {
      * (đánh dấu bẩn lúc dep đổi, tính lúc đọc). Đọc qua `getStateByKey(key)`
      * hoặc `subscribe([key])` như state thường.
      */
-    computed(key: string, fn: () => any, deps?: string[]): () => any;
+    computed<T>(key: string, fn: () => T, deps?: string[]): () => T;
     /** Update state by key */
     updateStateByKey(key: string | number, value: any): any;
     /** Get state value by key (supports nested paths: 'user.name') */
     getStateByKey(key: string | number): any;
+    getStateVersion(key: string): number;
     /** Subscribe to state changes */
     subscribe(key: string | number | string[] | Record<string, (value: any) => void>, callback?: (value: any) => void): () => void;
     /** Unsubscribe */
@@ -54,6 +55,8 @@ export interface StateManagerInterface {
      * Dùng sau commitData()/mount để DOM phản ánh state ngay trong cùng tick.
      */
     flushNow(): void;
+    /** Opt into expensive mutation diagnostics; disabled by default in browsers. */
+    setMutationDiagnostics(enabled: boolean): void;
     /** Destroy — cleanup all listeners and states */
     destroy(): void;
 }

@@ -1,4 +1,4 @@
-import { ServiceProvider } from "./ServiceProvider";
+import { ServiceProvider } from "./ServiceProvider.js";
 export declare class RouteServiceProvider extends ServiceProvider {
     readonly name: "router";
     /** ROUTER phải boot SAU VIEW để ViewManager đã sẵn sàng */

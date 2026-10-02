@@ -1,0 +1,16 @@
+<template>
+<div>
+    <textarea id="plain">Prefix &amp; {{ message }} &lt;b&gt;</textarea>
+    <textarea id="bound" @bind(message)></textarea>
+    <textarea id="explicit" @bind(message)>{{ message }}</textarea>
+    <textarea id="raw">{!! raw !!}</textarea>
+    <title id="heading">{{ message }}</title>
+    <button id="change" @click(change())>Change</button>
+</div>
+</template>
+<script setup>
+@state(message = 'hello <world> & friends', raw = '&amp;<b>literal</b>')
+export default {
+    change() { setMessage('changed <value> & ok'); }
+}
+</script>

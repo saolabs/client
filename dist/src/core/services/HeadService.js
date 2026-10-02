@@ -48,14 +48,15 @@ export class HeadServiceImpl {
                 el.setAttribute('data-head-id', id);
                 document.head.appendChild(el);
             }
-            const originalText = created ? null : el.textContent;
+            // Page-owned SSR schema belongs to the initial route; remove it on navigation.
+            const originalText = created || el.getAttribute('data-head-scope') === 'page' ? null : el.textContent;
             this.managed.set(key, {
                 scope: options.scope ?? 'page',
                 revert: () => {
                     const target = document.head.querySelector(selector);
                     if (!target)
                         return;
-                    if (created)
+                    if (originalText === null)
                         target.remove();
                     else
                         target.textContent = originalText;

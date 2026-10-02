@@ -16,16 +16,16 @@
  *   - Element tree rendering → ViewController.render()
  *   - Section system → Block/BlockOutlet
  */
-import type { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { ActiveRouteInterface, RouterNavigationType } from "../contracts/RouterInterface";
-import { HtmlInterface } from "../contracts/utils";
-import type { ViewInterface } from "../contracts/ViewInterface";
-import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
-import { BlockManagerService } from "../services/BlockManager";
-import { SectionManagerService } from "../services/SectionManager";
-import { PageCacheService } from "../services/PageCache";
-import { StoreService } from "../services/StoreService";
-import { InitMode } from "../contracts/common";
+import type { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import { ActiveRouteInterface, RouterNavigationType } from "../contracts/RouterInterface.js";
+import { HtmlInterface } from "../contracts/utils.js";
+import type { ViewInterface } from "../contracts/ViewInterface.js";
+import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
+import { BlockManagerService } from "../services/BlockManager.js";
+import { SectionManagerService } from "../services/SectionManager.js";
+import { PageCacheService } from "../services/PageCache.js";
+import { StoreService } from "../services/StoreService.js";
+import { InitMode } from "../contracts/common.js";
 /**
  * SSR boot info — server nhúng sau khi render xong (RUNTIME_CONTRACT §6).
  * `view` = registry path của page entry, `viewId` = id server đã dùng để prefix
@@ -103,6 +103,19 @@ export declare class ViewManager implements ViewManagerInterface {
     /** Render counter for debugging */
     private renderCount;
     /** Invalidates fire-and-forget render work when a newer navigation begins. */
+    /**
+     * Số lượt render `@await` đang bay.
+     *
+     * Nhánh "có prerender" cố ý fire-and-forget: nó trả skeleton về NGAY rồi
+     * mới fetch, nên người gọi không có promise nào để đợi và không có cách
+     * nào biết nội dung thật đã vào chưa. Đếm ở đây để {@link isSettled} trả
+     * lời được câu đó — công cụ đo, chụp ảnh trang, hay test parity SSR↔CSR
+     * đều cần một tín hiệu THẬT thay vì đoán bằng "DOM đứng yên": trang đang
+     * chờ dữ liệu thì DOM cũng đứng yên y như đã xong.
+     */
+    private pendingAsyncRenders;
+    /** Không còn render `@await` nào đang bay — nội dung thật đã vào DOM. */
+    get isSettled(): boolean;
     private navigationGeneration;
     store: StoreService;
     blockManager: BlockManagerService;
@@ -270,6 +283,20 @@ export declare class ViewManager implements ViewManagerInterface {
     private activateRenderedChain;
     /** CSR strategy: insert new DOM, while preserving/reusing a compatible Layout. */
     private activateCreatedChain;
+    /**
+     * Đưa `@section` của page tới `@yield` của layout.
+     *
+     * `mountViewSections` lọc yield theo `yieldEl.ctx.viewId`, mà YIELD THUỘC
+     * LAYOUT khai báo nó chứ không thuộc page — nên gọi riêng với viewId của
+     * page thì không yield nào khớp. Chỉ quét các layout MỚI cũng không đủ:
+     * điều hướng giữa hai trang dùng chung một layout thì `common` phủ hết
+     * chuỗi, vòng lặp mount layout không chạy lần nào, và section của trang mới
+     * không bao giờ tới nơi.
+     *
+     * Quét cả chuỗi là an toàn: mountViewSections chỉ áp lại `activeSections`
+     * hiện hành vào từng yield, gọi thừa không đổi kết quả.
+     */
+    private mountSectionsAcrossChain;
     /** Hydration strategy: claim Blade DOM without insert/clear mutations. */
     private activateHydratedChain;
     /**
@@ -333,6 +360,7 @@ export declare class ViewManager implements ViewManagerInterface {
      * Apply an atomic context update received from a JSON response before the
      * Router retries navigation with the newly materialized route table.
      */
+    requiresReloadForViewContext(state: Record<string, any>): boolean;
     applyViewContext(state: Record<string, any>): boolean;
     getContextRevision(): string | null;
     private extractAsyncData;
@@ -345,7 +373,7 @@ export declare class ViewManager implements ViewManagerInterface {
      *   3. Laravel truyền $__VIEW_ID__ về client qua page data (__SSR_VIEW_ID__)
      *   4. Client gọi hydrateView() — view được tạo với cùng viewId
      *   5. Html elements tìm server-rendered DOM nodes bằng class {viewId}-{elementId}
-     *   6. Reactive regions claim server markers via SaoMarker.first()
+     *   6. Reactive regions claim server markers via markerRegistry.claim()
      *   7. Event handlers và state subscriptions được gắn vào DOM đã có
      *
      * Lưu ý: Không gây layout shift vì cấu trúc DOM được reuse (Html claim),

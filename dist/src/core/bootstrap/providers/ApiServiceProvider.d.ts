@@ -1,4 +1,4 @@
-import { ServiceProvider } from "./ServiceProvider";
+import { ServiceProvider } from "./ServiceProvider.js";
 export declare class ApiServiceProvider extends ServiceProvider {
     readonly name: "api";
     readonly dependsOn: "core"[];

@@ -57,6 +57,24 @@ describe('HeadService — works with no View/ViewController involved', () => {
 });
 
 describe('HeadService — unset() / resetPage()', () => {
+    it('adopts page-owned SSR JSON-LD without duplicates and removes it on navigation', () => {
+        document.head.innerHTML = '<script type="application/ld+json" data-head-id="home" data-head-scope="page">{"@type":"WebSite","name":"Server"}</script>';
+        const existing = document.head.querySelector('script');
+        head.setJsonLd('home', { '@type': 'WebSite', name: 'Hydrated' });
+        expect(document.head.querySelectorAll('script[type="application/ld+json"]').length).toBe(1);
+        expect(document.head.querySelector('script')).toBe(existing);
+        head.resetPage();
+        expect(document.head.querySelector('script')).toBeNull();
+        head.setJsonLd('home', { '@type': 'WebSite', name: 'Returned' });
+        expect(JSON.parse(document.head.querySelector('script')!.textContent!).name).toBe('Returned');
+    });
+
+    it('preserves persistent SSR schema when a page override is reset', () => {
+        document.head.innerHTML = '<script type="application/ld+json" data-head-id="brand">{"@type":"Organization","name":"Brand"}</script>';
+        head.setJsonLd('brand', { '@type': 'Organization', name: 'Page override' });
+        head.resetPage();
+        expect(JSON.parse(document.head.querySelector('script')!.textContent!).name).toBe('Brand');
+    });
     it('unset() removes a tag this service created', () => {
         head.setMeta('robots', 'noindex');
         expect(document.head.querySelector('meta[name="robots"]')).not.toBeNull();

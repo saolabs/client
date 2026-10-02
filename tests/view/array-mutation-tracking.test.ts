@@ -261,6 +261,89 @@ describe('quan sát mutate — dọn sạch theo tham chiếu dùng chung', () =
         expect(hookCount(oldTree.a.b)).toBe(0);   // cây cũ sạch dấu vết
     });
 
+    it.each(['pop', 'shift', 'splice', 'fill'])(
+        '%s() → object bị lấy khỏi mảng không còn ghost notify/hook',
+        (method) => {
+            const s = makeState('view.detach.' + method);
+            const removed: any = { id: 1, nested: { value: 1 } };
+            const kept: any = { id: 2 };
+            const list: any[] = [removed, kept];
+            s.__.register('items', list);
+            let seen = 0;
+            s.__.subscribe('items', () => seen++);
+
+            if (method === 'pop') {
+                list.reverse();
+                s.__.flushNow();
+                seen = 0;
+                list.pop();
+            } else if (method === 'shift') {
+                list.shift();
+            } else if (method === 'splice') {
+                list.splice(0, 1);
+            } else {
+                list.fill(kept, 0, 1);
+            }
+            s.__.flushNow();
+            seen = 0;
+
+            expect(hookCount(removed)).toBe(0);
+            expect(hookCount(removed.nested)).toBe(0);
+            removed.nested.value = 2;
+            s.__.flushNow();
+            expect(seen).toBe(0);
+        },
+    );
+
+    it('node bị gỡ ở một nhánh nhưng còn shared ở nhánh khác vẫn reactive', () => {
+        const s = makeState('view.detach.shared');
+        const shared: any = { value: 1 };
+        const data: any = { items: [shared], selected: shared };
+        s.__.register('data', data);
+        let seen = 0;
+        s.__.subscribe('data', () => seen++);
+
+        data.items.pop();
+        s.__.flushNow();
+        seen = 0;
+
+        expect(hookCount(shared)).toBe(1);
+        shared.value = 2;
+        s.__.flushNow();
+        expect(seen).toBe(1);
+    });
+
+    it('thay object property → nhánh cũ được gỡ hook ngay', () => {
+        const s = makeState('view.detach.property');
+        const oldProfile: any = { name: 'old' };
+        const data: any = { profile: oldProfile };
+        s.__.register('data', data);
+        let seen = 0;
+        s.__.subscribe('data', () => seen++);
+
+        data.profile = { name: 'new' };
+        s.__.flushNow();
+        seen = 0;
+
+        expect(hookCount(oldProfile)).toBe(0);
+        oldProfile.name = 'detached';
+        s.__.flushNow();
+        expect(seen).toBe(0);
+    });
+
+    it('destroy sau detach lặp lại không tích lũy channel trên object ngoài state', () => {
+        const removed: any = { id: 1 };
+        for (let i = 0; i < 50; i++) {
+            const s = makeState('view.detach.destroy.' + i);
+            const list = [removed];
+            s.__.register('items', list);
+            list.pop();
+            s.__.flushNow();
+            s.__.destroy();
+        }
+        expect(hookCount(removed)).toBe(0);
+    });
+
     it('cùng object ở CHA và CON — cha destroy, con vẫn hoạt động', () => {
         const item: any = { id: 1, name: 'a' };
         const parent = makeState('view.p');

@@ -1,18 +1,20 @@
-import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface, EventModifier } from "../contracts/ElementInterface";
-import type { LoopContextInterface } from "../contracts/LoopContextInterface";
-import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo } from "../contracts/ViewControllerInterface";
-import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface";
-import type { SaoObjectType } from "../types/utils";
-import { ViewState } from "./ViewState";
-import { LoopContext } from "./LoopContext";
-import { Component } from "../elements/Component";
-import { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface";
-import { InitMode } from "../contracts/common";
-import { ComponentInterface } from "../contracts/ComponentInterface";
-import { ForeachSlotCache } from "../elements/ForeachSlotCache";
+import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface.js";
+import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface, EventModifier } from "../contracts/ElementInterface.js";
+import type { LoopContextInterface } from "../contracts/LoopContextInterface.js";
+import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo } from "../contracts/ViewControllerInterface.js";
+import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { ViewState } from "./ViewState.js";
+import { ResourceScope } from './ResourceScope.js';
+import { LoopContext } from "./LoopContext.js";
+import { Component } from "../elements/Component.js";
+import type { ViewUserConfig } from "./View.js";
+import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import { SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface.js";
+import { InitMode } from "../contracts/common.js";
+import { ComponentInterface } from "../contracts/ComponentInterface.js";
+import { ForeachSlotCache } from "../elements/ForeachSlotCache.js";
 type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | SaoNodeInterface;
 /**
  * ViewController — the brain behind a View.
@@ -61,6 +63,13 @@ export declare class ViewController implements ViewControllerInterface {
     originView: ViewControllerInterface | null;
     /** Raw input data from route/parent */
     data: Record<string, any>;
+    /**
+     * Component (@include) đã dựng view này — null với view gốc của route.
+     *
+     * Đây là lớp trung gian cha↔con: cha khai báo listener tại thẻ, Component
+     * giữ bảng đó, con phát qua {@link emit}.
+     */
+    ownerComponent: ComponentInterface | null;
     /** User-defined config from setup() */
     private config;
     /** Typed runtime config from compiled $__setup__ */
@@ -102,6 +111,12 @@ export declare class ViewController implements ViewControllerInterface {
      */
     _currentForeachCache: ForeachSlotCache | null;
     _foreachSkipRegistry: boolean;
+    private foreachRegistry;
+    private elementRegistries;
+    private inlineForeachCaches;
+    /** Deferred child factories retain the row scope in which they were created. */
+    private scopeFactory;
+    private inForeachScope;
     /** Section management across views */
     sections: Map<string, SectionInterface>;
     /** Block slots in layout views */
@@ -132,6 +147,15 @@ export declare class ViewController implements ViewControllerInterface {
     urlPath: string | null;
     callingMethod: string | null;
     constructor(view: ViewInterface, path?: string, viewType?: ViewType, viewId?: string | null);
+    private _scope?;
+    get scope(): ResourceScope;
+    private afterDomCallbacks;
+    private afterDomRAF;
+    private afterDomRevision;
+    /** One-shot callback after this view's state and DOM queues settle. */
+    afterDom(callback: () => void): () => void;
+    private flushAfterDom;
+    private cancelAfterDom;
     /**
      * Setup — called by compiled $__setup__ with full config.
      *
@@ -158,7 +182,7 @@ export declare class ViewController implements ViewControllerInterface {
         fallback?: any;
     };
     /** Set user-defined properties/methods on the View instance */
-    setUserDefinedConfig(userConfig: Record<string, any>): void;
+    setUserDefinedConfig<T extends object>(userConfig: ViewUserConfig<T>): void;
     /** Set the compiled render factory */
     setRenderFactory(factory: ViewRenderFactory): void;
     /** Set root element — the container this view renders into */
@@ -264,6 +288,16 @@ export declare class ViewController implements ViewControllerInterface {
      * Khi paused: buffer lại, apply lúc resume (ROUTE_RENDER_FLOW §8.2).
      */
     updateData(newData: Record<string, any>): void;
+    /**
+     * Con phát sự kiện lên ĐÚNG cha đã include nó: `emit('edit', card['id'])`.
+     *
+     * Kênh trực tiếp, không qua App.Event — hai instance cùng view không nghe
+     * nhầm của nhau, và không có gì để gỡ đăng ký lúc destroy. Không ai lắng
+     * nghe thì im lặng, đúng như một DOM event không listener.
+     *
+     * Trả về giá trị handler trả về, nên con hỏi cha được (`if (!emit('close'))`).
+     */
+    emit(event: string, ...args: any[]): any;
     /** Áp data vào biến data (trait) từng key — không đụng state, không đụng lock */
     private applyDataTrait;
     /**
@@ -293,6 +327,13 @@ export declare class ViewController implements ViewControllerInterface {
      * Multiple calls in the same frame are batched into a single RAF.
      */
     scheduleUpdate(reactive: ReactiveInterface): void;
+    /**
+     * Có vùng reactive nào đang chờ re-render trong frame này không?
+     *
+     * StateManager dùng để phân biệt "factory ném vì vùng bọc nó sắp bị dựng
+     * lại" với lỗi thật (xem StateManager.retryAfterReactiveFlush).
+     */
+    hasPendingReactiveUpdate(): boolean;
     private flushReactiveUpdates;
     pushBlockAndSections(): void;
     /**
@@ -308,6 +349,8 @@ export declare class ViewController implements ViewControllerInterface {
     }, contentRenderFactory: SectionContentRenderer): SectionInterface;
     /** `this.yieldContent(name, default)` — synchronous resolve, used inside attribute/prop binding factories. */
     yieldContent(name: string, defaultValue?: any): any;
+    /** Decode a raw SSR echo as RCDATA, preserving literal angle brackets. */
+    decodeTextContent(value: string): string;
     block(id: string | null, name: string, contentRenderFactory: BlockRenderFactory): BlockInterface;
     blockOutlet(id: string | null | undefined, name: string, parentElement: HtmlInterface | null): BlockOutletInterface;
     mountBlock(id: string | null | undefined, name: string, parent: HtmlInterface | null): BlockOutletInterface;
@@ -372,12 +415,12 @@ export declare class ViewController implements ViewControllerInterface {
      * so behaviour stays idempotent even in the broken case.
      */
     private resolveIncludeId;
-    include(id: string | null | undefined, path: string | undefined, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component;
-    includeIf(id: string | null | undefined, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component;
+    include(id: string | null | undefined, path: string | undefined, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>, listeners?: Record<string, (...args: any[]) => any>): Component;
+    includeIf(id: string | null | undefined, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>, listeners?: Record<string, (...args: any[]) => any>): Component;
     includeWhen(id: string | null, condition: {
         stateKeys: string[];
         checker: () => any;
-    }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component;
+    }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>, listeners?: Record<string, (...args: any[]) => any>): Component;
     extendView(path: string, data?: Record<string, any>): ViewInterface | null;
     /** Create and push a new LoopContext onto the stack */
     __setLoopContext(length: number): LoopContext;
@@ -418,7 +461,7 @@ export declare class ViewController implements ViewControllerInterface {
      *   - string — SSR data hoặc default '' → render text tĩnh (rỗng → []).
      */
     __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput;
-    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, keyFn?: (item: T, index: number) => any): any[];
+    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContextInterface, identity: number) => any, keyFn?: (item: T, index: number) => any, reconcile?: boolean, scopeId?: string): any[];
     __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, emptyCallback?: () => any): any[];
     __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any): any[];
     /**
@@ -429,23 +472,6 @@ export declare class ViewController implements ViewControllerInterface {
      * @while directive
      */
     __while(execute: (loop: LoopContext) => any, maxIterations?: number): any;
-    /**
-     * __showBinding — tính CSS style string cho @show directive.
-     *
-     * Compiler emit (pre-process trước AST):
-     *   @show($isVisible)  →  style="${this.__showBinding(['isVisible'], isVisible)}"
-     *
-     * Hành vi:
-     *   - condition truthy  → '' (element hiện, style="" hoặc style bị remove)
-     *   - condition falsy   → 'display: none;' (element ẩn)
-     *
-     * Reactivity được xử lý bởi Html._applyAttr() — nó subscribe stateKeys
-     * và gọi lại factory khi state thay đổi. Method này chỉ compute giá trị hiện tại.
-     *
-     * @param _stateKeys - Danh sách state keys (đã được encode trong compiled config, không dùng ở đây)
-     * @param condition  - Điều kiện hiện/ẩn (truthy = show, falsy = hide)
-     */
-    __showBinding(_stateKeys: string[], condition: any): string;
     /**
      * __styleBinding — tính inline CSS style string cho @style directive.
      *

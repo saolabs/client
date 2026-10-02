@@ -1,15 +1,12 @@
-import type { BlockInterface, BlockRenderFactory } from "../contracts/BlockInterface";
-import { InitMode, InitModes } from "../contracts/common";
-import type { FragmentInterface, HtmlInterface } from "../contracts/ElementInterface";
-import { MarkerModelInterface } from "../contracts/MarkerInterface";
-import type { ReactiveInterface } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { generateUUID } from "../helpers/utils";
-import { MarkerModel } from "../services/MarkerModel";
-import markerRegistry from "../services/MarkerRegistry";
-import { SaoMarker } from "../services/MarkerService";
-import type { SaoObjectType } from "../types/utils";
-import { Fragment } from "./Fragment";
+import type { BlockInterface, BlockRenderFactory } from "../contracts/BlockInterface.js";
+import { InitMode, InitModes } from "../contracts/common.js";
+import type { FragmentInterface, HtmlInterface } from "../contracts/ElementInterface.js";
+import type { ReactiveInterface } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { generateUUID } from "../helpers/utils.js";
+import markerRegistry from "../services/MarkerRegistry.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { Fragment } from "./Fragment.js";
 /**
  * Block — a named mounting slot used in layout views.
  * 
@@ -40,7 +37,6 @@ export class Block implements BlockInterface {
     contentRenderFactory: BlockRenderFactory | null = null;
     openTag: Comment;
     closeTag: Comment;
-    marker: MarkerModelInterface | null = null;
     domChildren: Node[] = [];
     initMode?: InitMode | undefined;
     parentElement: HtmlInterface | null = null;
@@ -69,39 +65,20 @@ export class Block implements BlockInterface {
         this.viewId = viewId ?? ctx.viewId; // Associate block with current viewId
         this.initMode = initMode;
         this.contentRenderFactory = contentRenderFactory || ((parentElement: HtmlInterface) => []);
-        if (this.initMode === InitModes.HYDRATE) {
-            let marker = SaoMarker.first('block', this.id);
-            if (marker) {
-                this.marker = marker;
-                this.openTag = marker.openTag as Comment;
-                this.closeTag = marker.closeTag as Comment;
-            } else {
-                this.openTag = markerRegistry.createMarkerStart('block', this.id);
-                this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
-                this.markerKey = markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
-                this.marker = new MarkerModel({
-                    tagName: "s:b",
-                    name: "block",
-                    markerID: this.id,
-                    openTag: this.openTag,
-                    closeTag: this.closeTag,
-                    children: [],
-                    attributes: {}
-                })
-            }
+        // Hydrate: claim cặp marker server qua index O(1) của MarkerRegistry.
+        // (Bản cũ dùng chung một TreeWalker không reset nên chỉ block ĐẦU TIÊN
+        // claim được, các block sau lặng lẽ tạo marker mới.)
+        const claimed = (this.initMode === InitModes.HYDRATE)
+            ? markerRegistry.claim('block', this.id)
+            : null;
+
+        if (claimed) {
+            this.openTag = claimed.open;
+            this.closeTag = claimed.close;
         } else {
             this.openTag = markerRegistry.createMarkerStart('block', this.id);
             this.closeTag = markerRegistry.createMarkerEnd('block', this.id);
             this.markerKey = markerRegistry.register('block', this.id, { name, viewId }); // Register block in marker registry
-            this.marker = new MarkerModel({
-                tagName: "s:b",
-                name: "block",
-                markerID: this.id,
-                openTag: this.openTag,
-                closeTag: this.closeTag,
-                children: [],
-                attributes: {}
-            })
         }
 
     }
@@ -140,6 +117,11 @@ export class Block implements BlockInterface {
             markerRegistry.remove(this.markerKey);
             this.markerKey = null;
         }
+        // openTag/closeTag nay NẰM TRONG DOM (BlockManager.mountBlockIntoOutlet chèn
+        // chúng quanh content). Bỏ lại comment mồ côi thì lần hydrate sau
+        // markerRegistry.claim('block', id) có thể bắt trúng cặp cũ và claim nhầm vùng.
+        this.openTag.remove();
+        this.closeTag.remove();
     }
     update(): void {
         // Update logic (e.g. re-render content on state change)

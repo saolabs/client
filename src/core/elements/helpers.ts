@@ -1,8 +1,8 @@
-import { BlockInterface, BlockOutletInterface } from "../contracts/BlockInterface";
-import { FragmentInterface, HtmlInterface, OutputInterface, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface";
-import { ReactiveInterface } from "../contracts/ReactiveInterface";
-import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { SaoObjectType } from "../types/utils";
+import { BlockInterface, BlockOutletInterface } from "../contracts/BlockInterface.js";
+import { FragmentInterface, HtmlInterface, OutputInterface, SaoChildrenFactoryOutput, SaoElementChildren } from "../contracts/ElementInterface.js";
+import { ReactiveInterface } from "../contracts/ReactiveInterface.js";
+import { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { SaoObjectType } from "../types/utils.js";
 
 export function getSaoObjectType(instance: any): SaoObjectType | null {
     if (instance && typeof instance === 'object' && 'saoType' in instance) {

@@ -1,36 +1,39 @@
-import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface";
+import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from "../contracts/BlockInterface.js";
 import type {
     FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput,
     SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface,
     TextInterface, WrapperInterface, YieldInterface, EventModifier
-} from "../contracts/ElementInterface";
-import type { LoopContextInterface } from "../contracts/LoopContextInterface";
-import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface";
-import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo, ErrorBoundaryHandler } from "../contracts/ViewControllerInterface";
-import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface";
-import type { ViewStateInterface } from "../contracts/ViewStateInterface";
-import type { SaoObjectType } from "../types/utils";
-import { ViewState } from "./ViewState";
-import { LoopContext } from "./LoopContext";
-import { Reactive } from "../elements/Reactive";
-import BlockManager, { BlockManagerService } from "../services/BlockManager";
-import SectionManager from "../services/SectionManager";
-import devtools from "../devtools/hook";
-import { Component } from "../elements/Component";
-import { generateUUID } from "../helpers/utils";
-import { Output } from "../elements/Output";
-import { View } from "./View";
-import { ApplicationInterface } from "../contracts/ApplicationInterface";
-import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface";
-import { Section } from "./Section";
-import { InitMode } from "../contracts/common";
-import { Block, BlockOutlet, Fragment, Html, TextElement } from "../elements";
-import { Wrapper } from "../elements/Wrapper";
-import { YieldElement } from "../elements/Yield";
-import { app } from "../helpers/app";
-import { ComponentInterface } from "../contracts/ComponentInterface";
-import { ForeachSlotCache } from "../elements/ForeachSlotCache";
-import AssetManager, { StyleSpec, ScriptSpec } from "../services/AssetManager";
+} from "../contracts/ElementInterface.js";
+import type { LoopContextInterface } from "../contracts/LoopContextInterface.js";
+import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface.js";
+import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ViewConfigThis, ErrorInfo, ErrorBoundaryHandler } from "../contracts/ViewControllerInterface.js";
+import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface.js";
+import type { ViewStateInterface } from "../contracts/ViewStateInterface.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { ViewState } from "./ViewState.js";
+import { ResourceScope } from './ResourceScope.js';
+import { LoopContext } from "./LoopContext.js";
+import { Reactive } from "../elements/Reactive.js";
+import BlockManager, { BlockManagerService } from "../services/BlockManager.js";
+import SectionManager from "../services/SectionManager.js";
+import devtools from "../devtools/hook.js";
+import { Component } from "../elements/Component.js";
+import { generateUUID } from "../helpers/utils.js";
+import { Output } from "../elements/Output.js";
+import { View } from "./View.js";
+import type { ViewUserConfig } from "./View.js";
+import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
+import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface.js";
+import { Section } from "./Section.js";
+import { InitMode } from "../contracts/common.js";
+import { Block, BlockOutlet, Fragment, Html, TextElement } from "../elements/index.js";
+import { Wrapper } from "../elements/Wrapper.js";
+import { YieldElement } from "../elements/Yield.js";
+import { app } from "../helpers/app.js";
+import { ComponentInterface } from "../contracts/ComponentInterface.js";
+import { ForeachSlotCache } from "../elements/ForeachSlotCache.js";
+import { reuseStaticText } from '../elements/reconcileChildren.js';
+import AssetManager, { StyleSpec, ScriptSpec } from "../services/AssetManager.js";
 
 type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | SaoNodeInterface;
 
@@ -90,10 +93,18 @@ export class ViewController implements ViewControllerInterface {
     // ─── Data & Config ──────────────────────────────────────────
     /** Raw input data from route/parent */
     public data: Record<string, any> = {};
+
+    /**
+     * Component (@include) đã dựng view này — null với view gốc của route.
+     *
+     * Đây là lớp trung gian cha↔con: cha khai báo listener tại thẻ, Component
+     * giữ bảng đó, con phát qua {@link emit}.
+     */
+    public ownerComponent: ComponentInterface | null = null;
     /** User-defined config from setup() */
     private config: ViewConfig = {};
     /** Typed runtime config from compiled $__setup__ */
-    private runtimeConfig: ViewRuntimeConfig | null = {};
+    private runtimeConfig: ViewRuntimeConfig = {};
     /** Track own properties to avoid conflicts when setting user config */
     private ownProperties: Set<string> = new Set(['__ctrl__']);
 
@@ -144,6 +155,25 @@ export class ViewController implements ViewControllerInterface {
      */
     public _currentForeachCache: ForeachSlotCache | null = null;
     public _foreachSkipRegistry: boolean = false;
+    private foreachRegistry: Map<string, any> | null = null;
+    private elementRegistries = new WeakMap<object, Map<string, any>>();
+    private inlineForeachCaches = new WeakMap<Map<string, any>, Map<string, ForeachSlotCache>>();
+
+    /** Deferred child factories retain the row scope in which they were created. */
+    private scopeFactory<F extends (...args: any[]) => any>(factory: F): F {
+        const registry = this.foreachRegistry;
+        if (!registry) return factory;
+        return ((...args: any[]) => this.inForeachScope(registry, () => factory(...args))) as F;
+    }
+
+    private inForeachScope<T>(registry: Map<string, any>, run: () => T): T {
+        const previous = this.foreachRegistry;
+        const skip = this._foreachSkipRegistry;
+        this.foreachRegistry = registry;
+        this._foreachSkipRegistry = false;
+        try { return run(); }
+        finally { this.foreachRegistry = previous; this._foreachSkipRegistry = skip; }
+    }
 
     // ─── Layout (Sections & Blocks) ─────────────────────────────
     /** Section management across views */
@@ -194,6 +224,67 @@ export class ViewController implements ViewControllerInterface {
         this.states = new ViewState(this);
     }
 
+    private _scope?: ResourceScope;
+    get scope(): ResourceScope {
+        if (!this._scope) {
+            this._scope = new ResourceScope(this.states.__, callback => this.afterDom(callback), error => {
+                if (!this.handleError(error, { phase: 'update', path: this.path }).handled) {
+                    console.error(`[ViewController] Watch error in "${this.path}":`, error);
+                }
+            });
+            if (this._isDestroyed) this._scope.destroy();
+            else if (this._isStarted && this._lifecycleState === 'active') this._scope.resume();
+        }
+        return this._scope;
+    }
+
+    private afterDomCallbacks = new Set<() => void>();
+    private afterDomRAF: number | null = null;
+    private afterDomRevision = 0;
+
+    /** One-shot callback after this view's state and DOM queues settle. */
+    afterDom(callback: () => void): () => void {
+        if (this._isDestroyed || this._lifecycleState === 'paused') return () => {};
+        this.afterDomCallbacks.add(callback);
+        if (this.afterDomRAF === null) {
+            this.afterDomRAF = requestAnimationFrame(() => {
+                this.afterDomRAF = null;
+                const revision = this.afterDomRevision;
+                this.states.__.flushNow();
+                if (revision === this.afterDomRevision) this.flushReactiveUpdatesNow();
+            });
+        }
+        return () => {
+            this.afterDomCallbacks.delete(callback);
+            if (this.afterDomCallbacks.size === 0 && this.afterDomRAF !== null) {
+                cancelAnimationFrame(this.afterDomRAF);
+                this.afterDomRAF = null;
+            }
+        };
+    }
+
+    private flushAfterDom(): void {
+        if (this._isDestroyed || this._lifecycleState === 'paused') return;
+        this.afterDomRevision++;
+        if (this.afterDomRAF !== null) cancelAnimationFrame(this.afterDomRAF);
+        this.afterDomRAF = null;
+        // Callbacks queued by another callback belong to the next frame.
+        const callbacks = Array.from(this.afterDomCallbacks);
+        for (const callback of callbacks) {
+            if (!this.afterDomCallbacks.delete(callback)) continue;
+            try { callback(); }
+            catch (error) {
+                if (!this.handleError(error, { phase: 'update', path: this.path }).handled) console.error(error);
+            }
+        }
+    }
+
+    private cancelAfterDom(): void {
+        if (this.afterDomRAF !== null) cancelAnimationFrame(this.afterDomRAF);
+        this.afterDomRAF = null;
+        this.afterDomCallbacks.clear();
+    }
+
     // ─── Lifecycle ──────────────────────────────────────────────
 
     /**
@@ -203,7 +294,7 @@ export class ViewController implements ViewControllerInterface {
      * CHƯA gọi commitConstructorData — đợi ViewManager gọi commitData().
      */
     setup(config: ViewRuntimeConfig): void {
-        this.runtimeConfig = config as ViewRuntimeConfig;
+        this.runtimeConfig = config;
 
         // Extract metadata
         if (config.viewId) this.viewId = config.viewId;
@@ -224,7 +315,7 @@ export class ViewController implements ViewControllerInterface {
 
     getConfig(key?: string, defaultValue?: any): ViewControllerConfig | any {
         if (key) {
-            return this.runtimeConfig?.[key] ?? (this.config[key] ?? defaultValue);
+            return this.runtimeConfig[key] ?? (this.config[key] ?? defaultValue);
         }
         return { ...this.runtimeConfig, ...this.config };
     }
@@ -273,7 +364,7 @@ export class ViewController implements ViewControllerInterface {
     }
 
     /** Set user-defined properties/methods on the View instance */
-    setUserDefinedConfig(userConfig: Record<string, any>): void {
+    setUserDefinedConfig<T extends object>(userConfig: ViewUserConfig<T>): void {
         for (const [key, value] of Object.entries(userConfig)) {
             if (!this.ownProperties.has(key)) {
                 (this.view as any)[key] = typeof value === 'function' && value.bind
@@ -485,6 +576,8 @@ export class ViewController implements ViewControllerInterface {
         this._lifecycleState = 'active';
         this.isActive = true;
 
+        this._scope?.resume();
+
         this.callHook('started');
         this.callHook('onMounted'); // legacy alias
     }
@@ -519,6 +612,8 @@ export class ViewController implements ViewControllerInterface {
         }
 
         this.callHook('pausing');
+        this._scope?.pause();
+        this.cancelAfterDom();
 
         // 1. Flush nốt mọi update đang chờ → DOM là snapshot nhất quán
         this.states.__.flushNow();
@@ -583,6 +678,8 @@ export class ViewController implements ViewControllerInterface {
             if (child.lifecycleState === 'paused') child.resume();
         }
 
+        this._scope?.resume();
+
         // 4. Hook
         this.callHook('resumed');
         this.callHook('onResume'); // legacy alias
@@ -593,7 +690,7 @@ export class ViewController implements ViewControllerInterface {
         if (this.hasScheduledUpdate || this.pendingReactiveUpdates.size > 0) {
             this.flushReactiveUpdates();
             this.hasScheduledUpdate = false;
-        }
+        } else this.flushAfterDom();
     }
 
     /**
@@ -605,6 +702,8 @@ export class ViewController implements ViewControllerInterface {
 
         this.callHook('stopping');
         this._isStarted = false;
+        this._scope?.pause();
+        this.cancelAfterDom();
 
         // Recursively stop all children
         if (this._rootTree && 'stop' in this._rootTree && typeof this._rootTree.stop === 'function') {
@@ -632,6 +731,8 @@ export class ViewController implements ViewControllerInterface {
 
         this._isDestroyed = true;
         this._lifecycleState = 'destroyed';
+        this._scope?.destroy();
+        this.cancelAfterDom();
 
         // Cancel pending updates
         this.pendingReactiveUpdates.clear();
@@ -711,7 +812,7 @@ export class ViewController implements ViewControllerInterface {
      * `this` context cho các hàm compiled config (updateVariableData dùng
      * this.config.updateVariableItemData và this.data).
      */
-    private makeConfigThis(): any {
+    private makeConfigThis(): ViewConfigThis {
         return {
             config: this.runtimeConfig,
             data: this.data,
@@ -730,7 +831,7 @@ export class ViewController implements ViewControllerInterface {
      */
     commitData(): void {
         if (this._isDataCommitted || this._isDestroyed) return;
-        const fn = this.runtimeConfig?.commitConstructorData;
+        const fn = this.runtimeConfig.commitConstructorData;
         if (typeof fn === 'function') {
             try {
                 fn.call(this.makeConfigThis());
@@ -776,7 +877,7 @@ export class ViewController implements ViewControllerInterface {
             this.applyDataTrait(newData);
             return;
         }
-        const fn = this.runtimeConfig?.updateVariableData;
+        const fn = this.runtimeConfig.updateVariableData;
         if (typeof fn === 'function') {
             this.states.__.unlockUpdateRealState();
             try {
@@ -789,9 +890,23 @@ export class ViewController implements ViewControllerInterface {
         }
     }
 
+    /**
+     * Con phát sự kiện lên ĐÚNG cha đã include nó: `emit('edit', card['id'])`.
+     *
+     * Kênh trực tiếp, không qua App.Event — hai instance cùng view không nghe
+     * nhầm của nhau, và không có gì để gỡ đăng ký lúc destroy. Không ai lắng
+     * nghe thì im lặng, đúng như một DOM event không listener.
+     *
+     * Trả về giá trị handler trả về, nên con hỏi cha được (`if (!emit('close'))`).
+     */
+    emit(event: string, ...args: any[]): any {
+        const fn = this.ownerComponent?.listeners?.[event];
+        return typeof fn === 'function' ? fn(...args) : undefined;
+    }
+
     /** Áp data vào biến data (trait) từng key — không đụng state, không đụng lock */
     private applyDataTrait(newData: Record<string, any>): void {
-        const itemFn = this.runtimeConfig?.updateVariableItemData;
+        const itemFn = this.runtimeConfig.updateVariableItemData;
         if (typeof itemFn !== 'function') return;
         for (const key of Object.keys(newData)) {
             try {
@@ -812,7 +927,7 @@ export class ViewController implements ViewControllerInterface {
             this.applyDataTrait({ [key]: value });
             return;
         }
-        const fn = this.runtimeConfig?.updateVariableItemData;
+        const fn = this.runtimeConfig.updateVariableItemData;
         if (typeof fn === 'function') {
             this.states.__.unlockUpdateRealState();
             try {
@@ -951,6 +1066,16 @@ export class ViewController implements ViewControllerInterface {
         }
     }
 
+    /**
+     * Có vùng reactive nào đang chờ re-render trong frame này không?
+     *
+     * StateManager dùng để phân biệt "factory ném vì vùng bọc nó sắp bị dựng
+     * lại" với lỗi thật (xem StateManager.retryAfterReactiveFlush).
+     */
+    hasPendingReactiveUpdate(): boolean {
+        return this.pendingReactiveUpdates.size > 0;
+    }
+
     private flushReactiveUpdates(): void {
         if (this._isDestroyed) return;
         this.hasScheduledUpdate = false;
@@ -965,6 +1090,7 @@ export class ViewController implements ViewControllerInterface {
                 console.error(`[ViewController] Reactive update error in "${this.path}":`, e);
             }
         }
+        this.flushAfterDom();
     }
 
 
@@ -1006,6 +1132,13 @@ export class ViewController implements ViewControllerInterface {
         return SectionManager.resolve(name, defaultValue);
     }
 
+    /** Decode a raw SSR echo as RCDATA, preserving literal angle brackets. */
+    decodeTextContent(value: string): string {
+        const decoder = document.createElement('textarea');
+        decoder.innerHTML = value;
+        return decoder.textContent ?? '';
+    }
+
 
     // template methods called by compiled output — these build the element tree directly
 
@@ -1035,7 +1168,7 @@ export class ViewController implements ViewControllerInterface {
             id = `ob-${name}`;
         }
         id = `${this.viewId}-${id}`;
-        const existing = this.elements.get(id);
+        const existing = this.foreachRegistry ? this.foreachRegistry.get(id) : this.elements.get(id);
         if (existing instanceof BlockOutlet && !(existing as any).__destroyed__) {
             existing.setParentElement(parentElement);
             existing.initMode = initMode;
@@ -1066,7 +1199,7 @@ export class ViewController implements ViewControllerInterface {
     }
 
     yield(id: string, name: string, defaultValue: any = null, parentElement: HtmlInterface | null = null): YieldInterface {
-        const existing = this.elements.get(id);
+        const existing = this.foreachRegistry ? this.foreachRegistry.get(id) : this.elements.get(id);
         if (existing instanceof YieldElement) {
             existing.setParentElement(parentElement);
             existing.defaultValue = defaultValue;
@@ -1097,6 +1230,7 @@ export class ViewController implements ViewControllerInterface {
 
 
     fragment(id: string | null = null, parentElement: HtmlInterface | null, childrenFactory: SaoChildrenFactory): FragmentInterface {
+        childrenFactory = this.scopeFactory(childrenFactory);
         if (!id) {
             id = `fr-${generateUUID(5)}`;
         }
@@ -1120,6 +1254,7 @@ export class ViewController implements ViewControllerInterface {
      */
 
     html(id: string | null = null, tagName: string, parentElement: HtmlInterface | null, config: any, childrenFactory?: SaoChildrenFactory): SaoNodeInterface {
+        if (childrenFactory) childrenFactory = this.scopeFactory(childrenFactory);
         if (!id) {
             id = `el-${tagName}-${generateUUID(5)}`;
         }
@@ -1138,6 +1273,7 @@ export class ViewController implements ViewControllerInterface {
 
 
     reactive(id: string | null, type: string, parentReactive: ReactiveInterface | null, parentElement: HtmlInterface | null, stateKeys: string[], childrenFactory: ReactiveChildrenFactory): ReactiveInterface {
+        childrenFactory = this.scopeFactory(childrenFactory);
         // check
         if (!id) {
             id = `r-${type}-${generateUUID(5)}`;
@@ -1206,6 +1342,10 @@ export class ViewController implements ViewControllerInterface {
     private registerElement<T extends object>(id: string, el: T): T {
         this.elements.set(id, el as any);
         this.elementKeys.set(el, id);
+        if (this.foreachRegistry) {
+            this.foreachRegistry.set(id, el);
+            this.elementRegistries.set(el, this.foreachRegistry);
+        }
         return el;
     }
 
@@ -1222,6 +1362,9 @@ export class ViewController implements ViewControllerInterface {
         const id = this.elementKeys.get(el);
         if (id === undefined) return;
         this.elementKeys.delete(el);
+        const registry = this.elementRegistries.get(el);
+        if (registry?.get(id) === el) registry.delete(id);
+        this.elementRegistries.delete(el);
         if (this.elements.get(id) === el) this.elements.delete(id);
     }
 
@@ -1232,7 +1375,7 @@ export class ViewController implements ViewControllerInterface {
      */
     private aliveFromRegistry<T>(id: string, ctor: abstract new (...args: any[]) => T): T | null {
         if (this._foreachSkipRegistry) return null;
-        const existing = this.elements.get(id);
+        const existing = this.foreachRegistry ? this.foreachRegistry.get(id) : this.elements.get(id);
         if (existing instanceof ctor && !(existing as any).__destroyed__) {
             return existing as T;
         }
@@ -1270,12 +1413,14 @@ export class ViewController implements ViewControllerInterface {
         path: string = '',
         parentElement: HtmlInterface | null,
         stateKeys: string[],
-        dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>
+        dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>,
+        listeners: Record<string, (...args: any[]) => any> = {}
     ): Component {
         id = this.resolveIncludeId(id, 'include', path);
         const existing = this.aliveFromRegistry(id, Component);
         if (existing) {
             existing.setDataFactory(dataFactory);
+            existing.setListeners(listeners);
             if (stateKeys) {
                 existing.setStateKeys(stateKeys);
             }
@@ -1290,17 +1435,19 @@ export class ViewController implements ViewControllerInterface {
             path,
             type: 'default',
             initMode: this.initMode,
+            listeners,
         });
         this.registerElement(id, component);
 
         return component;
     }
 
-    includeIf(id: string | null = null, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component {
+    includeIf(id: string | null = null, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>, listeners: Record<string, (...args: any[]) => any> = {}): Component {
         id = this.resolveIncludeId(id, 'includeIf', path);
         const existing = this.aliveFromRegistry(id, Component);
         if (existing) {
             existing.setDataFactory(dataFactory);
+            existing.setListeners(listeners);
             if (stateKeys) {
                 existing.setStateKeys(stateKeys);
             }
@@ -1315,12 +1462,13 @@ export class ViewController implements ViewControllerInterface {
             path,
             type: 'if',
             initMode: this.initMode,
+            listeners,
         });
         this.registerElement(id, component);
         return component;
     }
 
-    includeWhen(id: string | null, condition: { stateKeys: string[], checker: () => any }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>): Component {
+    includeWhen(id: string | null, condition: { stateKeys: string[], checker: () => any }, path: string, parentElement: HtmlInterface | null, stateKeys: string[], dataFactory: (parentElement: HtmlInterface | null) => Record<string, any>, listeners: Record<string, (...args: any[]) => any> = {}): Component {
         id = this.resolveIncludeId(id, 'includeWhen', path);
         const existing = this.aliveFromRegistry(id, Component);
         if (existing) {
@@ -1341,6 +1489,7 @@ export class ViewController implements ViewControllerInterface {
             type: 'when',
             condition,
             initMode: this.initMode,
+            listeners,
         });
         this.registerElement(id, component);
         return component;
@@ -1430,88 +1579,70 @@ export class ViewController implements ViewControllerInterface {
 
     __foreach<T>(
         list: T[] | Record<string, T>,
-        callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any,
-        keyFn?: (item: T, index: number) => any
+        callback: (item: T, key: string, index: number, loop: LoopContextInterface, identity: number) => any,
+        keyFn?: (item: T, index: number) => any,
+        reconcile = false,
+        scopeId?: string,
     ): any[] {
         if (!list || typeof list !== 'object') return [];
-
-        // Lấy cache đang active (null = không có cache, dùng behavior cũ)
-        const cache = this._currentForeachCache;
-
+        let cache = Array.isArray(list) || reconcile ? this._currentForeachCache : null;
+        let ownsPass = false;
+        if (!cache && reconcile && scopeId && this.foreachRegistry) {
+            let caches = this.inlineForeachCaches.get(this.foreachRegistry);
+            if (!caches) this.inlineForeachCaches.set(this.foreachRegistry, caches = new Map());
+            cache = caches.get(scopeId) ?? null;
+            if (!cache) caches.set(scopeId, cache = new ForeachSlotCache());
+            cache.beginPass();
+            ownsPass = true;
+        }
         const result: any[] = [];
+        const keys = Array.isArray(list)
+            ? Object.keys(list).filter(key => String(Number(key)) === key && Number(key) >= 0 && Number(key) < list.length)
+            : Object.keys(list);
+        const loopCtx = this.__setLoopContext(Array.isArray(list) ? list.length : keys.length);
+        loopCtx.setType('increment');
         try {
-            if (Array.isArray(list)) {
-                const loopCtx = this.__setLoopContext(list.length);
-                loopCtx.setType('increment');
-
-                list.forEach((item, index) => {
-                    loopCtx.setCurrentTimes(index);
-
-                    // ── Cache-aware path ──────────────────────────────────────
-                    let claimOcc = 0;
-                    let cacheKey: any = item;
-                    if (cache) {
-                        cacheKey = keyFn ? keyFn(item, index) : item;
-                        const { slot, occ } = cache.claim(cacheKey, item);
-                        claimOcc = occ;
-                        if (slot) {
-                            // HIT: reuse elements cũ — closure vẫn trỏ đúng object ref.
-                            result.push(...slot.elements);
-                            return; // skip callback
-                        }
-                    }
-
-                    // ── Cache MISS hoặc không dùng cache ─────────────────────
-                    // Đóng cửa sổ cache quanh callback: @foreach lồng chạy NGAY
-                    // trong loop body (không bọc thẻ → compiler emit `__foreach`
-                    // trần) sẽ thấy cache=null thay vì mượn cache của loop ngoài.
-                    // Mượn nhầm thì slot của loop trong bị prunePass loop ngoài
-                    // destroy oan mỗi khi item ngoài là cache HIT.
-                    // Khôi phục giá trị TRƯỚC ĐÓ (không gán cứng false) — loop
-                    // lồng phải trả lại cờ cho loop ngoài đang dở dang.
-                    const prevSkip = this._foreachSkipRegistry;
-                    if (cache) {
-                        this._foreachSkipRegistry = true;
-                        this._currentForeachCache = null;
-                    }
-                    let output: any;
-                    try {
-                        // Snapshot BẤT BIẾN: childrenFactory chạy muộn (sau khi
-                        // loop kết thúc) nên bắt loopCtx theo tham chiếu sẽ cho
-                        // mọi hàng cùng một giá trị cuối. Xem LoopContext.snapshot().
-                        output = callback(item, String(index), index, loopCtx.snapshot());
-                    } finally {
-                        if (cache) {
-                            this._foreachSkipRegistry = prevSkip;
-                            this._currentForeachCache = cache;
-                        }
-                    }
-                    if (output !== undefined && output !== null) {
-                        const elements = Array.isArray(output) ? output : [output];
-                        result.push(...elements);
-
-                        if (cache) {
-                            cache.store(cacheKey, claimOcc, item, elements);
-                        }
-                    }
-                });
-            } else {
-                // Object iteration — cache không áp dụng (keys thay vì refs)
-                const keys = Object.keys(list);
-                const loopCtx = this.__setLoopContext(keys.length);
-                loopCtx.setType('increment');
-                keys.forEach((key, index) => {
-                    loopCtx.setCurrentTimes(index);
-                    // Xem chú thích nhánh array phía trên — cùng lý do.
-                    const output = callback((list as Record<string, T>)[key], key, index, loopCtx.snapshot());
-                    if (output !== undefined && output !== null) {
-                        if (Array.isArray(output)) result.push(...output);
-                        else result.push(output);
-                    }
-                });
-            }
-        } catch (e) {
-            console.error(`[ViewController] @foreach error in "${this.path}":`, e);
+            keys.forEach((key, index) => {
+                // Sparse arrays retain their actual index and loop count.
+                const loopIndex = Array.isArray(list) ? Number(key) : index;
+                const item = (list as any)[key] as T;
+                loopCtx.setCurrentTimes(loopIndex);
+                const cacheKey = keyFn ? keyFn(item, loopIndex) : item;
+                const claim = cache?.claim(cacheKey, item, reconcile);
+                const slot = claim?.slot;
+                if (slot && !reconcile) {
+                    result.push(...slot.elements);
+                    return;
+                }
+                const registry = reconcile ? slot?.registry ?? new Map<string, any>() : null;
+                const identity = slot?.identity ?? (cache && reconcile ? cache.allocateIdentity(loopIndex) : loopIndex);
+                const previousCache = this._currentForeachCache;
+                const previousSkip = this._foreachSkipRegistry;
+                this._currentForeachCache = null; // nested inline loops own no outer slots
+                if (cache && !reconcile) this._foreachSkipRegistry = true;
+                let output: any;
+                try {
+                    const run = () => callback(item, key, loopIndex, loopCtx.snapshot(), identity);
+                    output = registry ? this.inForeachScope(registry, run) : run();
+                } finally {
+                    this._currentForeachCache = previousCache;
+                    this._foreachSkipRegistry = previousSkip;
+                }
+                let elements = output == null ? [] : Array.isArray(output) ? output : [output];
+                if (slot && reconcile) elements = reuseStaticText(slot.elements, elements);
+                result.push(...elements);
+                if (cache && claim) {
+                    if (slot && reconcile) {
+                        slot.item = item;
+                        slot.identity = identity;
+                        slot.elements = elements;
+                        for (const el of elements) cache.refreshedElements.add(el);
+                    } else cache.store(cacheKey, claim.occ, item, elements, registry ?? undefined).identity = identity;
+                }
+            });
+            if (ownsPass) cache!.prunePass(slot => {
+                for (const el of slot.elements) el.destroy?.();
+            });
         } finally {
             this.__resetLoopContext();
         }
@@ -1576,35 +1707,18 @@ export class ViewController implements ViewControllerInterface {
 
     // ─── Directive Binding Helpers ──────────────────────────────
     //
-    // Compiler pre-processes @show/@style/@class directives thành
-    // template literal calls trước khi tạo element config.
-    // Ví dụ: @show($isVisible) → style="${this.__showBinding(['isVisible'], isVisible)}"
-    //        @style([...])     → ${this.__styleBinding([...], [...])}
-    //        @class([...])     → ${this.__classBinding([...])}  (legacy path)
+    // Compiler pre-processes @style/@class directives thành template literal
+    // calls trước khi tạo element config.
+    // Ví dụ: @style([...]) → ${this.__styleBinding([...], [...])}
+    //        @class([...]) → ${this.__classBinding([...])}  (legacy path)
     //
     // Các method này được Html._applyAttr() gọi qua factory khi render và khi
     // state thay đổi (Html đã subscribe stateKeys từ compiled config).
+    //
+    // `__showBinding` từng ở đây, cho `@show`. Compiler đã gỡ `@show`/`@hide`
+    // (chúng hỏng ở CẢ HAI nhánh và ra hai cây DOM khác nhau) nên không còn ai
+    // gọi tới — xem docs/SAO_ELEMENT_DIRECTIVES_RFC.md §10.1.
     // ────────────────────────────────────────────────────────────
-
-    /**
-     * __showBinding — tính CSS style string cho @show directive.
-     *
-     * Compiler emit (pre-process trước AST):
-     *   @show($isVisible)  →  style="${this.__showBinding(['isVisible'], isVisible)}"
-     *
-     * Hành vi:
-     *   - condition truthy  → '' (element hiện, style="" hoặc style bị remove)
-     *   - condition falsy   → 'display: none;' (element ẩn)
-     *
-     * Reactivity được xử lý bởi Html._applyAttr() — nó subscribe stateKeys
-     * và gọi lại factory khi state thay đổi. Method này chỉ compute giá trị hiện tại.
-     *
-     * @param _stateKeys - Danh sách state keys (đã được encode trong compiled config, không dùng ở đây)
-     * @param condition  - Điều kiện hiện/ẩn (truthy = show, falsy = hide)
-     */
-    __showBinding(_stateKeys: string[], condition: any): string {
-        return condition ? '' : 'display: none;';
-    }
 
     /**
      * __styleBinding — tính inline CSS style string cho @style directive.

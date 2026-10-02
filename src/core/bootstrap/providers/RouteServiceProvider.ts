@@ -1,7 +1,7 @@
-import { Router } from "../../routers";
-import { ViewManager } from "../../view";
-import { PROVIDER_NAMES } from "./provider-order";
-import { ServiceProvider } from "./ServiceProvider";
+import { Router } from "../../routers/index.js";
+import { ViewManager } from "../../view/index.js";
+import { PROVIDER_NAMES } from "./provider-order.js";
+import { ServiceProvider } from "./ServiceProvider.js";
 
 export class RouteServiceProvider extends ServiceProvider {
     readonly name = PROVIDER_NAMES.ROUTER;

@@ -1,6 +1,19 @@
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import type { StateManagerInterface, ViewStateInterface, StateItem, StateListener, MultiKeyStateListener } from "../contracts/ViewStateInterface";
-import devtools from "../devtools/hook";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import type { StateManagerInterface, ViewStateInterface, StateItem, StateListener } from "../contracts/ViewStateInterface.js";
+import devtools from "../devtools/hook.js";
+
+type MutationChannel = {
+    notify: (() => void) | null;
+    root: any;
+    nodes: Set<any>;
+};
+
+type Subscription = {
+    keys: Set<string>;
+    callback: StateListener;
+    multi: boolean;
+    active: boolean;
+};
 
 /**
  * StateManager — manages reactive state for a ViewController.
@@ -22,14 +35,17 @@ import devtools from "../devtools/hook";
  */
 export class StateManager implements StateManagerInterface {
     private states: Record<string | number, StateItem> = {};
-    private listeners = new Map<string | number, StateListener[]>();
-    private multiKeyListeners: MultiKeyStateListener[] = [];
+    private subscriptions = new Map<string, Set<Subscription>>();
     private pendingChanges = new Set<string | number>();
+    private versions = new Map<string, number>();
     private stateIndex = 0;
     private flushRAF: number | null = null;
     private hasPendingFlush = false;
     private isFlushing = false;
     private _isDestroyed = false;
+    // Browsers opt in explicitly; production never scans unrelated state objects.
+    private mutationDiagnostics = !!(globalThis as any).process?.env?.NODE_ENV
+        && (globalThis as any).process.env.NODE_ENV !== 'production';
 
     /** Flag — cho phép update state qua update$xxx chỉ trước lock */
     private _canUpdateStateByKey: boolean = true;
@@ -81,9 +97,10 @@ export class StateManager implements StateManagerInterface {
     updateRealState(stateMap: Record<string | number, any>): void {
         if (!this._canUpdateStateByKey) return;
         for (const key in stateMap) {
-            if (stateMap.hasOwnProperty(key) && this.states[key]) {
+            if (stateMap.hasOwnProperty(key) && this.states[key] && !this.computedNodes.has(key)) {
                 this.states[key].value = stateMap[key];
                 this.trackArray(key, stateMap[key]);
+                this.invalidateComputed(key, false);
             }
         }
     }
@@ -99,12 +116,18 @@ export class StateManager implements StateManagerInterface {
      * `viewState.count` reads/writes the state reactively.
      */
     useState(value: any, key?: string | number): [any, (newValue: any) => void, string | number] {
-        // If key already exists, return existing state
-        if (key !== undefined && key !== null && this.states[key]) {
-            return [this.states[key].value, this.states[key].setValue, key];
+        let stateKey: string;
+        if (key === undefined || key === null) {
+            do stateKey = String(this.stateIndex++);
+            while (this.states[stateKey]);
+        } else {
+            stateKey = String(key);
         }
 
-        const stateKey = String(key ?? this.stateIndex++);
+        // If key already exists, return existing state
+        if (this.states[stateKey]) {
+            return [this.states[stateKey].value, this.states[stateKey].setValue, stateKey];
+        }
 
         const setValue = (newValue: any) => {
             const oldValue = this.states[stateKey].value;
@@ -122,7 +145,7 @@ export class StateManager implements StateManagerInterface {
         // coi "chưa có bản chụp" là ĐÃ ĐỔI (an toàn: thà render thừa còn hơn nuốt
         // cập nhật) — thiếu baseline thì lần set-cùng-ref đầu tiên luôn bị tính là
         // thay đổi, kể cả khi thật ra không đổi gì.
-        if (value !== null && typeof value === 'object') {
+        if (this.mutationDiagnostics && value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
             this.mutationSnapshots.set(stateKey, {
                 ref: value,
                 copy: StateManager.shallowCopy(value),
@@ -165,8 +188,24 @@ export class StateManager implements StateManagerInterface {
         return this.useState(value, key)[1];
     }
 
-    /** Huỷ subscription của các computed khi destroy. */
-    private computedUnsubs: (() => void)[] = [];
+    private computedNodes = new Map<string, { deps: string[]; dirty: () => void }>();
+    private computedDependents = new Map<string | number, Set<string>>();
+
+    /** Invalidate the dependency graph synchronously; evaluation remains lazy. */
+    private invalidateComputed(key: string | number, notify = true): void {
+        const seen = new Set<string | number>([key]);
+        const pending: (string | number)[] = [key];
+        for (let i = 0; i < pending.length; i++) {
+            for (const dependent of this.computedDependents.get(pending[i]) ?? []) {
+                if (seen.has(dependent)) continue;
+                seen.add(dependent);
+                this.computedNodes.get(dependent)?.dirty();
+                this.versions.set(dependent, (this.versions.get(dependent) ?? 0) + 1);
+                if (notify) (this._isPaused ? this.dirtyKeys : this.pendingChanges).add(dependent);
+                pending.push(dependent);
+            }
+        }
+    }
 
     /**
      * State dẫn xuất có memo hoá (kiểu Vue `computed`).
@@ -183,68 +222,74 @@ export class StateManager implements StateManagerInterface {
      * states.__.computed('fullName', () => `${first} ${last}`, ['first', 'last']);
      * this.output('o', p, true, ['fullName'], () => states.__.getStateByKey('fullName'));
      */
-    computed(key: string, fn: () => any, deps: string[] = []): () => any {
-        const existing = this.states[key];
-        if (existing) {
-            // Khai báo lại (re-render): cập nhật fn tại chỗ, giữ nguyên subscription.
-            if ((existing as any).__computed__) {
-                (existing as any).__setFn__(fn);
-                return () => this.getStateByKey(key);
-            }
-            console.warn(`[ViewState] computed("${key}") trùng tên với state thường — bỏ qua.`);
-            return () => this.getStateByKey(key);
+    computed<T>(key: string, fn: () => T, deps: string[] = []): () => T {
+        if (this._isDestroyed) throw new Error('[ViewState] Cannot register computed after destroy.');
+        // Validate before replacing any edges, including indirect cycles.
+        const reaches = (name: string, seen = new Set<string>()): boolean => {
+            if (name === key) return true;
+            if (seen.has(name)) return false;
+            seen.add(name);
+            return (this.computedNodes.get(name)?.deps ?? []).some(dep => reaches(dep, seen));
+        };
+        if (deps.some(dep => reaches(dep))) throw new Error(`[ViewState] Computed dependency cycle: ${key}`);
+        const existing = this.states[key] as any;
+        if (existing && !existing.__computed__) throw new Error(`[ViewState] State already exists: ${key}`);
+        for (const dep of this.computedNodes.get(key)?.deps ?? []) {
+            const dependents = this.computedDependents.get(dep);
+            dependents?.delete(key);
+            if (dependents?.size === 0) this.computedDependents.delete(dep);
         }
-
-        let compute = fn;
-        let cache: any;
+        let cache: T;
         let dirty = true;
-
+        let evaluating = false;
         const slot: any = {
             key,
             __computed__: true,
-            __setFn__: (next: () => any) => { compute = next; dirty = true; },
-            setValue: () => {
-                console.warn(`[ViewState] computed("${key}") là read-only — bỏ qua set.`);
-            },
+            setValue: () => console.warn(`[ViewState] computed("${key}") is read-only.`),
         };
-        // Getter trên chính slot → MỌI đường đọc (getStateByKey, proxy,
-        // states[key].value trực tiếp) đều nhận giá trị tươi.
         Object.defineProperty(slot, 'value', {
             get: () => {
-                if (dirty) { cache = compute(); dirty = false; }
+                if (dirty) {
+                    if (evaluating) throw new Error(`[ViewState] Recursive computed read: ${key}`);
+                    evaluating = true;
+                    try { cache = fn(); dirty = false; }
+                    finally { evaluating = false; }
+                }
                 return cache;
             },
+            set: slot.setValue,
             enumerable: true,
         });
-
         this.states[key] = slot;
         this.setters[key] = slot.setValue;
-
-        if (!this.ownProperties.includes(key)) {
+        this.computedNodes.set(key, { deps: [...new Set(deps)], dirty: () => { dirty = true; } });
+        for (const dep of deps) {
+            if (!this.computedDependents.has(dep)) this.computedDependents.set(dep, new Set());
+            this.computedDependents.get(dep)!.add(key);
+        }
+        if (!existing && !this.ownProperties.includes(key)) {
             Object.defineProperty(this.stateInstance, key, {
-                get: () => this.states[key].value,
-                configurable: false,
+                get: () => this.states[key]?.value,
+                set: slot.setValue,
                 enumerable: true,
             });
         }
-
-        if (deps.length > 0) {
-            this.computedUnsubs.push(this.subscribe(deps, () => {
-                dirty = true;
-                this.enqueueChange(key); // báo subscriber; KHÔNG đọc value → giữ lazy
-            }));
-        }
-
-        return () => this.getStateByKey(key);
+        if (existing) this.enqueueChange(key);
+        return () => this.getStateByKey(key) as T;
     }
 
     /** Update state by key */
     updateStateByKey(key: string | number, value: any): any {
-        if (!this.states[key]) return undefined;
-        const oldValue = this.states[key].value;
-        this.states[key].value = value;
-        this.trackArray(key, value);
-        this.commitStateChange(key, oldValue);
+        const stateKey = String(key);
+        if (!this.states[stateKey]) return undefined;
+        if (this.computedNodes.has(stateKey)) {
+            this.setters[stateKey](value);
+            return this.states[stateKey].value;
+        }
+        const oldValue = this.states[stateKey].value;
+        this.states[stateKey].value = value;
+        this.trackArray(stateKey, value);
+        this.commitStateChange(stateKey, oldValue);
         return value;
     }
 
@@ -308,96 +353,64 @@ export class StateManager implements StateManagerInterface {
         key: string | number | string[] | Record<string, StateListener>,
         callback?: StateListener
     ): () => void {
-        // Array of keys
-        if (Array.isArray(key)) {
-            if (key.length === 0) return () => {};
-            if (key.length === 1 && callback) return this.subscribe(key[0], callback);
-            if (typeof callback !== 'function') return () => {};
-
-            // KHÔNG lọc theo `this.states[k]`: key chưa register tại thời điểm
-            // subscribe vẫn hợp lệ (computed khai báo trong render, state đăng ký
-            // muộn). Lọc ở đây làm subscription bị bỏ ÂM THẦM và mất reactivity
-            // không dấu vết — trong khi đường single-key ngay dưới chưa bao giờ
-            // lọc, nên `subscribe(['a'])` chạy mà `subscribe(['a','b'])` thì không.
-            // Key không bao giờ được register thì đơn giản không bao giờ fire:
-            // flushChanges() đã kiểm `mkl.keys.has(changedKey)`.
-            const keys = new Set<string | number>(key);
-
-            const listener: MultiKeyStateListener = { keys, callback, called: false };
-            this.multiKeyListeners.push(listener);
-
-            return () => {
-                const idx = this.multiKeyListeners.indexOf(listener);
-                if (idx !== -1) this.multiKeyListeners.splice(idx, 1);
-            };
+        if (this._isDestroyed) return () => {};
+        if (typeof key === 'object' && key !== null && !Array.isArray(key)) {
+            const unsubs = Object.entries(key).map(([k, cb]) => this.subscribe(k, cb));
+            return () => { for (const off of unsubs) off(); };
         }
-
-        // Object map of keys → callbacks
-        if (typeof key === 'object' && key !== null) {
-            const unsubs: Record<string, () => void> = {};
-            for (const k in key) {
-                unsubs[k] = this.subscribe(k, key[k]);
-            }
-            return () => { for (const k in unsubs) unsubs[k](); };
-        }
-
-        // Single key
         if (typeof callback !== 'function') return () => {};
-        if (!this.listeners.has(key)) this.listeners.set(key, []);
-        this.listeners.get(key)!.push(callback);
+        const keys = new Set((Array.isArray(key) ? key : [key]).map(String));
+        if (keys.size === 0) return () => {};
+        const record: Subscription = { keys, callback, multi: Array.isArray(key) && key.length > 1, active: true };
+        for (const k of keys) {
+            let records = this.subscriptions.get(k);
+            if (!records) this.subscriptions.set(k, records = new Set());
+            records.add(record);
+        }
+        return () => this.removeSubscription(record);
+    }
 
-        // Gỡ theo REFERENCE (không theo index chụp lúc đăng ký — listener trước
-        // unsubscribe làm index sau lệch → gỡ nhầm listener khác)
-        return () => {
-            const listeners = this.listeners.get(key);
-            if (!listeners) return;
-            const idx = listeners.indexOf(callback);
-            if (idx !== -1) listeners.splice(idx, 1);
-            if (listeners.length === 0) this.listeners.delete(key);
-        };
+    private removeSubscription(record: Subscription): void {
+        if (!record.active) return;
+        record.active = false;
+        for (const k of record.keys) {
+            const records = this.subscriptions.get(k);
+            records?.delete(record);
+            if (records?.size === 0) this.subscriptions.delete(k);
+        }
     }
 
     unsubscribe(
         key: string | number | string[] | Record<string, StateListener>,
         callback?: StateListener
     ): void {
-        if (Array.isArray(key)) {
-            if (key.length === 0) return;
-            if (key.length === 1) { this.unsubscribe(key[0], callback); return; }
-
-            const keySet = new Set(key);
-            if (!callback) {
-                for (let i = this.multiKeyListeners.length - 1; i >= 0; i--) {
-                    if (this.setsEqual(this.multiKeyListeners[i].keys, keySet)) {
-                        this.multiKeyListeners.splice(i, 1);
-                    }
-                }
-                return;
-            }
-            const idx = this.multiKeyListeners.findIndex(l =>
-                l.callback === callback && this.setsEqual(l.keys, keySet)
-            );
-            if (idx !== -1) this.multiKeyListeners.splice(idx, 1);
+        if (typeof key === 'object' && key !== null && !Array.isArray(key)) {
+            for (const [k, cb] of Object.entries(key)) this.unsubscribe(k, cb);
             return;
         }
-
-        if (typeof key === 'object' && key !== null) {
-            for (const k in key) this.unsubscribe(k, key[k]);
-            return;
-        }
-
-        if (callback) {
-            const listeners = this.listeners.get(key);
-            if (listeners) {
-                const idx = listeners.indexOf(callback);
-                if (idx !== -1) {
-                    listeners.splice(idx, 1);
-                    if (listeners.length === 0) this.listeners.delete(key);
-                }
+        const keys = new Set((Array.isArray(key) ? key : [key]).map(String));
+        const multi = Array.isArray(key) && key.length > 1;
+        const first = keys.values().next().value;
+        if (first === undefined) return;
+        for (const record of Array.from(this.subscriptions.get(first) ?? [])) {
+            if (record.multi === multi && this.setsEqual(record.keys, keys) && (!callback || record.callback === callback)) {
+                this.removeSubscription(record);
+                if (callback) break; // remove one registration, as before
             }
-        } else {
-            this.listeners.delete(key);
         }
+    }
+
+    /** Expensive checks for mutations not intercepted by accessors/mutators. */
+    setMutationDiagnostics(enabled: boolean): void {
+        this.mutationDiagnostics = enabled;
+        this.mutationSnapshots.clear();
+        this.hookHandledKeys.clear();
+        if (enabled) this.detectExternalMutation();
+    }
+
+    /** Synchronous revision, including changes not flushed to DOM yet. */
+    getStateVersion(key: string): number {
+        return this.versions.get(key) ?? 0;
     }
 
     // ─── Pause / Resume (dirty tracking) ────────────────────────
@@ -455,6 +468,13 @@ export class StateManager implements StateManagerInterface {
         if (this._isDestroyed) return;
         const newValue = this.states[key]?.value;
         if (_oldValue === newValue) {
+            if (fromSetter && !this.mutationDiagnostics && newValue !== null
+                && typeof newValue === 'object' && !Object.isFrozen(newValue)) {
+                // An explicit same-reference setter declares a mutation. No copy
+                // is needed in production, including for new keys/array indexes.
+                this.enqueueChange(key);
+                return;
+            }
             // Cùng reference. Trước đây dừng luôn ⇒ `list.splice(i,1); setList(list)`
             // — cách viết TỰ NHIÊN NHẤT — im lặng không cập nhật gì.
             //
@@ -477,7 +497,7 @@ export class StateManager implements StateManagerInterface {
             // chỉ là thừa, KHÔNG phải bug. Không cảnh báo, tránh dương tính giả
             // cho cách viết rất phổ biến: `list.splice(i,1); setList(list)`.
             if (fromSetter && (this.pendingChanges.has(key) || this.dirtyKeys.has(key))) return;
-            if (fromSetter) this.warnSameReference(key, newValue);
+            if (fromSetter && this.mutationDiagnostics && !Object.isFrozen(newValue)) this.warnSameReference(key, newValue);
             return;
         }
         this.enqueueChange(key);
@@ -542,6 +562,8 @@ export class StateManager implements StateManagerInterface {
      */
     private enqueueChange(key: string | number): void {
         if (this._isDestroyed) return;
+        this.versions.set(String(key), (this.versions.get(String(key)) ?? 0) + 1);
+        this.invalidateComputed(key);
 
         // Paused → ghi sổ, không notify (giá trị đã được set vào states)
         if (this._isPaused) {
@@ -645,13 +667,10 @@ export class StateManager implements StateManagerInterface {
     private static readonly HOOKS = Symbol.for('sao.mutationHooks');
 
     /**
-     * Một kênh cho MỘT key. Mọi node trong cây đều giữ CÙNG object này, nên gỡ
-     * theo dõi chỉ là `notify = null` — O(1), không phải duyệt lại cả cây.
+     * Một kênh cho MỘT key. `nodes` giữ đúng tập node đang reachable để cleanup
+     * không phụ thuộc vào hình dạng cây tại thời điểm destroy.
      */
-    private trackedChannels = new Map<
-        string | number,
-        { channel: { notify: (() => void) | null }; root: any }
-    >();
+    private trackedChannels = new Map<string | number, MutationChannel>();
 
     /**
      * Key vừa được hook mutate xử lý trong chu kỳ hiện tại — `detectExternalMutation`
@@ -672,10 +691,11 @@ export class StateManager implements StateManagerInterface {
      * Gọi ở MỌI chỗ gán `states[key].value`.
      */
     private trackArray(key: string | number, value: any): void {
+        if (this.trackedChannels.get(key)?.root === value) return;
         this.untrackKey(key);
         if (!StateManager.isObservable(value)) return;
 
-        const channel: { notify: (() => void) | null } = { notify: null };
+        const channel: MutationChannel = { notify: null, root: value, nodes: new Set() };
         channel.notify = () => {
             if (this._isDestroyed) return;
             // ĐƯỜNG NÓNG — chạy mỗi lần mutate. Chỉ ĐÁNH DẤU (O(1)); tuyệt đối
@@ -684,10 +704,10 @@ export class StateManager implements StateManagerInterface {
             // lần gán trên list 10k mất ~28ms. `detectExternalMutation` ở đầu
             // flush vốn đã chụp lại mọi key rồi — chỉ cần cho nó biết key này
             // đã được xử lý để đừng cảnh báo "mutate mà KHÔNG set lại".
-            this.hookHandledKeys.add(key);
+            if (this.mutationDiagnostics) this.hookHandledKeys.add(key);
             this.enqueueChange(key);
         };
-        this.trackedChannels.set(key, { channel, root: value });
+        this.trackedChannels.set(key, channel);
         StateManager.observe(value, channel, new Set());
     }
 
@@ -701,16 +721,19 @@ export class StateManager implements StateManagerInterface {
      * 50 lần mount/destroy trên cùng mảng để lại 50 channel. Đúng lớp lỗi mà
      * `tests/view/registry-cleanup.test.ts` canh ("mọi registry phải có trần").
      *
-     * Duyệt LẠI TỪ GỐC thay vì nhớ sẵn danh sách node: nhớ danh sách sẽ giữ sống
-     * cả những node đã bị gỡ khỏi cây (item xoá khỏi list) cho tới lúc destroy —
-     * đổi một rò rỉ này lấy một rò rỉ khác. Node đã rời cây thì không ai còn tham
-     * chiếu, GC dọn cùng tập hook của nó.
+     * Channel giữ tập node đang sống. Mỗi mutator/setter gỡ node tách khỏi cây
+     * ngay lập tức; nhờ vậy destroy có thể dọn cả cây chính xác mà không bỏ sót
+     * object đã từng được observe.
      */
     private untrackKey(key: string | number): void {
         const prev = this.trackedChannels.get(key);
         if (!prev) return;
-        prev.channel.notify = null;                       // chặn notify ngay
-        StateManager.unobserve(prev.root, prev.channel, new Set());
+        prev.notify = null;                               // chặn notify ngay
+        for (const node of prev.nodes) {
+            const hooks: Set<MutationChannel> | undefined = node[StateManager.HOOKS];
+            hooks?.delete(prev);
+        }
+        prev.nodes.clear();
         this.trackedChannels.delete(key);
     }
 
@@ -721,27 +744,42 @@ export class StateManager implements StateManagerInterface {
     }
 
     /** Gỡ `channel` khỏi tập hook của `node` và toàn bộ cây con. */
-    private static unobserve(node: any, channel: { notify: (() => void) | null }, seen: Set<any>): void {
+    private static unobserve(node: any, channel: MutationChannel, seen: Set<any>, reachable?: Set<any>): void {
         if (!StateManager.isObservable(node) || seen.has(node)) return;
         seen.add(node);
-        const hooks: Set<{ notify: (() => void) | null }> | undefined = node[StateManager.HOOKS];
-        hooks?.delete(channel);
+        if (!reachable?.has(node)) {
+            const hooks: Set<MutationChannel> | undefined = node[StateManager.HOOKS];
+            hooks?.delete(channel);
+            channel.nodes.delete(node);
+        }
         if (Array.isArray(node)) {
-            for (const item of node) StateManager.unobserve(item, channel, seen);
+            for (const item of node) StateManager.unobserve(item, channel, seen, reachable);
             return;
         }
-        for (const prop of Object.keys(node)) StateManager.unobserve(node[prop], channel, seen);
+        for (const prop of Object.keys(node)) StateManager.unobserve(node[prop], channel, seen, reachable);
+    }
+
+    /** Thu thập cây hiện còn reachable để không gỡ nhầm shared reference. */
+    private static collectReachable(node: any, seen = new Set<any>()): Set<any> {
+        if (!StateManager.isObservable(node) || seen.has(node)) return seen;
+        seen.add(node);
+        if (Array.isArray(node)) {
+            for (const item of node) StateManager.collectReachable(item, seen);
+        } else {
+            for (const prop of Object.keys(node)) StateManager.collectReachable(node[prop], seen);
+        }
+        return seen;
     }
 
     /**
      * Cài bộ bắt mutate lên `node` và toàn bộ cây con, rồi ghi `channel` vào
      * tập hook của mỗi node. `seen` chặn vòng lặp tham chiếu.
      */
-    private static observe(node: any, channel: { notify: (() => void) | null }, seen: Set<any>): void {
+    private static observe(node: any, channel: MutationChannel, seen: Set<any>): void {
         if (!StateManager.isObservable(node) || seen.has(node)) return;
         seen.add(node);
 
-        let hooks: Set<{ notify: (() => void) | null }> | undefined = node[StateManager.HOOKS];
+        let hooks: Set<MutationChannel> | undefined = node[StateManager.HOOKS];
         const fresh = !hooks;
         if (!hooks) {
             hooks = new Set();
@@ -754,12 +792,13 @@ export class StateManager implements StateManagerInterface {
             }
         }
         hooks!.add(channel);
+        channel.nodes.add(node);
 
         // Đường NÓNG — chạy mỗi lần gán/mutate. Duyệt thẳng, không `Array.from`:
         // `notify` chỉ enqueue key, không bao giờ thêm/bớt hook nên không có
         // rủi ro sửa Set đang duyệt.
         const fire = () => {
-            const set: Set<{ notify: (() => void) | null }> | undefined = node[StateManager.HOOKS];
+            const set: Set<MutationChannel> | undefined = node[StateManager.HOOKS];
             if (!set) return;
             for (const ch of set) ch.notify?.();
         };
@@ -767,10 +806,26 @@ export class StateManager implements StateManagerInterface {
         /** Giá trị MỚI gán vào cũng phải được quan sát — chỉ khi nó đáng quan sát. */
         const observeIncoming = (next: any) => {
             if (!StateManager.isObservable(next)) return;   // primitive: thoát sớm, không cấp phát
-            const set: Set<{ notify: (() => void) | null }> | undefined = node[StateManager.HOOKS];
+            const set: Set<MutationChannel> | undefined = node[StateManager.HOOKS];
             if (!set) return;
             for (const ch of Array.from(set)) {
                 if (ch.notify) StateManager.observe(next, ch, new Set());
+            }
+        };
+
+        /** Gỡ hook khỏi nhánh vừa rời cây, nhưng giữ node còn reachable qua nhánh khác. */
+        const unobserveOutgoing = (outgoing: any[]) => {
+            const observableOutgoing = outgoing.filter(StateManager.isObservable);
+            if (observableOutgoing.length === 0) return;
+            const set: Set<MutationChannel> | undefined = node[StateManager.HOOKS];
+            if (!set) return;
+            for (const ch of Array.from(set)) {
+                if (!ch.notify) continue;
+                const reachable = StateManager.collectReachable(ch.root);
+                const seen = new Set<any>();
+                for (const oldValue of observableOutgoing) {
+                    StateManager.unobserve(oldValue, ch, seen, reachable);
+                }
             }
         };
 
@@ -781,7 +836,36 @@ export class StateManager implements StateManagerInterface {
                     try {
                         Object.defineProperty(node, name, {
                             value: function (this: any[], ...args: any[]) {
+                                const outgoing: any[] = [];
+                                const length = this.length;
+                                const normalizeIndex = (raw: any, fallback: number) => {
+                                    const number = raw === undefined ? fallback : Number(raw);
+                                    if (!Number.isFinite(number)) return number < 0 ? 0 : length;
+                                    const integer = Math.trunc(number);
+                                    return integer < 0
+                                        ? Math.max(length + integer, 0)
+                                        : Math.min(integer, length);
+                                };
+
+                                if (name === 'fill') {
+                                    outgoing.push(...this.slice(
+                                        normalizeIndex(args[1], 0),
+                                        normalizeIndex(args[2], length),
+                                    ));
+                                } else if (name === 'copyWithin') {
+                                    const target = normalizeIndex(args[0], 0);
+                                    const start = normalizeIndex(args[1], 0);
+                                    const end = normalizeIndex(args[2], length);
+                                    const count = Math.max(0, Math.min(end - start, length - target));
+                                    outgoing.push(...this.slice(target, target + count));
+                                }
+
                                 const result = original.apply(this, args);
+                                if ((name === 'pop' || name === 'shift') && result !== undefined) {
+                                    outgoing.push(result);
+                                } else if (name === 'splice') {
+                                    outgoing.push(...result);
+                                }
                                 // Chỉ quan sát phần tử MỚI ĐƯA VÀO (tham số), KHÔNG
                                 // quét lại cả mảng — quét lại là O(n) mỗi lần push,
                                 // list 10k phần tử sẽ đứng hình. `push`/`unshift`/
@@ -789,6 +873,7 @@ export class StateManager implements StateManagerInterface {
                                 // method còn lại chỉ nhận số/hàm nên `isObservable`
                                 // tự bỏ qua.
                                 for (const arg of args) observeIncoming(arg);
+                                unobserveOutgoing(outgoing);
                                 fire();
                                 return result;
                             },
@@ -814,8 +899,10 @@ export class StateManager implements StateManagerInterface {
                     get: () => current,
                     set: (next) => {
                         if (next === current) return;
+                        const previous = current;
                         current = next;
                         observeIncoming(next);
+                        unobserveOutgoing([previous]);
                         fire();
                     },
                 });
@@ -853,11 +940,12 @@ export class StateManager implements StateManagerInterface {
      * gần như luôn xảy ra ngay lần tương tác sau.
      */
     private detectExternalMutation(): void {
+        if (!this.mutationDiagnostics) return;
         for (const key in this.states) {
             const slot: any = this.states[key];
             if (slot?.__computed__) continue;   // lazy — đọc `.value` sẽ ép tính lại
             const value = slot?.value;
-            if (value === null || typeof value !== 'object') {
+            if (value === null || typeof value !== 'object' || Object.isFrozen(value)) {
                 this.mutationSnapshots.delete(key);
                 continue;
             }
@@ -893,43 +981,71 @@ export class StateManager implements StateManagerInterface {
         const changed = Array.from(this.pendingChanges);
         this.pendingChanges.clear();
 
-        devtools.emit('state:changed', {
-            viewId: (this.controller as any)?.viewId,
-            path: (this.controller as any)?.path,
-            detail: { keys: changed.map(String) },
-        });
-
-        // Reset multi-key listener flags
-        for (const listener of this.multiKeyListeners) {
-            listener.called = false;
+        if (devtools.isEnabled()) {
+            devtools.emit('state:changed', {
+                viewId: (this.controller as any)?.viewId,
+                path: (this.controller as any)?.path,
+                detail: { keys: changed.map(String) },
+            });
         }
 
-        // Notify single-key listeners
-        for (const changedKey of changed) {
-            const listeners = this.listeners.get(changedKey);
-            if (listeners) {
-                const currentValue = this.states[changedKey]?.value;
-                for (const listener of listeners) {
-                    try { listener(currentValue); }
-                    catch (e) { this.reportListenerError(e); }
-                }
-            }
-
-            // Notify multi-key listeners
-            for (const mkl of this.multiKeyListeners) {
-                if (!mkl.called && mkl.keys.has(changedKey)) {
-                    mkl.called = true;
-                    const values: Record<string, any> = {};
-                    for (const k of mkl.keys) {
-                        if (changed.includes(k as any)) {
-                            values[String(k)] = this.states[k]?.value;
+        // Snapshot the whole batch before invoking callbacks. Subscriptions added
+        // during notification start next batch; removed records are never invoked.
+        const changedSet = new Set(changed.map(String));
+        const batches = changed.map(key => [String(key), Array.from(this.subscriptions.get(String(key)) ?? [])] as const);
+        const called = new Set<Subscription>();
+        for (const [key, records] of batches) {
+            // Retain single-key-before-multi-key order used by existing bindings.
+            for (const multi of [false, true]) {
+                for (const record of records) {
+                    if (!record.active || record.multi !== multi || called.has(record)) continue;
+                    called.add(record);
+                    let value: any;
+                    if (multi) {
+                        value = {};
+                        for (const k of record.keys) {
+                            if (changedSet.has(k)) value[k] = this.states[k]?.value;
                         }
+                    } else value = this.states[key]?.value;
+                    try { record.callback(value); }
+                    catch (e) {
+                        this.retryAfterReactiveFlush(e, v => {
+                            if (record.active) record.callback(v);
+                        }, value);
                     }
-                    try { mkl.callback(values); }
-                    catch (e) { this.reportListenerError(e); }
                 }
             }
         }
+    }
+
+    /**
+     * Vùng reactive re-render ở RAF kế tiếp, còn listener của Output/Text/binding
+     * chạy NGAY trong đợt flush này. Nên khi guard đổi chiều
+     * (`@if(record !== null)` thành false), factory bên trong vùng —
+     * `{{ record['name'] }}` — vẫn chạy một lần với state mới và ném, dù DOM đó
+     * chỉ còn sống thêm một frame.
+     *
+     * Có vùng đang chờ dựng lại thì chạy lại listener SAU đợt đó: element hoặc
+     * đã bị destroy (listener no-op), hoặc chạy được với state nhất quán. Còn
+     * ném nữa mới là lỗi thật và đi tiếp tới boundary.
+     *
+     * rAF của flushReactiveUpdates đã đăng ký TRƯỚC (trong chính đợt flush này,
+     * lúc vùng gọi scheduleUpdate), nên rAF đăng ký ở đây chạy sau nó.
+     *
+     * Giới hạn: chỉ bắt được khi vùng bọc đã kịp vào hàng đợi trước listener
+     * này — đúng với @if/@foreach bọc ngoài vì chúng subscribe trước con.
+     */
+    private retryAfterReactiveFlush(err: unknown, listener: (value: any) => void, value: any): void {
+        const ctrl: any = this.controller;
+        if (!ctrl?.hasPendingReactiveUpdate?.()) {
+            this.reportListenerError(err);
+            return;
+        }
+        requestAnimationFrame(() => {
+            if (this._isDestroyed) return;
+            try { listener(value); }
+            catch (e) { this.reportListenerError(e); }
+        });
     }
 
     /**
@@ -963,12 +1079,13 @@ export class StateManager implements StateManagerInterface {
             cancelAnimationFrame(this.flushRAF);
             this.flushRAF = null;
         }
-        for (const unsub of this.computedUnsubs) {
-            try { unsub(); } catch { /* listener đã gỡ */ }
+        this.computedNodes.clear();
+        this.computedDependents.clear();
+        this.versions.clear();
+        for (const records of this.subscriptions.values()) {
+            for (const record of records) record.active = false;
         }
-        this.computedUnsubs = [];
-        this.listeners.clear();
-        this.multiKeyListeners = [];
+        this.subscriptions.clear();
         this.pendingChanges.clear();
         this.untrackAllArrays();
         this.hookHandledKeys.clear();

@@ -1,6 +1,6 @@
-import { Router } from "../../routers";
-import { PROVIDER_NAMES } from "./provider-order";
-import { ServiceProvider } from "./ServiceProvider";
+import { Router } from "../../routers/index.js";
+import { PROVIDER_NAMES } from "./provider-order.js";
+import { ServiceProvider } from "./ServiceProvider.js";
 export class RouteServiceProvider extends ServiceProvider {
     constructor() {
         super(...arguments);

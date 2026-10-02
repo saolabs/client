@@ -1,4 +1,4 @@
-import type { HeadLinkOptions, HeadServiceInterface, HeadTagOptions } from "../contracts/HeadServiceInterface";
+import type { HeadLinkOptions, HeadServiceInterface, HeadTagOptions } from "../contracts/HeadServiceInterface.js";
 /**
  * HeadService — the single place that writes to `<head>` (title, meta, link,
  * JSON-LD). Independent of any View: callable from anywhere via `app('Head')`

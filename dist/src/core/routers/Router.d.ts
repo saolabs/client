@@ -13,7 +13,7 @@
  *   - Route caching (pattern match + ActiveRoute)
  *   - Browser back/forward handling
  */
-import type { ViewManagerInterface } from "../contracts/ViewManagerInterface";
+import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
 export interface RouteDefinition {
     /** URL pattern: '/users/{id}', '/posts/{page?}' */
     path: string;
@@ -103,7 +103,15 @@ export declare class Router {
     private currentUri;
     /** Navigation guards */
     private _beforeEach;
-    private _afterEach;
+    /**
+     * NHIỀU hook, không phải một.
+     *
+     * Trước đây đây là một slot duy nhất, và mỗi layout muốn biết "đã điều hướng
+     * xong" đều phải giành lấy nó: layout mới đăng ký đè hook của layout cũ, rồi
+     * layout cũ destroy lại xoá hook của layout mới → không còn hook nào. Đúng
+     * chuỗi docs → demo → docs. Hook giờ là tập hợp, `afterEach()` trả về hàm huỷ.
+     */
+    private afterHooks;
     /** Caches */
     private routeCache;
     /** State */
@@ -170,7 +178,8 @@ export declare class Router {
      */
     configure(config: RouterConfig): this;
     beforeEach(guard: NavigationGuard): this;
-    afterEach(hook: AfterNavigationHook): this;
+    /** Đăng ký hook chạy sau mỗi lần điều hướng. Trả về hàm HUỶ đăng ký. */
+    afterEach(hook: AfterNavigationHook): () => void;
     /**
      * Navigate to a URL path.
      * History chỉ được cập nhật SAU khi guard cho phép (trong handleRoute) —
@@ -225,6 +234,12 @@ export declare class Router {
      */
     stop(): void;
     private handleViewContextChange;
+    /**
+     * Switch to a coherent server-rendered document when the view namespace
+     * changes. A short-lived token prevents a bad deployment from reloading the
+     * same URL/revision forever.
+     */
+    private reloadForViewContext;
     /**
      * Full destroy — cleanup everything.
      */

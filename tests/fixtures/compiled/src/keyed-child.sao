@@ -1,0 +1,5 @@
+@props({item: {}})
+@state(local = 0)
+<template>
+<button class="child" @click(setLocal(local + 1))>{{ item['name'] }}:{{ local }}</button>
+</template>

@@ -1,13 +1,15 @@
-import type { SaoObjectType } from "../types/utils";
-import type { ViewInterface, ViewRenderFactory } from "./ViewInterface";
-import type { ViewStateInterface } from "./ViewStateInterface";
-import type { HtmlInterface, FragmentInterface, SaoElementEventHandler, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, WrapperInterface, EventModifier } from "./ElementInterface";
-import type { ReactiveInterface } from "./ReactiveInterface";
-import type { BlockInterface } from "./BlockInterface";
-import type { LoopContextInterface } from "./LoopContextInterface";
-import { SectionInterface } from "../contracts/SectionInterface";
-import type { ForeachSlotCache } from "../elements/ForeachSlotCache";
-import type { InitMode } from "./common";
+import type { SaoObjectType } from "../types/utils.js";
+import type { ViewInterface, ViewRenderFactory } from "./ViewInterface.js";
+import type { ViewUserConfig } from "../view/View.js";
+import type { ViewStateInterface } from "./ViewStateInterface.js";
+import type { HtmlInterface, FragmentInterface, SaoElementEventHandler, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, WrapperInterface, EventModifier } from "./ElementInterface.js";
+import type { ReactiveInterface } from "./ReactiveInterface.js";
+import type { BlockInterface } from "./BlockInterface.js";
+import type { LoopContextInterface } from "./LoopContextInterface.js";
+import { SectionInterface } from "../contracts/SectionInterface.js";
+import type { ForeachSlotCache } from "../elements/ForeachSlotCache.js";
+import type { InitMode } from "./common.js";
+import type { ResourceScope } from '../view/ResourceScope.js';
 export type ViewType = 'view' | 'layout' | 'component' | 'template';
 export interface ViewControllerInterface {
     saoType: SaoObjectType;
@@ -16,6 +18,8 @@ export interface ViewControllerInterface {
     path: string;
     viewType: ViewType;
     states: ViewStateInterface;
+    readonly scope: ResourceScope;
+    afterDom(callback: () => void): () => void;
     loopContext: LoopContextInterface | null;
     /** Raw input data reference */
     data: Record<string, any>;
@@ -31,6 +35,8 @@ export interface ViewControllerInterface {
     _currentForeachCache: ForeachSlotCache | null;
     /** Element gọi trong destroy() để tự gỡ khỏi registry (no-op nếu key đã trỏ bản mới) */
     releaseElement(el: object): void;
+    /** Compiler helper for raw interpolation inside HTML RCDATA. */
+    decodeTextContent(value: string): string;
     /** Path to super view (layout) */
     superViewPath: string | null;
     /** Main element (Wrapper) for this view */
@@ -46,6 +52,8 @@ export interface ViewControllerInterface {
     addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler, modifiers?: EventModifier[]): void;
     /** Called by reactive system to schedule an update */
     scheduleUpdate(reactive: ReactiveInterface): void;
+    /** Còn vùng reactive chờ re-render trong frame này không? */
+    hasPendingReactiveUpdate(): boolean;
     /** Flush đồng bộ các reactive update đang chờ (sau mount/hydrate). */
     flushReactiveUpdatesNow(): void;
     /**
@@ -81,13 +89,13 @@ export interface ViewControllerInterface {
     /** Materialize the lazy parent-owned slot only when ChildrenNode is rendered. */
     __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput;
     /** Loop directives */
-    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: any) => any, keyFn?: (item: T, index: number) => any): any[];
+    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: any, identity: number) => any, keyFn?: (item: T, index: number) => any, reconcile?: boolean, scopeId?: string): any[];
     __for(loopType?: string, start?: number, end?: number, execute?: (loop: any) => any): any;
     __while(execute: (loop: any) => any, maxIterations?: number): any;
     /** App reference */
     App: any;
     setApp(app: any): void;
-    setUserDefinedConfig(config: Record<string, any>): void;
+    setUserDefinedConfig<T extends object>(config: ViewUserConfig<T>): void;
     /** Set root element — the container this view renders into */
     setRootElement(rootElement: HtmlInterface): void;
     setParentElement(parentElement: HtmlInterface): void;
@@ -179,4 +187,30 @@ export type ErrorInfo = {
 };
 export type ErrorBoundaryHandler = (err: unknown, info: ErrorInfo) => any;
 export type ViewControllerConfig = ViewConfig & ViewRuntimeConfig;
+/**
+ * `this` bên trong các hàm config do compiler sinh — `commitConstructorData`,
+ * `updateVariableData`, `updateVariableItemData`.
+ *
+ * Chúng được gọi bằng `fn.call(makeConfigThis(), …)`, tức receiver KHÔNG phải
+ * object chứa chúng. TypeScript mặc định suy `this` = chính object literal đó,
+ * nên `this.config` không tồn tại theo kiểu và `tsc --strict` báo TS2339.
+ *
+ * Compiler emit `function(this: ViewConfigThis)` cho đầu ra `.ts`; đầu ra `.js`
+ * không có tham số này vì tham số `this` là cú pháp chỉ có ở TypeScript và bị
+ * xoá khi emit — nó không bao giờ là đối số thật.
+ */
+export interface ViewConfigThis {
+    /**
+     * Config runtime của chính view — nơi các hàm sinh ra gọi lẫn nhau.
+     *
+     * KHÔNG nullable, và `ViewController.runtimeConfig` cũng vậy: nó khởi tạo
+     * `{}` rồi chỉ bị `setup()` ghi đè bằng config thật. Cái CÓ THỂ vắng là
+     * từng hàm trong đó (`commitConstructorData`… đều optional) — mỗi lời gọi
+     * đã tự canh bằng `typeof fn === 'function'`.
+     */
+    config: ViewRuntimeConfig;
+    data: Record<string, any>;
+    ctrl: ViewControllerInterface;
+    view: ViewInterface;
+}
 //# sourceMappingURL=ViewControllerInterface.d.ts.map

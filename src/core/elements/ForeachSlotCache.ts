@@ -44,6 +44,9 @@ export interface ForeachSlot {
     item: any;
     /** Saola elements sinh ra bởi item factory — Html, Output, Reactive, ... */
     elements: any[];
+    /** Compiler opt-in: closures are refreshed within this occurrence's scope. */
+    registry?: Map<string, any>;
+    identity?: number;
 }
 
 /** Kết quả claim: slot khi reuse được, occ để store khi phải tạo mới. */
@@ -53,6 +56,15 @@ export interface ForeachClaim {
 }
 
 export class ForeachSlotCache {
+    readonly refreshedElements = new Set<any>();
+    private nextIdentity = 0;
+
+    /** Initial SSR indexes, then monotonically allocated identities for new rows. */
+    allocateIdentity(index: number): number {
+        const identity = Math.max(index, this.nextIdentity);
+        this.nextIdentity = identity + 1;
+        return identity;
+    }
     /** Map key → danh sách slot theo occurrence (duplicate keys) */
     private _map: Map<any, ForeachSlot[]> = new Map();
     /** Occurrence counter của pass hiện tại */
@@ -71,6 +83,7 @@ export class ForeachSlotCache {
 
     /** Bắt đầu một chu kỳ render — reset counters + touched set. */
     beginPass(): void {
+        this.refreshedElements.clear();
         this._passOcc = new Map();
         this._touched = new Set();
         this._evicted = [];
@@ -81,12 +94,12 @@ export class ForeachSlotCache {
      * Trả slot khi reuse được (key khớp + ref không đổi); ngược lại slot=null
      * và caller phải store(key, occ, ...) sau khi tạo elements.
      */
-    claim(key: any, item: any): ForeachClaim {
+    claim(key: any, item: any, reconcile = false): ForeachClaim {
         const occ = this._passOcc.get(key) ?? 0;
         this._passOcc.set(key, occ + 1);
 
         const slot = this._map.get(key)?.[occ] ?? null;
-        if (slot && slot.item === item) {
+        if (slot && (slot.item === item || (reconcile && slot.registry))) {
             this._touched.add(slot);
             return { slot, occ };
         }
@@ -98,8 +111,8 @@ export class ForeachSlotCache {
      * Slot bị ghi đè KHÔNG còn nằm trong `_map` nên prunePass duyệt `_map` sẽ
      * không thấy nó nữa → phải chuyển sang `_evicted` để vẫn được destroy.
      */
-    store(key: any, occ: number, item: any, elements: any[]): ForeachSlot {
-        const slot: ForeachSlot = { item, elements };
+    store(key: any, occ: number, item: any, elements: any[], registry?: Map<string, any>): ForeachSlot {
+        const slot: ForeachSlot = { item, elements, registry };
         let slots = this._map.get(key);
         if (!slots) {
             slots = [];
@@ -147,6 +160,8 @@ export class ForeachSlotCache {
      * KHÔNG tự gọi destroy() trên elements — caller phải làm trước.
      */
     clear(): void {
+        this.nextIdentity = 0;
+        this.refreshedElements.clear();
         this._map.clear();
         this._passOcc = new Map();
         this._touched = new Set();

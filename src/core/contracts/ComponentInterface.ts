@@ -1,7 +1,7 @@
-import type { SaoObjectType } from "../types/utils";
-import type { ViewControllerInterface } from "./ViewControllerInterface";
-import type { ViewInterface } from "./ViewInterface";
-import type { HtmlInterface } from "./ElementInterface";
+import type { SaoObjectType } from "../types/utils.js";
+import type { ViewControllerInterface } from "./ViewControllerInterface.js";
+import type { ViewInterface } from "./ViewInterface.js";
+import type { HtmlInterface } from "./ElementInterface.js";
 
 // ─── Component Interface ─────────────────────────────────────────
 
@@ -15,6 +15,7 @@ export interface ComponentInterface {
     openTag: Comment;
     closeTag: Comment;
     stateKeys: string[];
+    listeners: Record<string, (...args: any[]) => any>;
     subscribeFn: () => void;
     unsubscribeFn: () => void;
     render(): void;

@@ -1,13 +1,13 @@
-import { InitMode, InitModes } from "../contracts/common";
-import type { DOMElement, FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElement, SaoElementChildren, WrapperInterface } from "../contracts/ElementInterface";
-import type { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { app } from "../helpers/app";
-import { generateUUID } from "../helpers/utils";
-import { mountElementList } from "../helpers/view";
-import { MarkerRegistryService } from "../services";
-import type { SaoObjectType } from "../types/utils";
-import { Html } from "./Html";
-import { TextElement } from "./TextElement";
+import { InitMode, InitModes } from "../contracts/common.js";
+import type { DOMElement, FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoElement, SaoElementChildren, WrapperInterface } from "../contracts/ElementInterface.js";
+import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { app } from "../helpers/app.js";
+import { generateUUID } from "../helpers/utils.js";
+import { mountElementList } from "../helpers/view.js";
+import { MarkerRegistryService } from "../services/index.js";
+import type { SaoObjectType } from "../types/utils.js";
+import { Html } from "./Html.js";
+import { TextElement } from "./TextElement.js";
 
 /**
  * Wrapper — renders multiple root nodes into a parent without a wrapping tag.
@@ -82,25 +82,7 @@ export class Wrapper implements WrapperInterface {
     private claimSSRMarkers(
         registry: MarkerRegistryService
     ): { open: Comment; close: Comment } | null {
-        const searchRoot = this.parent?.element ?? document.body;
-        const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_COMMENT);
-
-        const openText = registry.openComment('view', this.id);
-        const closeText = registry.closeComment('view', this.id);
-        let openNode: Comment | null = null;
-
-        let node: Comment | null;
-        while ((node = walker.nextNode() as Comment | null)) {
-            const value = node.nodeValue?.trim() ?? '';
-            if (!openNode && value === openText) {
-                openNode = node;
-                continue;
-            }
-            if (openNode && value === closeText) {
-                return { open: openNode, close: node };
-            }
-        }
-        return null;
+        return registry.claim('view', this.id, this.parent?.element ?? null);
     }
 
     init() {

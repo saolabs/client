@@ -28,6 +28,8 @@
 const OWNER_ATTR = 'data-sao-asset';
 /** Attribute scope cho scoped style — value = scopeId của component path. */
 export const SCOPE_ATTR = 'data-sao-scope';
+/** Mốc của `<style>` do server in sẵn (core ViewHelperService::renderHeadAssets). */
+const SSR_STYLE_ATTR = 'data-sao-style';
 export class AssetManagerService {
     constructor() {
         /** key = semantic asset identity → record (ref-count + DOM node). */
@@ -162,9 +164,17 @@ export class AssetManagerService {
             head.appendChild(link);
             return link;
         }
+        const raw = style.content ?? '';
+        const css = style.scoped ? this.scopeCss(raw, scopeId) : raw;
+        const ssr = this.findExistingStyle(css, style);
+        if (ssr) {
+            // Adopt <style> do Blade SSR in trong <head> (`addStyle`) — nó đã có từ
+            // byte đầu nên trang không vẽ trần; nhận quyền sở hữu để còn gỡ được.
+            ssr.setAttribute(OWNER_ATTR, path);
+            return ssr;
+        }
         const el = document.createElement('style');
-        const css = style.content ?? '';
-        el.textContent = style.scoped ? this.scopeCss(css, scopeId) : css;
+        el.textContent = css;
         if (style.scoped)
             el.setAttribute(SCOPE_ATTR, scopeId);
         this.applyExtraAttrs(el, style);
@@ -184,6 +194,17 @@ export class AssetManagerService {
             if (!this.matchesExtraAttrs(link, style))
                 continue;
             return link;
+        }
+        return null;
+    }
+    /** `<style data-sao-style>` SSR chưa ai nhận, cùng nội dung + attribute. */
+    findExistingStyle(css, style) {
+        if (typeof document === 'undefined')
+            return null;
+        const nodes = document.querySelectorAll(`style[${SSR_STYLE_ATTR}]:not([${OWNER_ATTR}])`);
+        for (const node of Array.from(nodes)) {
+            if (node.textContent === css && this.matchesExtraAttrs(node, style))
+                return node;
         }
         return null;
     }

@@ -1,7 +1,7 @@
-import { InitMode } from "../contracts/common";
-import { HtmlInterface, YieldInterface } from "../contracts/ElementInterface";
-import { ViewControllerInterface } from "../contracts/ViewControllerInterface";
-import { SaoObjectType } from "../types/utils";
+import { InitMode } from "../contracts/common.js";
+import { HtmlInterface, YieldInterface } from "../contracts/ElementInterface.js";
+import { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
+import { SaoObjectType } from "../types/utils.js";
 export declare class YieldElement implements YieldInterface {
     saoType: SaoObjectType;
     ctx: ViewControllerInterface;

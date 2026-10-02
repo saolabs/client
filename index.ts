@@ -8,8 +8,18 @@ export { Application } from './src/core/app/Application.js';
 export { app } from './src/core/helpers/app.js';
 export { default as App } from './src/core/bootstrap/app.js';
 
+// Bundle nạp rời (theme / gói mở rộng)
+export { defineBundle, loadBundles, mergeBundles, bootBundles } from './src/core/bootstrap/bundle.js';
+export type { SaolaBundle, MergedBundles, ViewFactory } from './src/core/contracts/BundleInterface.js';
+
+// Service Provider — lớp base + hằng tên, để app và theme viết provider của mình.
+// KHÔNG export thì cả tính năng "người dùng thêm provider" chỉ dùng được nội bộ.
+export { ServiceProvider } from './src/core/bootstrap/providers/ServiceProvider.js';
+export { PROVIDER_NAMES, resolveProviderOrder } from './src/core/bootstrap/providers/provider-order.js';
+export type { NamedServiceProvider, ProviderName } from './src/core/bootstrap/providers/provider-order.js';
+export type { ServiceProviderInterface } from './src/core/contracts/ServiceProviderInterface.js';
+
 // Services
-export { MarkerService } from './src/core/services/MarkerService.js';
 export { EventService } from './src/core/services/EventService.js';
 export { HttpService } from './src/core/services/HttpService.js';
 export { StoreService } from './src/core/services/StoreService.js';
@@ -29,6 +39,9 @@ export type { DevtoolsEvent, DevtoolsEventType, DevtoolsViewNode } from './src/c
 
 // View System
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';
+export type { ViewUserConfig } from './src/core/view/View.js';
+export { ResourceScope } from './src/core/view/ResourceScope.js';
+export type { WatchCallback, WatchContext, WatchOptions, Cleanup } from './src/core/view/ResourceScope.js';
 
 // Router
 export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
@@ -62,9 +75,12 @@ export type { StorageServiceInterface } from './src/core/contracts/StorageServic
 export type { LoggerServiceInterface, LoggerConfig, LogLevel } from './src/core/contracts/LoggerServiceInterface.js';
 export type { ViewInterface } from './src/core/contracts/ViewInterface.js';
 export type { ViewControllerInterface } from './src/core/contracts/ViewControllerInterface.js';
+// Compiler emit `function(this: ViewConfigThis)` trong view .ts — kiểu này phải
+// công khai, nếu không view đã compile không typecheck được ở app người dùng.
+export type { ViewConfigThis, ViewRuntimeConfig } from './src/core/contracts/ViewControllerInterface.js';
 export type { ViewManagerInterface } from './src/core/contracts/ViewManagerInterface.js';
 export type { ReactiveInterface } from './src/core/contracts/ReactiveInterface.js';
 export type { RouterInterface } from './src/core/contracts/RouterInterface.js';
 export type { RouteDefinition, Route, RouteMatch, RouterConfig } from './src/core/routers/Router.js';
-export type { MarkerRecord, MarkerTagName } from './src/core/contracts/MarkerInterface.js';
+export type { MarkerTagName } from './src/core/contracts/MarkerInterface.js';
 export type { APIEndpoints } from './src/core/helpers/ApiClient.js';
