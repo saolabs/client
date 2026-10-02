@@ -34,6 +34,8 @@ export class SectionManagerService {
         this.unsubscribers = new Map();
         /** yield id -> tracked nodes/elements mounted between its markers (for clear/start/stop) */
         this.mounted = new Map();
+        /** Owners in the current route chain; cached pages retain their sections. */
+        this.headViewIds = new Set();
     }
     add(section) {
         const key = section.name + (section.viewId ?? '');
@@ -103,6 +105,7 @@ export class SectionManagerService {
      * mirroring BlockManagerService.mountViewBlocks()'s per-owner pass.
      */
     mountViewSections(viewId) {
+        this.activateHeadSections(viewId);
         for (const [, yieldEl] of this.yields) {
             if (yieldEl.ctx?.viewId !== viewId)
                 continue;
@@ -112,6 +115,7 @@ export class SectionManagerService {
     }
     /** Hydrate counterpart: trust server-rendered content, only let nested elements self-claim. */
     hydrateViewSections(viewId) {
+        this.activateHeadSections(viewId);
         for (const [, yieldEl] of this.yields) {
             if (yieldEl.ctx?.viewId !== viewId)
                 continue;
@@ -299,6 +303,7 @@ export class SectionManagerService {
             listeners.forEach(fn => fn(section));
     }
     unmountView(viewId) {
+        this.headViewIds.delete(viewId);
         for (const [name, section] of Array.from(this.activeSections)) {
             if (section.viewId === viewId)
                 this.activeSections.delete(name);
@@ -323,9 +328,19 @@ export class SectionManagerService {
      * `app('Head')` directly (e.g. from an async data callback) — both end up
      * writing through the same service, so they never fight each other.
      */
+    activateHeadSections(viewId) {
+        this.headViewIds.add(viewId);
+        for (const section of this.sections.values()) {
+            if (section.viewId === viewId && section.name.startsWith(HEAD_SECTION_PREFIX)) {
+                this.activeSections.set(section.name, section);
+            }
+        }
+    }
     syncHeadSections() {
         for (const [name, section] of this.activeSections) {
             if (!name.startsWith(HEAD_SECTION_PREFIX) || !section.renderFactory)
+                continue;
+            if (!this.headViewIds.has(section.viewId ?? ''))
                 continue;
             const raw = section.renderFactory(null);
             if (raw === undefined || raw === null)
@@ -351,6 +366,19 @@ export class SectionManagerService {
             else if (key === 'canonical') {
                 HeadService.setLink('canonical', value);
             }
+            else if (key.startsWith('jsonld:')) {
+                if (!value.trim())
+                    continue; // Async page data has not arrived yet.
+                try {
+                    const data = JSON.parse(value);
+                    if (data && typeof data === 'object' && !Array.isArray(data)) {
+                        HeadService.setJsonLd(key.slice('jsonld:'.length), data);
+                    }
+                }
+                catch {
+                    console.warn(`[SectionManager] Invalid JSON-LD in section "${name}".`);
+                }
+            }
             else {
                 HeadService.setMeta(key, value);
             }
@@ -359,8 +387,10 @@ export class SectionManagerService {
     /** Revert every page-scoped head tag before mounting a new page's chain. Call once per navigation. */
     resetPageHead() {
         HeadService.resetPage();
+        this.headViewIds.clear();
     }
     destroy() {
+        this.headViewIds.clear();
         for (const unsub of this.unsubscribers.values())
             unsub();
         this.unsubscribers.clear();

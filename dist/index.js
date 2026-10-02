@@ -28,6 +28,7 @@ export { HeadService } from './src/core/services/HeadService.js';
 export { Devtools, devtools, inspector } from './src/core/devtools/index.js';
 // View System
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';
+export { ResourceScope } from './src/core/view/ResourceScope.js';
 // Router
 export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
 // Elements

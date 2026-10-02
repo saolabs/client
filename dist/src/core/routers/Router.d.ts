@@ -235,6 +235,12 @@ export declare class Router {
     stop(): void;
     private handleViewContextChange;
     /**
+     * Switch to a coherent server-rendered document when the view namespace
+     * changes. A short-lived token prevents a bad deployment from reloading the
+     * same URL/revision forever.
+     */
+    private reloadForViewContext;
+    /**
      * Full destroy — cleanup everything.
      */
     destroy(): void;

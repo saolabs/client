@@ -1525,7 +1525,28 @@ export class ViewManager implements ViewManagerInterface {
      * Apply an atomic context update received from a JSON response before the
      * Router retries navigation with the newly materialized route table.
      */
+    requiresReloadForViewContext(state: Record<string, any>): boolean {
+        const revision = typeof state?.revision === 'string' ? state.revision : null;
+        if (!revision || revision === this.contextRevision) return false;
+
+        const nextViews = typeof state?.views === 'string' && state.views !== ''
+            ? state.views
+            : this.contextViews;
+
+        // The current registry was built for one namespace. Changing only its
+        // string prefix cannot materialize the new theme factories/CSS and can
+        // mix new Blade names with old JavaScript. Until a staged registry swap
+        // exists, a document load is the only coherent transition.
+        return nextViews !== this.contextViews;
+    }
+
     applyViewContext(state: Record<string, any>): boolean {
+        if (this.requiresReloadForViewContext(state)) {
+            // Router owns the document transition. A direct caller must not
+            // mutate revision/systemData while the matching registry is absent.
+            return false;
+        }
+
         const revision = typeof state?.revision === 'string' ? state.revision : null;
         if (!revision || revision === this.contextRevision) return false;
 

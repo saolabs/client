@@ -38,6 +38,8 @@ export class SectionManagerService implements SectionManagerInterface {
     private unsubscribers: Map<string, () => void> = new Map();
     /** yield id -> tracked nodes/elements mounted between its markers (for clear/start/stop) */
     private mounted: Map<string, any[]> = new Map();
+    /** Owners in the current route chain; cached pages retain their sections. */
+    private headViewIds = new Set<string>();
 
     add(section: SectionInterface): void {
         const key = section.name + (section.viewId ?? '');
@@ -108,6 +110,7 @@ export class SectionManagerService implements SectionManagerInterface {
      * mirroring BlockManagerService.mountViewBlocks()'s per-owner pass.
      */
     mountViewSections(viewId: string): void {
+        this.activateHeadSections(viewId);
         for (const [, yieldEl] of this.yields) {
             if ((yieldEl as any).ctx?.viewId !== viewId) continue;
             this.mountSectionIntoYield(this.activeSections.get(yieldEl.name) ?? null, yieldEl);
@@ -117,6 +120,7 @@ export class SectionManagerService implements SectionManagerInterface {
 
     /** Hydrate counterpart: trust server-rendered content, only let nested elements self-claim. */
     hydrateViewSections(viewId: string): void {
+        this.activateHeadSections(viewId);
         for (const [, yieldEl] of this.yields) {
             if ((yieldEl as any).ctx?.viewId !== viewId) continue;
             const section = this.activeSections.get(yieldEl.name) ?? null;
@@ -292,6 +296,7 @@ export class SectionManagerService implements SectionManagerInterface {
     }
 
     unmountView(viewId: string): void {
+        this.headViewIds.delete(viewId);
         for (const [name, section] of Array.from(this.activeSections)) {
             if (section.viewId === viewId) this.activeSections.delete(name);
         }
@@ -312,9 +317,19 @@ export class SectionManagerService implements SectionManagerInterface {
      * `app('Head')` directly (e.g. from an async data callback) — both end up
      * writing through the same service, so they never fight each other.
      */
+    private activateHeadSections(viewId: string): void {
+        this.headViewIds.add(viewId);
+        for (const section of this.sections.values()) {
+            if (section.viewId === viewId && section.name.startsWith(HEAD_SECTION_PREFIX)) {
+                this.activeSections.set(section.name, section);
+            }
+        }
+    }
+
     private syncHeadSections(): void {
         for (const [name, section] of this.activeSections) {
             if (!name.startsWith(HEAD_SECTION_PREFIX) || !section.renderFactory) continue;
+            if (!this.headViewIds.has(section.viewId ?? '')) continue;
             const raw = section.renderFactory(null);
             if (raw === undefined || raw === null) continue;
             const value = String(raw);
@@ -333,6 +348,16 @@ export class SectionManagerService implements SectionManagerInterface {
                 HeadService.setMeta(key, value);
             } else if (key === 'canonical') {
                 HeadService.setLink('canonical', value);
+            } else if (key.startsWith('jsonld:')) {
+                if (!value.trim()) continue; // Async page data has not arrived yet.
+                try {
+                    const data = JSON.parse(value);
+                    if (data && typeof data === 'object' && !Array.isArray(data)) {
+                        HeadService.setJsonLd(key.slice('jsonld:'.length), data);
+                    }
+                } catch {
+                    console.warn(`[SectionManager] Invalid JSON-LD in section "${name}".`);
+                }
             } else {
                 HeadService.setMeta(key, value);
             }
@@ -342,9 +367,11 @@ export class SectionManagerService implements SectionManagerInterface {
     /** Revert every page-scoped head tag before mounting a new page's chain. Call once per navigation. */
     resetPageHead(): void {
         HeadService.resetPage();
+        this.headViewIds.clear();
     }
 
     destroy(): void {
+        this.headViewIds.clear();
         for (const unsub of this.unsubscribers.values()) unsub();
         this.unsubscribers.clear();
         for (const [, y] of this.yields) this.clearYield(y);

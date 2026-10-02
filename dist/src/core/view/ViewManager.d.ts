@@ -360,6 +360,7 @@ export declare class ViewManager implements ViewManagerInterface {
      * Apply an atomic context update received from a JSON response before the
      * Router retries navigation with the newly materialized route table.
      */
+    requiresReloadForViewContext(state: Record<string, any>): boolean;
     applyViewContext(state: Record<string, any>): boolean;
     getContextRevision(): string | null;
     private extractAsyncData;

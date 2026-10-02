@@ -18,6 +18,7 @@ export declare class Html implements HtmlInterface {
     private bindingUnsubscribes;
     /** Invalidates deferred/stale binding callbacks after a config reconciliation. */
     private bindingGeneration;
+    private contentUnsubscribe;
     /** DOM state owned by this Html config, used for exact cleanup before reuse. */
     private managedAttributeNames;
     private managedClassNames;
@@ -26,6 +27,7 @@ export declare class Html implements HtmlInterface {
     /** Events actually registered through ViewController, independent of current config. */
     private registeredEventNames;
     initMode: InitMode;
+    private adoptedSSR;
     constructor({ ctx, id, parentElement, tagName, element, config, childrenFactory, initMode, }: {
         ctx: ViewControllerInterface | ViewManagerInterface;
         id?: string | null;
@@ -76,6 +78,7 @@ export declare class Html implements HtmlInterface {
     private addClass;
     private removeClass;
     private toggleClass;
+    private applyStyle;
     private initializeStyles;
     private initializeEvents;
     addEventListeners(): void;
@@ -86,7 +89,12 @@ export declare class Html implements HtmlInterface {
     isSingleElement(): boolean;
     getElement(): HTMLElement;
     renderChildren(): SaoElementChildren;
+    private contentRendered;
+    private bindingInitialized;
+    private composing;
+    private isStarted;
     render(): HTMLElement;
+    private renderTextContent;
     /** Đã chạy enter rồi — re-render không được chạy lại. */
     private _entered;
     /**

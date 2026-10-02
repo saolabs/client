@@ -20,6 +20,10 @@
 export interface HttpRequestConfig extends RequestInit {
     headers?: Record<string, string>;
     timeout?: number;
+    /** Default: cancel only an identical method + final URL. */
+    dedupe?: 'cancel-previous' | 'parallel';
+    /** Explicit logical identity, e.g. latest search across different queries. */
+    requestKey?: string;
     [key: string]: any;
 }
 
@@ -57,7 +61,8 @@ export class HttpService {
     private timeout: number = 10000;
     private defaultHeaders: Record<string, string> = {};
     private interceptors: HttpInterceptor[] = [];
-    private pending = new Map<string, AbortController>();
+    private pending = new Map<string, Set<AbortController>>();
+    private activeRequests = new Set<AbortController>();
 
     // ─── Config ─────────────────────────────────────────────────
 
@@ -103,67 +108,72 @@ export class HttpService {
         data: any = null,
         options: HttpRequestConfig = {},
     ): Promise<HttpResponse<T>> {
-        // Build full URL
-        let fullUrl = url.startsWith('http') ? url : `${this.baseUrl}${url}`;
-
-        // Cancel duplicate in-flight request
-        const requestKey = `${method.toUpperCase()}:${fullUrl}`;
-        this.pending.get(requestKey)?.abort();
-
         const controller = new AbortController();
-        this.pending.set(requestKey, controller);
-
-        // Build config
-        let config: HttpRequestConfig = {
-            method: method.toUpperCase(),
-            headers: { ...this.defaultHeaders, ...options.headers },
-            signal: options.signal ?? controller.signal,
-            ...options,
+        this.activeRequests.add(controller);
+        const detach: (() => void)[] = [];
+        const linked = new Set<AbortSignal>();
+        const linkSignal = (signal?: AbortSignal | null) => {
+            if (!signal || signal === controller.signal || linked.has(signal)) return;
+            linked.add(signal);
+            const abort = () => controller.abort(signal.reason);
+            if (signal.aborted) abort();
+            else {
+                signal.addEventListener('abort', abort, { once: true });
+                detach.push(() => signal.removeEventListener('abort', abort));
+            }
         };
-
-        if (typeof window !== 'undefined') {
-            const revision = (window as any).APP_CONFIGS?.view?.revision;
-            const headers = config.headers as Record<string, string>;
-            if (typeof revision === 'string' && !headers['X-Saola-View-Revision']) {
-                headers['X-Saola-View-Revision'] = revision;
-                headers['X-Sao-Response'] ??= 'json';
-            }
-        }
-
-        // Apply request interceptors
-        for (const i of this.interceptors) {
-            if (i.request) config = await i.request(config);
-        }
-
-        // Body for POST/PUT/PATCH
-        if (data && ['POST', 'PUT', 'PATCH'].includes(config.method!)) {
-            const ct = (config.headers as Record<string, string>)?.['Content-Type'];
-            if (data instanceof FormData) {
-                config.body = data;
-                delete (config.headers as Record<string, string>)['Content-Type'];
-            } else if (ct === 'application/json' || !ct) {
-                (config.headers as Record<string, string>)['Content-Type'] = 'application/json';
-                config.body = JSON.stringify(data);
-            } else {
-                config.body = data;
-            }
-        }
-
-        // Query params for GET
-        if (data && config.method === 'GET' && typeof data === 'object') {
-            const urlObj = new URL(fullUrl, window.location.origin);
-            for (const [key, value] of Object.entries(data)) {
-                urlObj.searchParams.append(key, String(value));
-            }
-            fullUrl = urlObj.toString();
-        }
-
+        linkSignal(options.signal);
+        let requestKey: string | undefined;
+        const timeoutId = setTimeout(() => controller.abort(), options.timeout ?? this.timeout);
         try {
-            const timeoutId = setTimeout(() => controller.abort(), options.timeout ?? this.timeout);
+            let config: HttpRequestConfig = {
+                ...options,
+                method: (options.method ?? method).toUpperCase(),
+                headers: { ...this.defaultHeaders, ...options.headers },
+                signal: controller.signal,
+            };
+            if (typeof window !== 'undefined') {
+                const revision = (window as any).APP_CONFIGS?.view?.revision;
+                const headers = config.headers as Record<string, string>;
+                if (typeof revision === 'string' && !headers['X-Saola-View-Revision']) {
+                    headers['X-Saola-View-Revision'] = revision;
+                    headers['X-Sao-Response'] ??= 'json';
+                }
+            }
+            controller.signal.throwIfAborted();
+            for (const i of this.interceptors) {
+                if (i.request) config = await i.request(config);
+                linkSignal(config.signal);
+                config.signal = controller.signal;
+                controller.signal.throwIfAborted();
+            }
+            config.method = (config.method ?? method).toUpperCase();
+            if (data !== null && ['POST', 'PUT', 'PATCH'].includes(config.method)) {
+                const ct = config.headers?.['Content-Type'];
+                if (data instanceof FormData) {
+                    config.body = data;
+                    if (config.headers) delete config.headers['Content-Type'];
+                } else if (ct === 'application/json' || !ct) {
+                    config.headers ??= {};
+                    config.headers['Content-Type'] = 'application/json';
+                    config.body = JSON.stringify(data);
+                } else config.body = data;
+            }
+            const urlObj = this.resolveUrl(url);
+            if (data && config.method === 'GET' && typeof data === 'object') {
+                for (const [key, value] of Object.entries(data)) urlObj.searchParams.append(key, String(value));
+            }
+            const fullUrl = urlObj.toString();
+            requestKey = `${config.method}:${config.requestKey ?? fullUrl}`;
+            let group = this.pending.get(requestKey);
+            if (config.dedupe !== 'parallel') {
+                for (const previous of group ?? []) previous.abort();
+            }
+            if (!group) this.pending.set(requestKey, group = new Set());
+            group.add(controller);
             const raw = await fetch(fullUrl, config);
-            clearTimeout(timeoutId);
-
             const responseData = await raw.json().catch(() => ({}));
+            controller.signal.throwIfAborted();
 
             const viewContext = responseData?.viewContext;
             const currentContext = typeof window !== 'undefined'
@@ -189,7 +199,7 @@ export class HttpService {
                 if (i.response) response = await i.response(response);
             }
 
-            this.pending.delete(requestKey);
+            controller.signal.throwIfAborted();
 
             if (!raw.ok) {
                 // Ưu tiên message của server (Laravel 422 trả "The email field is
@@ -207,17 +217,25 @@ export class HttpService {
 
             return response;
         } catch (err) {
-            this.pending.delete(requestKey);
 
             let error = err as Error;
             for (const i of this.interceptors) {
                 if (i.error) error = await i.error(error);
             }
 
-            if (error.name === 'AbortError') {
-                throw new Error('Request cancelled');
+            if (controller.signal.aborted || error.name === 'AbortError') {
+                throw Object.assign(new Error('Request cancelled'), { name: 'AbortError', cause: error });
             }
             throw error;
+        } finally {
+            clearTimeout(timeoutId);
+            for (const off of detach) off();
+            this.activeRequests.delete(controller);
+            if (requestKey !== undefined) {
+                const group = this.pending.get(requestKey);
+                group?.delete(controller);
+                if (group?.size === 0) this.pending.delete(requestKey);
+            }
         }
     }
 
@@ -247,15 +265,27 @@ export class HttpService {
 
     /** Cancel all pending requests */
     cancelAll(): void {
-        this.pending.forEach((c) => c.abort());
+        for (const controller of this.activeRequests) controller.abort();
         this.pending.clear();
     }
 
     /** Cancel a specific pending request */
     cancel(url: string, method: string = 'GET'): void {
-        const key = `${method.toUpperCase()}:${url}`;
-        this.pending.get(key)?.abort();
+        this.cancelKey(this.resolveUrl(url).toString(), method);
+    }
+
+    /** Cancel a logical requestKey (all parallel requests in the group). */
+    cancelKey(identity: string, method: string = 'GET'): void {
+        const key = `${method.toUpperCase()}:${identity}`;
+        for (const controller of this.pending.get(key) ?? []) controller.abort();
         this.pending.delete(key);
+    }
+
+    private resolveUrl(url: string): URL {
+        const full = /^(https?:)?\/\//i.test(url) ? url : `${this.baseUrl}${url}`;
+        const resolved = new URL(full, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+        resolved.hash = ''; // fragments are never sent to the server
+        return resolved;
     }
 
     /** Destroy — cancel all + clear interceptors */

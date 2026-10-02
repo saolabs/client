@@ -1,0 +1,18 @@
+@state(message: string = 'initial', observed: string = '')
+<template>
+<p id="observed">{{ observed }}</p>
+</template>
+<script setup lang="ts">
+export default {
+    runs: 0,
+    cleanups: 0,
+    mounted() {
+        this.watch(['message'], ({message}, run) => {
+            this.runs++;
+            run.onCleanup(() => { this.cleanups++; });
+            setObserved(message);
+        });
+    },
+    change(value: string) { setMessage(value); }
+}
+</script>

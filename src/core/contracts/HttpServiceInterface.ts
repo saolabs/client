@@ -3,6 +3,8 @@
 export interface HttpRequestConfig extends RequestInit {
     headers?: Record<string, string>;
     timeout?: number;
+    dedupe?: 'cancel-previous' | 'parallel';
+    requestKey?: string;
     [key: string]: any;
 }
 
@@ -45,6 +47,7 @@ export interface HttpServiceInterface {
     cancelAll(): void;
     /** Cancel a specific pending request */
     cancel(url: string, method?: string): void;
+    cancelKey(identity: string, method?: string): void;
 
     /** Destroy — cancel all + clear interceptors */
     destroy(): void;

@@ -20,14 +20,15 @@ import type { StateManagerInterface, ViewStateInterface, StateListener } from ".
  */
 export declare class StateManager implements StateManagerInterface {
     private states;
-    private listeners;
-    private multiKeyListeners;
+    private subscriptions;
     private pendingChanges;
+    private versions;
     private stateIndex;
     private flushRAF;
     private hasPendingFlush;
     private isFlushing;
     private _isDestroyed;
+    private mutationDiagnostics;
     /** Flag — cho phép update state qua update$xxx chỉ trước lock */
     private _canUpdateStateByKey;
     /** Setter functions exposed for direct property assignment on ViewState */
@@ -107,7 +108,12 @@ export declare class StateManager implements StateManagerInterface {
      */
     updateStateAddressKey(key: string | number, value: any): void;
     subscribe(key: string | number | string[] | Record<string, StateListener>, callback?: StateListener): () => void;
+    private removeSubscription;
     unsubscribe(key: string | number | string[] | Record<string, StateListener>, callback?: StateListener): void;
+    /** Expensive checks for mutations not intercepted by accessors/mutators. */
+    setMutationDiagnostics(enabled: boolean): void;
+    /** Synchronous revision, including changes not flushed to DOM yet. */
+    getStateVersion(key: string): number;
     private _isPaused;
     private dirtyKeys;
     get isPaused(): boolean;
@@ -164,8 +170,8 @@ export declare class StateManager implements StateManagerInterface {
     /** Tập "kênh" gắn trên một node — nhiều view/key có thể dùng chung dữ liệu. */
     private static readonly HOOKS;
     /**
-     * Một kênh cho MỘT key. Mọi node trong cây đều giữ CÙNG object này, nên gỡ
-     * theo dõi chỉ là `notify = null` — O(1), không phải duyệt lại cả cây.
+     * Một kênh cho MỘT key. `nodes` giữ đúng tập node đang reachable để cleanup
+     * không phụ thuộc vào hình dạng cây tại thời điểm destroy.
      */
     private trackedChannels;
     /**
@@ -190,16 +196,17 @@ export declare class StateManager implements StateManagerInterface {
      * 50 lần mount/destroy trên cùng mảng để lại 50 channel. Đúng lớp lỗi mà
      * `tests/view/registry-cleanup.test.ts` canh ("mọi registry phải có trần").
      *
-     * Duyệt LẠI TỪ GỐC thay vì nhớ sẵn danh sách node: nhớ danh sách sẽ giữ sống
-     * cả những node đã bị gỡ khỏi cây (item xoá khỏi list) cho tới lúc destroy —
-     * đổi một rò rỉ này lấy một rò rỉ khác. Node đã rời cây thì không ai còn tham
-     * chiếu, GC dọn cùng tập hook của nó.
+     * Channel giữ tập node đang sống. Mỗi mutator/setter gỡ node tách khỏi cây
+     * ngay lập tức; nhờ vậy destroy có thể dọn cả cây chính xác mà không bỏ sót
+     * object đã từng được observe.
      */
     private untrackKey;
     /** Gỡ mọi channel của manager này (destroy view). */
     private untrackAllArrays;
     /** Gỡ `channel` khỏi tập hook của `node` và toàn bộ cây con. */
     private static unobserve;
+    /** Thu thập cây hiện còn reachable để không gỡ nhầm shared reference. */
+    private static collectReachable;
     /**
      * Cài bộ bắt mutate lên `node` và toàn bộ cây con, rồi ghi `channel` vào
      * tập hook của mỗi node. `seen` chặn vòng lặp tham chiếu.

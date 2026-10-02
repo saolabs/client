@@ -9,6 +9,7 @@ Thư mục này chứa tất cả tài liệu kỹ thuật liên quan đến **S
 ## 📋 Danh Sách Tài Liệu
 
 ### 🔄 Runtime & Architecture
+- **[REACTIVE_SCOPE.md](REACTIVE_SCOPE.md)** - Watch, cleanup, async cancellation, afterDom và quy tắc form/list mới
 - **[RUNTIME_API_SPEC.md](RUNTIME_API_SPEC.md)** - Thông số kỹ thuật API runtime
 - **[RUNTIME_ARCHITECTURE.md](RUNTIME_ARCHITECTURE.md)** - Kiến trúc runtime system
 

@@ -17,6 +17,10 @@
 export interface HttpRequestConfig extends RequestInit {
     headers?: Record<string, string>;
     timeout?: number;
+    /** Default: cancel only an identical method + final URL. */
+    dedupe?: 'cancel-previous' | 'parallel';
+    /** Explicit logical identity, e.g. latest search across different queries. */
+    requestKey?: string;
     [key: string]: any;
 }
 export interface HttpResponse<T = any> {
@@ -40,6 +44,7 @@ export declare class HttpService {
     private defaultHeaders;
     private interceptors;
     private pending;
+    private activeRequests;
     setBaseUrl(url: string): this;
     setTimeout(ms: number): this;
     setDefaultHeaders(headers: Record<string, string>): this;
@@ -57,6 +62,9 @@ export declare class HttpService {
     cancelAll(): void;
     /** Cancel a specific pending request */
     cancel(url: string, method?: string): void;
+    /** Cancel a logical requestKey (all parallel requests in the group). */
+    cancelKey(identity: string, method?: string): void;
+    private resolveUrl;
     /** Destroy — cancel all + clear interceptors */
     destroy(): void;
 }

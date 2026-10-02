@@ -2,6 +2,7 @@ import type { ViewType } from "../contracts/ViewControllerInterface.js";
 import type { ViewInterface, ViewLifecycleHooks } from "../contracts/ViewInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
 import { ViewController } from "./ViewController.js";
+import type { WatchCallback, WatchOptions } from './ResourceScope.js';
 /** Declared View API without the legacy catch-all that would hide misspelled members. */
 type ViewMembers = {
     [K in keyof View as string extends K ? never : number extends K ? never : K]: View[K];
@@ -78,6 +79,9 @@ export declare class View implements ViewInterface, ViewLifecycleHooks {
      * dạng chuỗi trên chính View.
      */
     emit(event: string, ...args: any[]): any;
+    watch(keys: readonly string[], callback: WatchCallback, options?: WatchOptions): () => void;
+    afterDom(callback: () => void): () => void;
+    get $scope(): import("./ResourceScope.js").ResourceScope;
     get path(): string;
     get viewType(): ViewType;
     /** Shortcut to controller */

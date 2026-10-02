@@ -304,7 +304,14 @@ export class Component implements ComponentInterface {
 
     /** Tạo + mount child view giữa markers (nếu chưa có) */
     private mountChild(): void {
-        if (this._childMounted && this.viewRef) return;
+        if (this._childMounted && this.viewRef) {
+            if (this.dataFactory) {
+                const ctrl = this.viewRef.__ctrl__;
+                ctrl.updateData(this.dataFactory(this.parent));
+                ctrl.states.__.flushNow();
+            }
+            return;
+        }
         const childView = this.resolveChildView();
         if (!childView) return;
         const childCtrl = childView.__ctrl__;

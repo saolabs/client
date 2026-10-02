@@ -13,6 +13,7 @@ import type { LoopContextInterface } from "./LoopContextInterface.js";
 import { SectionInterface } from "../contracts/SectionInterface.js";
 import type { ForeachSlotCache } from "../elements/ForeachSlotCache.js";
 import type { InitMode } from "./common.js";
+import type { ResourceScope } from '../view/ResourceScope.js';
 
 // ─── ViewController Interface ────────────────────────────────────
 
@@ -25,6 +26,8 @@ export interface ViewControllerInterface {
     path: string;
     viewType: ViewType;
     states: ViewStateInterface;
+    readonly scope: ResourceScope;
+    afterDom(callback: () => void): () => void;
     loopContext: LoopContextInterface | null;
     /** Raw input data reference */
     data: Record<string, any>;
@@ -42,6 +45,8 @@ export interface ViewControllerInterface {
     _currentForeachCache: ForeachSlotCache | null;
     /** Element gọi trong destroy() để tự gỡ khỏi registry (no-op nếu key đã trỏ bản mới) */
     releaseElement(el: object): void;
+    /** Compiler helper for raw interpolation inside HTML RCDATA. */
+    decodeTextContent(value: string): string;
     /** Path to super view (layout) */
     superViewPath: string | null;
 
@@ -98,7 +103,7 @@ export interface ViewControllerInterface {
     /** Materialize the lazy parent-owned slot only when ChildrenNode is rendered. */
     __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput;
     /** Loop directives */
-    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: any) => any, keyFn?: (item: T, index: number) => any): any[];
+    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: any, identity: number) => any, keyFn?: (item: T, index: number) => any, reconcile?: boolean, scopeId?: string): any[];
     __for(loopType?: string, start?: number, end?: number, execute?: (loop: any) => any): any;
     __while(execute: (loop: any) => any, maxIterations?: number): any;
     /** App reference */

@@ -1,0 +1,29 @@
+<template>
+<div>
+    <span id="picked">{{ picked }}</span>
+    <ul>
+        @foreach(items as item)
+        @key(item['id'])
+        <li data-id="{{ item['id'] }}">
+            <input class="editor">
+            <span class="name">{{ item['name'] }}</span>
+            <span class="index">{{ loop.index }}</span>
+            <span class="count">{{ loop.count }}</span>
+            <button class="pick" @click(pick(item['name'], loop.index))>Pick</button>
+            @include('fixtures.keyed-child', {item: item})
+            @foreach(item['tags'] as tag)
+            @key(tag['id'])
+            <i data-tag="{{ tag['id'] }}">{{ tag['label'] }}</i>
+            @endforeach
+        </li>
+        @endforeach
+    </ul>
+</div>
+</template>
+<script setup>
+@state(items = [{id: 1, name: 'one', tags: [{id: 'a', label: 'alpha'}]}, {id: 2, name: 'two', tags: []}], picked = '')
+export default {
+    replace(next) { setItems(next); },
+    pick(name, index) { setPicked(name + ':' + index); }
+}
+</script>

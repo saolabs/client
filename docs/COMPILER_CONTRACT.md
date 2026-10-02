@@ -1,12 +1,20 @@
 # Compiler ↔ Client Runtime Contract
 
-**Phiên bản**: 0.1 — Phase 4 alignment  
-**Cập nhật**: 2026-06-13  
+**Phiên bản**: 0.2 — scoped reactivity và keyed reconciliation
+
+**Cập nhật**: 2026-10-01
 **Tham chiếu**: `compiler/examples/js/`, `client/tests/contract/`
 
 Tài liệu này mô tả **các pattern chính xác** mà compiler (.sao → JS) sinh ra,
 và **những gì client runtime phải hỗ trợ**. Mỗi pattern có section riêng,
 kèm ví dụ compiler output và contract test tương ứng.
+
+Hợp đồng hiện hành: [RUNTIME_CONTRACT.md](../../docs/RUNTIME_CONTRACT.md), output
+contract **2**. Các phân tích Python/Phase 4 bên dưới là lịch sử; đặc biệt §14
+không còn mô tả compiler PHP hiện tại. ID ngầm của foreach dùng `__loopIdentity`
+(zero-based ở lần mount đầu, ổn định qua reorder), không dùng `index + 1`.
+`@key` khuyến nghị cho dữ liệu refresh từ API để giữ node khi object reference đổi.
+RCDATA `content`, row scope và API watch/afterDom nằm ở §5.3–§5.5 của hợp đồng mới.
 
 ---
 

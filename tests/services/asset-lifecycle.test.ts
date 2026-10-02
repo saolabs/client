@@ -98,6 +98,48 @@ describe('Asset của view qua vòng đời', () => {
         expect(links(HREF_A).length).toBe(0);        // node SSR cũng phải đi
     });
 
+    it('<style> do SSR in sẵn: adopt theo nội dung, không chèn thêm, và vẫn gỡ được', () => {
+        // Server in <style> trong <head> để trang không vẽ trần chờ JS (FOUC).
+        const css = '.card.s1 { padding: 12px; }';
+        const ssr = document.createElement('style');
+        ssr.setAttribute('data-sao-style', '');
+        ssr.textContent = css;
+        document.head.appendChild(ssr);
+        const styles = () => [...document.head.querySelectorAll('style')].filter(s => s.textContent === css);
+
+        const a = mountView(function (this: any) {
+            return this.wrapper((p: any) => [this.html('root', 'div', p, {}, () => [this.text('a')])]);
+        }, { path: 'web.a', styles: [{ type: 'code', content: css }] } as any);
+        harnesses.push(a);
+        expect(styles()).toEqual([ssr]);             // đúng node server, không phải bản mới
+
+        a.ctrl.destroy();
+        expect(styles().length).toBe(0);             // node SSR cũng phải đi
+    });
+
+    it('<style> SSR của view lặp (component trong @foreach): một thẻ, gỡ khi instance CUỐI rời', () => {
+        // Server dồn N lần include về MỘT thẻ; client có N instance cùng acquire.
+        const css = '.ucard.s2 { display: grid; }';
+        const ssr = document.createElement('style');
+        ssr.setAttribute('data-sao-style', '');
+        ssr.textContent = css;
+        document.head.appendChild(ssr);
+        const styles = () => [...document.head.querySelectorAll('style')].filter(s => s.textContent === css);
+
+        const cards = [1, 2, 3].map(i => mountView(function (this: any) {
+            return this.wrapper((p: any) => [this.html('root', 'div', p, {}, () => [this.text(`card ${i}`)])]);
+        }, { path: 'web.card', styles: [{ type: 'code', content: css }] } as any));
+        harnesses.push(...cards);
+        expect(styles()).toEqual([ssr]);
+
+        cards[0].ctrl.destroy();
+        cards[1].ctrl.destroy();
+        expect(styles()).toEqual([ssr]);             // còn một card → còn giữ
+
+        cards[2].ctrl.destroy();
+        expect(styles().length).toBe(0);
+    });
+
     it('<script src> thì GIỮ lại sau khi rời trang', () => {
         // Gỡ thẻ script không hoàn tác side effect của nó, mà chèn lại sẽ chạy
         // lần hai (nạp lại Prism là xoá sạch grammar đã đăng ký).

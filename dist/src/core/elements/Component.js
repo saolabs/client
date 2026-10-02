@@ -252,8 +252,14 @@ export class Component {
     }
     /** Tạo + mount child view giữa markers (nếu chưa có) */
     mountChild() {
-        if (this._childMounted && this.viewRef)
+        if (this._childMounted && this.viewRef) {
+            if (this.dataFactory) {
+                const ctrl = this.viewRef.__ctrl__;
+                ctrl.updateData(this.dataFactory(this.parent));
+                ctrl.states.__.flushNow();
+            }
             return;
+        }
         const childView = this.resolveChildView();
         if (!childView)
             return;

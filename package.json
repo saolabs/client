@@ -27,11 +27,12 @@
     "index.ts",
     "plugins.ts"
   ],
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "clean": "rm -rf dist",
-    "check-exports": "node scripts/check-exports.js",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "clean": "rm -rf dist",
+        "check": "npm ci --dry-run --ignore-scripts && npm audit && npm run typecheck && npm test && npm run check-exports",
+        "check-exports": "node scripts/check-exports.js",
     "prepublishOnly": "npm run clean && npm run build && npm run check-exports",
     "publish-dry-run": "npm publish --dry-run",
     "test": "vitest run",
@@ -56,14 +57,17 @@
     "url": "https://github.com/saolabs/client/issues"
   },
   "homepage": "https://github.com/saolabs/client#readme",
-  "devDependencies": {
-    "typescript": "^5.0.0",
-    "@types/node": "^20.0.0",
-    "vitest": "^3.2.4",
-    "jsdom": "^25.0.1"
+  "publishConfig": {
+    "access": "public"
   },
-  "engines": {
-    "node": ">=16.0.0"
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.11"
+  },
+    "engines": {
+        "node": "^20.0.0 || ^22.0.0 || >=24.0.0"
   },
   "directories": {
     "doc": "docs"

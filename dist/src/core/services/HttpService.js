@@ -22,6 +22,7 @@ export class HttpService {
         this.defaultHeaders = {};
         this.interceptors = [];
         this.pending = new Map();
+        this.activeRequests = new Set();
     }
     static getInstance(key = 'default') {
         if (!HttpService.instances.has(key)) {
@@ -67,61 +68,82 @@ export class HttpService {
     }
     // ─── Core Request ───────────────────────────────────────────
     async request(method, url, data = null, options = {}) {
-        // Build full URL
-        let fullUrl = url.startsWith('http') ? url : `${this.baseUrl}${url}`;
-        // Cancel duplicate in-flight request
-        const requestKey = `${method.toUpperCase()}:${fullUrl}`;
-        this.pending.get(requestKey)?.abort();
         const controller = new AbortController();
-        this.pending.set(requestKey, controller);
-        // Build config
-        let config = {
-            method: method.toUpperCase(),
-            headers: { ...this.defaultHeaders, ...options.headers },
-            signal: options.signal ?? controller.signal,
-            ...options,
-        };
-        if (typeof window !== 'undefined') {
-            const revision = window.APP_CONFIGS?.view?.revision;
-            const headers = config.headers;
-            if (typeof revision === 'string' && !headers['X-Saola-View-Revision']) {
-                headers['X-Saola-View-Revision'] = revision;
-                headers['X-Sao-Response'] ?? (headers['X-Sao-Response'] = 'json');
-            }
-        }
-        // Apply request interceptors
-        for (const i of this.interceptors) {
-            if (i.request)
-                config = await i.request(config);
-        }
-        // Body for POST/PUT/PATCH
-        if (data && ['POST', 'PUT', 'PATCH'].includes(config.method)) {
-            const ct = config.headers?.['Content-Type'];
-            if (data instanceof FormData) {
-                config.body = data;
-                delete config.headers['Content-Type'];
-            }
-            else if (ct === 'application/json' || !ct) {
-                config.headers['Content-Type'] = 'application/json';
-                config.body = JSON.stringify(data);
-            }
+        this.activeRequests.add(controller);
+        const detach = [];
+        const linked = new Set();
+        const linkSignal = (signal) => {
+            if (!signal || signal === controller.signal || linked.has(signal))
+                return;
+            linked.add(signal);
+            const abort = () => controller.abort(signal.reason);
+            if (signal.aborted)
+                abort();
             else {
-                config.body = data;
+                signal.addEventListener('abort', abort, { once: true });
+                detach.push(() => signal.removeEventListener('abort', abort));
             }
-        }
-        // Query params for GET
-        if (data && config.method === 'GET' && typeof data === 'object') {
-            const urlObj = new URL(fullUrl, window.location.origin);
-            for (const [key, value] of Object.entries(data)) {
-                urlObj.searchParams.append(key, String(value));
-            }
-            fullUrl = urlObj.toString();
-        }
+        };
+        linkSignal(options.signal);
+        let requestKey;
+        const timeoutId = setTimeout(() => controller.abort(), options.timeout ?? this.timeout);
         try {
-            const timeoutId = setTimeout(() => controller.abort(), options.timeout ?? this.timeout);
+            let config = {
+                ...options,
+                method: (options.method ?? method).toUpperCase(),
+                headers: { ...this.defaultHeaders, ...options.headers },
+                signal: controller.signal,
+            };
+            if (typeof window !== 'undefined') {
+                const revision = window.APP_CONFIGS?.view?.revision;
+                const headers = config.headers;
+                if (typeof revision === 'string' && !headers['X-Saola-View-Revision']) {
+                    headers['X-Saola-View-Revision'] = revision;
+                    headers['X-Sao-Response'] ?? (headers['X-Sao-Response'] = 'json');
+                }
+            }
+            controller.signal.throwIfAborted();
+            for (const i of this.interceptors) {
+                if (i.request)
+                    config = await i.request(config);
+                linkSignal(config.signal);
+                config.signal = controller.signal;
+                controller.signal.throwIfAborted();
+            }
+            config.method = (config.method ?? method).toUpperCase();
+            if (data !== null && ['POST', 'PUT', 'PATCH'].includes(config.method)) {
+                const ct = config.headers?.['Content-Type'];
+                if (data instanceof FormData) {
+                    config.body = data;
+                    if (config.headers)
+                        delete config.headers['Content-Type'];
+                }
+                else if (ct === 'application/json' || !ct) {
+                    config.headers ?? (config.headers = {});
+                    config.headers['Content-Type'] = 'application/json';
+                    config.body = JSON.stringify(data);
+                }
+                else
+                    config.body = data;
+            }
+            const urlObj = this.resolveUrl(url);
+            if (data && config.method === 'GET' && typeof data === 'object') {
+                for (const [key, value] of Object.entries(data))
+                    urlObj.searchParams.append(key, String(value));
+            }
+            const fullUrl = urlObj.toString();
+            requestKey = `${config.method}:${config.requestKey ?? fullUrl}`;
+            let group = this.pending.get(requestKey);
+            if (config.dedupe !== 'parallel') {
+                for (const previous of group ?? [])
+                    previous.abort();
+            }
+            if (!group)
+                this.pending.set(requestKey, group = new Set());
+            group.add(controller);
             const raw = await fetch(fullUrl, config);
-            clearTimeout(timeoutId);
             const responseData = await raw.json().catch(() => ({}));
+            controller.signal.throwIfAborted();
             const viewContext = responseData?.viewContext;
             const currentContext = typeof window !== 'undefined'
                 ? window.APP_CONFIGS?.view?.systemData?.__context__
@@ -144,7 +166,7 @@ export class HttpService {
                 if (i.response)
                     response = await i.response(response);
             }
-            this.pending.delete(requestKey);
+            controller.signal.throwIfAborted();
             if (!raw.ok) {
                 // Ưu tiên message của server (Laravel 422 trả "The email field is
                 // required."): caller nào cũng in `err.message`, mà "HTTP 422
@@ -161,16 +183,27 @@ export class HttpService {
             return response;
         }
         catch (err) {
-            this.pending.delete(requestKey);
             let error = err;
             for (const i of this.interceptors) {
                 if (i.error)
                     error = await i.error(error);
             }
-            if (error.name === 'AbortError') {
-                throw new Error('Request cancelled');
+            if (controller.signal.aborted || error.name === 'AbortError') {
+                throw Object.assign(new Error('Request cancelled'), { name: 'AbortError', cause: error });
             }
             throw error;
+        }
+        finally {
+            clearTimeout(timeoutId);
+            for (const off of detach)
+                off();
+            this.activeRequests.delete(controller);
+            if (requestKey !== undefined) {
+                const group = this.pending.get(requestKey);
+                group?.delete(controller);
+                if (group?.size === 0)
+                    this.pending.delete(requestKey);
+            }
         }
     }
     // ─── Convenience ────────────────────────────────────────────
@@ -192,14 +225,26 @@ export class HttpService {
     // ─── Cancellation ───────────────────────────────────────────
     /** Cancel all pending requests */
     cancelAll() {
-        this.pending.forEach((c) => c.abort());
+        for (const controller of this.activeRequests)
+            controller.abort();
         this.pending.clear();
     }
     /** Cancel a specific pending request */
     cancel(url, method = 'GET') {
-        const key = `${method.toUpperCase()}:${url}`;
-        this.pending.get(key)?.abort();
+        this.cancelKey(this.resolveUrl(url).toString(), method);
+    }
+    /** Cancel a logical requestKey (all parallel requests in the group). */
+    cancelKey(identity, method = 'GET') {
+        const key = `${method.toUpperCase()}:${identity}`;
+        for (const controller of this.pending.get(key) ?? [])
+            controller.abort();
         this.pending.delete(key);
+    }
+    resolveUrl(url) {
+        const full = /^(https?:)?\/\//i.test(url) ? url : `${this.baseUrl}${url}`;
+        const resolved = new URL(full, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+        resolved.hash = ''; // fragments are never sent to the server
+        return resolved;
     }
     /** Destroy — cancel all + clear interceptors */
     destroy() {

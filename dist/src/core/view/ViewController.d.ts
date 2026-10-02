@@ -6,6 +6,7 @@ import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, 
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
 import { ViewState } from "./ViewState.js";
+import { ResourceScope } from './ResourceScope.js';
 import { LoopContext } from "./LoopContext.js";
 import { Component } from "../elements/Component.js";
 import type { ViewUserConfig } from "./View.js";
@@ -110,6 +111,12 @@ export declare class ViewController implements ViewControllerInterface {
      */
     _currentForeachCache: ForeachSlotCache | null;
     _foreachSkipRegistry: boolean;
+    private foreachRegistry;
+    private elementRegistries;
+    private inlineForeachCaches;
+    /** Deferred child factories retain the row scope in which they were created. */
+    private scopeFactory;
+    private inForeachScope;
     /** Section management across views */
     sections: Map<string, SectionInterface>;
     /** Block slots in layout views */
@@ -140,6 +147,15 @@ export declare class ViewController implements ViewControllerInterface {
     urlPath: string | null;
     callingMethod: string | null;
     constructor(view: ViewInterface, path?: string, viewType?: ViewType, viewId?: string | null);
+    private _scope?;
+    get scope(): ResourceScope;
+    private afterDomCallbacks;
+    private afterDomRAF;
+    private afterDomRevision;
+    /** One-shot callback after this view's state and DOM queues settle. */
+    afterDom(callback: () => void): () => void;
+    private flushAfterDom;
+    private cancelAfterDom;
     /**
      * Setup — called by compiled $__setup__ with full config.
      *
@@ -333,6 +349,8 @@ export declare class ViewController implements ViewControllerInterface {
     }, contentRenderFactory: SectionContentRenderer): SectionInterface;
     /** `this.yieldContent(name, default)` — synchronous resolve, used inside attribute/prop binding factories. */
     yieldContent(name: string, defaultValue?: any): any;
+    /** Decode a raw SSR echo as RCDATA, preserving literal angle brackets. */
+    decodeTextContent(value: string): string;
     block(id: string | null, name: string, contentRenderFactory: BlockRenderFactory): BlockInterface;
     blockOutlet(id: string | null | undefined, name: string, parentElement: HtmlInterface | null): BlockOutletInterface;
     mountBlock(id: string | null | undefined, name: string, parent: HtmlInterface | null): BlockOutletInterface;
@@ -443,7 +461,7 @@ export declare class ViewController implements ViewControllerInterface {
      *   - string — SSR data hoặc default '' → render text tĩnh (rỗng → []).
      */
     __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput;
-    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, keyFn?: (item: T, index: number) => any): any[];
+    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContextInterface, identity: number) => any, keyFn?: (item: T, index: number) => any, reconcile?: boolean, scopeId?: string): any[];
     __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, emptyCallback?: () => any): any[];
     __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any): any[];
     /**

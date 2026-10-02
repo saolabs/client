@@ -139,6 +139,10 @@ export class Output implements OutputInterface {
             return;
         }
 
+        if (this.openTag.parentNode && this.textNode) {
+            this.update();
+            return;
+        }
         if (!this.openTag.parentNode) {
             const parentEl = this.parent?.element;
             if (!parentEl) return;

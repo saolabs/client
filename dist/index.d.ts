@@ -27,6 +27,8 @@ export { Devtools, devtools, inspector } from './src/core/devtools/index.js';
 export type { DevtoolsEvent, DevtoolsEventType, DevtoolsViewNode } from './src/core/devtools/index.js';
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';
 export type { ViewUserConfig } from './src/core/view/View.js';
+export { ResourceScope } from './src/core/view/ResourceScope.js';
+export type { WatchCallback, WatchContext, WatchOptions, Cleanup } from './src/core/view/ResourceScope.js';
 export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
 export { Reactive } from './src/core/elements/Reactive.js';
 export { Block } from './src/core/elements/Block.js';

@@ -9,9 +9,9 @@ export class DomService {
     
     parse(html: string): Node[]{
         this.container.innerHTML = html;
-        const content = this.container.content;
+        const nodes = Array.from(this.container.content.childNodes);
         this.container.innerHTML = ''; // Clear template content to free memory
-        return Array.from(content.childNodes);
+        return nodes;
     }
     create(tagName: string, options?: ElementCreationOptions): HTMLElement {
         return document.createElement(tagName, options);

@@ -189,6 +189,6 @@ describe('computed — cleanup', () => {
         manager.destroy();
         // destroy() xoá states nên không đọc lại được — điều cần bảo đảm là
         // không còn listener nào sống sót gây tính lại/leak.
-        expect(manager.listeners.size).toBe(0);
+        expect(manager.subscriptions.size).toBe(0);
     });
 });

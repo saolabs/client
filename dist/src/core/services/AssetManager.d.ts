@@ -84,6 +84,8 @@ export declare class AssetManagerService {
     private createStyleNode;
     /** Tìm stylesheet SSR cùng identity để hydration không tạo node trùng. */
     private findExistingStylesheet;
+    /** `<style data-sao-style>` SSR chưa ai nhận, cùng nội dung + attribute. */
+    private findExistingStyle;
     private matchesExtraAttrs;
     /** scopeId ổn định theo path (mọi instance + cả node <style> dùng chung). */
     private scopeIdFor;

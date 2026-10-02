@@ -119,11 +119,6 @@ export declare class Reactive implements ReactiveInterface {
      */
     private renderForeach;
     /**
-     * Di chuyển một khối marker-based (openTag ... closeTag) đến trước closeTag của Reactive.
-     * Dùng khi reuse một slot đã có trong DOM nhưng cần thay đổi vị trí (reorder).
-     */
-    private _moveMarkerBlock;
-    /**
      * Xoá các DOM nodes "mồ côi" giữa openTag và closeTag của Reactive.
      * Orphan = nodes không thuộc bất kỳ child nào trong newChildren.
      *

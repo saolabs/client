@@ -444,6 +444,15 @@ export class Router {
         if (!state || state.changed !== true)
             return;
         const vm = this.viewManager ?? this.App?.View;
+        const target = this.activeNavigationUrl || this.currentUri
+            || (typeof window !== 'undefined'
+                ? window.location.pathname + window.location.search + window.location.hash
+                : '/');
+        if (vm?.requiresReloadForViewContext?.(state)) {
+            vm.cancelNavigation?.();
+            this.reloadForViewContext(target, state);
+            return;
+        }
         const applied = vm?.applyViewContext?.(state) ?? false;
         if (!applied)
             return;
@@ -452,9 +461,43 @@ export class Router {
         }
         // If a fetch discovered the change mid-navigation, requestNavigation
         // queues the same target and invalidates the old render generation.
-        const target = this.activeNavigationUrl || this.currentUri;
         if (target)
             this.requestNavigation(target, 'replace');
+    }
+    /**
+     * Switch to a coherent server-rendered document when the view namespace
+     * changes. A short-lived token prevents a bad deployment from reloading the
+     * same URL/revision forever.
+     */
+    reloadForViewContext(target, state) {
+        if (typeof window === 'undefined')
+            return;
+        const url = new URL(target || '/', window.location.href);
+        const revision = typeof state.revision === 'string' ? state.revision : 'unknown';
+        const token = `${revision}:${url.pathname}${url.search}`;
+        const storageKey = 'saola:view-context-reload';
+        const now = Date.now();
+        try {
+            const previousRaw = window.sessionStorage.getItem(storageKey);
+            const previous = previousRaw ? JSON.parse(previousRaw) : null;
+            if (previous?.token === token && typeof previous.at === 'number' && now - previous.at < 15000) {
+                const message = 'Không thể đồng bộ view context sau khi tải lại. Vui lòng kiểm tra revision và asset đã triển khai.';
+                console.error(`[Router] ${message}`, { revision, target: url.href });
+                (this.viewManager ?? this.App?.View)?.showError?.(message, {
+                    revision,
+                    target: url.href,
+                });
+                return;
+            }
+            window.sessionStorage.setItem(storageKey, JSON.stringify({ token, at: now }));
+        }
+        catch {
+            // Storage có thể bị chặn; coherence vẫn quan trọng hơn loop guard.
+        }
+        window.dispatchEvent(new CustomEvent('saola:view-context-reload', {
+            detail: { ...state, target: url.href },
+        }));
+        window.location.replace(url.href);
     }
     /**
      * Full destroy — cleanup everything.

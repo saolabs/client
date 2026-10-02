@@ -105,6 +105,10 @@ export class Output {
         if (this.initMode === InitModes.HYDRATE && this.openTag.parentNode && this.textNode) {
             return;
         }
+        if (this.openTag.parentNode && this.textNode) {
+            this.update();
+            return;
+        }
         if (!this.openTag.parentNode) {
             const parentEl = this.parent?.element;
             if (!parentEl)

@@ -19,6 +19,7 @@ export declare class TextElement implements TextInterface {
     _text: string;
     shouldEscapeHTML: boolean;
     isStarted: boolean;
+    readonly isStatic: boolean;
     domChildren: Node[];
     constructor({ ctx, parent, stateKeys, generateText, isEscapeHTML }: {
         ctx: ViewControllerInterface;
@@ -34,6 +35,7 @@ export declare class TextElement implements TextInterface {
     /** Update text content in-place */
     update(newText: string): void;
     render(): HTMLElement | Text | Comment;
+    replaceStaticText(text: string): void;
     remove(): void;
     /** Registry guard — element đã destroy không được reuse */
     __destroyed__: boolean;

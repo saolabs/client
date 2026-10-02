@@ -59,6 +59,13 @@ export class View {
     emit(event, ...args) {
         return this.__ctrl__.emit(event, ...args);
     }
+    watch(keys, callback, options) {
+        return this.__ctrl__.scope.watch(keys, callback, options);
+    }
+    afterDom(callback) {
+        return this.__ctrl__.afterDom(callback);
+    }
+    get $scope() { return this.__ctrl__.scope; }
     // ─── Convenience Accessors ──────────────────────────────────
     get path() {
         return this.__ctrl__.path;

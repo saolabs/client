@@ -1,3 +1,4 @@
+import { reconcileChildren } from './reconcileChildren.js';
 import { InitModes } from "../contracts/common.js";
 import { generateUUID } from "../helpers/utils.js";
 import { mountChildrenBeforeAnchor } from "../helpers/view.js";
@@ -165,9 +166,18 @@ export class Reactive {
         }
         else {
             // ── Re-render các type khác: clear + factory ──────────────────────
-            this.clearContent();
-            this._renderChildren();
+            const output = this._runFactoryWithCache();
+            const next = output.filter(child => child != null).map(child => typeof child === 'string' || typeof child === 'number' ? document.createTextNode(String(child)) : child);
+            const parent = this.closeTag.parentNode;
+            if (parent)
+                reconcileChildren(parent, this.children, next, this.closeTag);
+            this.children = next;
+            this._cleanOrphanNodes(next);
+            if (this._isStarted)
+                for (const child of next)
+                    child.start?.();
         }
+        this.mounted = true;
     }
     /**
      * Phần render nội bộ: chạy childrenFactory, insert children vào DOM.
@@ -310,73 +320,15 @@ export class Reactive {
                 }
             }
         });
-        // ── Step 4: Reorder DOM ───────────────────────────────────────────────
-        // insertBefore(closeTag) cho từng element mới:
-        //   - Cached elements: DOM MOVE (đã có trong DOM, di chuyển đến vị trí đúng)
-        //   - New elements: chạy render() + insert
-        const trulyNew = [];
-        for (const child of newChildren) {
-            if ('element' in child && child.element) {
-                if (prevChildren.has(child)) {
-                    // Reused — chỉ move DOM
-                    this.insertBeforeClose(child.element);
-                }
-                else {
-                    // New — render + insert
-                    this.insertBeforeClose(child.element);
-                    child.render();
-                    trulyNew.push(child);
-                }
-            }
-            else if ('openTag' in child) {
-                if (prevChildren.has(child)) {
-                    // Reused marker-based: move openTag + closeTag + nội dung giữa
-                    this._moveMarkerBlock(child);
-                }
-                else {
-                    // New marker-based: insert markers, render
-                    this.insertBeforeClose(child.openTag);
-                    this.insertBeforeClose(child.closeTag);
-                    child.render();
-                    trulyNew.push(child);
-                }
-            }
-        }
-        // ── Step 5: Cleanup orphan DOM nodes ──────────────────────────────────
-        // Sau khi reorder, các DOM nodes của items đã destroyed còn "trôi nổi"
-        // giữa openTag và đầu tiên của new children → phải xoá.
-        this._cleanOrphanNodes(newChildren);
-        // ── Step 6: Cập nhật children list ────────────────────────────────────
-        this.children = newChildren;
-        // ── Step 7: Start new elements nếu vùng đang active ──────────────────
-        if (this._isStarted) {
-            for (const child of trulyNew) {
-                if (typeof child.start === 'function') {
-                    child.start();
-                }
-            }
-        }
-    }
-    /**
-     * Di chuyển một khối marker-based (openTag ... closeTag) đến trước closeTag của Reactive.
-     * Dùng khi reuse một slot đã có trong DOM nhưng cần thay đổi vị trí (reorder).
-     */
-    _moveMarkerBlock(child) {
+        const trulyNew = newChildren.filter(child => !prevChildren.has(child));
         const parent = this.closeTag.parentNode;
-        if (!parent)
-            return;
-        // Thu thập tất cả nodes từ child.openTag → child.closeTag (inclusive)
-        const nodes = [];
-        let current = child.openTag;
-        while (current && current !== child.closeTag) {
-            nodes.push(current);
-            current = current.nextSibling;
-        }
-        if (current)
-            nodes.push(current); // closeTag
-        // Move toàn bộ block về vị trí mới (trước this.closeTag)
-        for (const node of nodes) {
-            parent.insertBefore(node, this.closeTag);
+        if (parent)
+            reconcileChildren(parent, this.children, newChildren, this.closeTag, child => cache.refreshedElements.has(child));
+        this._cleanOrphanNodes(newChildren);
+        this.children = newChildren;
+        if (this._isStarted) {
+            for (const child of trulyNew)
+                child.start?.();
         }
     }
     /**

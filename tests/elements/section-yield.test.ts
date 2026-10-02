@@ -141,6 +141,49 @@ describe('Section — head metadata sync (meta:*)', () => {
     // are cleared consistently between tests, not just the DOM.
     beforeEach(() => { SectionManager.resetPageHead(); });
 
+    it('does not reapply cached-page metadata on another route and restores it on return', () => {
+        const cached = mountView(function () {
+            this.section('meta:title', { type: 'static', contentType: 'text' }, () => 'Home');
+            this.section('meta:jsonld:home', { type: 'static', contentType: 'text' }, () => '{"@type":"WebSite","name":"Home"}');
+            return this.wrapper(() => []);
+        });
+        try {
+            activateSections(cached.ctrl);
+            SectionManager.resetPageHead();
+            h = mountView(function () {
+                this.section('meta:title', { type: 'static', contentType: 'text' }, () => 'Workspace');
+                return this.wrapper(() => []);
+            });
+            activateSections(h.ctrl);
+            expect(document.title).toBe('Workspace');
+            expect(document.head.querySelector('script[data-head-id="home"]')).toBeNull();
+            SectionManager.resetPageHead();
+            activateSections(cached.ctrl);
+            expect(document.title).toBe('Home');
+            expect(document.head.querySelectorAll('script[data-head-id="home"]').length).toBe(1);
+        } finally {
+            cached.destroy();
+        }
+    });
+
+    it('refreshes JSON-LD when async data arrives and restores it on a new page mount', async () => {
+        h = mountView(function () {
+            const manager: any = this.states.__;
+            this.section('meta:jsonld:home', { type: 'reactive', contentType: 'text', stateKeys: ['schema'] },
+                () => manager.states['schema'].value);
+            return this.wrapper(() => []);
+        }, { states: { schema: '' } });
+        activateSections(h.ctrl);
+        expect(document.head.querySelector('script[data-head-id="home"]')).toBeNull();
+        h.setState('schema', JSON.stringify({ '@type': 'WebSite', name: 'Home' }));
+        await nextFrame();
+        expect(JSON.parse(document.head.querySelector('script[data-head-id="home"]')!.textContent!).name).toBe('Home');
+        SectionManager.resetPageHead();
+        expect(document.head.querySelector('script[data-head-id="home"]')).toBeNull();
+        activateSections(h.ctrl);
+        expect(document.head.querySelectorAll('script[data-head-id="home"]').length).toBe(1);
+    });
+
     it('pushes meta:title to document.title and meta:description to a <meta> tag', () => {
         h = mountView(function () {
             this.section('meta:title', { type: 'static', contentType: 'text' }, () => 'Page One');

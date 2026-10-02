@@ -21,6 +21,7 @@ export class TextElement {
         this.generateText = generateText;
         this.parent = parent;
         this.statekeys = stateKeys;
+        this.isStatic = stateKeys.length === 0;
         this.shouldEscapeHTML = isEscapeHTML;
         // FIX(baseline#3): KHÔNG escapeHTML khi ghi vào Text node — text node tự an toàn,
         // escape thủ công gây double-escape. shouldEscapeHTML chỉ dùng cho SSR string path.
@@ -59,9 +60,12 @@ export class TextElement {
     }
     render() {
         const text = this.generateText();
-        this._text = text;
-        this.element.textContent = text;
+        this.update(text);
         return this.element;
+    }
+    replaceStaticText(text) {
+        this.generateText = () => text;
+        this.update(text);
     }
     remove() {
         this.element.remove();

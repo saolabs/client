@@ -2,6 +2,7 @@ import type { ViewControllerInterface, ViewType } from "../contracts/ViewControl
 import type { ViewInterface, ViewLifecycleHooks } from "../contracts/ViewInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
 import { ViewController } from "./ViewController.js";
+import type { WatchCallback, WatchOptions } from './ResourceScope.js';
 
 /** Declared View API without the legacy catch-all that would hide misspelled members. */
 type ViewMembers = {
@@ -105,6 +106,16 @@ export class View implements ViewInterface, ViewLifecycleHooks {
     emit(event: string, ...args: any[]): any {
         return this.__ctrl__.emit(event, ...args);
     }
+
+    watch(keys: readonly string[], callback: WatchCallback, options?: WatchOptions): () => void {
+        return this.__ctrl__.scope.watch(keys, callback, options);
+    }
+
+    afterDom(callback: () => void): () => void {
+        return this.__ctrl__.afterDom(callback);
+    }
+
+    get $scope() { return this.__ctrl__.scope; }
 
     // ─── Convenience Accessors ──────────────────────────────────
 

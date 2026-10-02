@@ -17,22 +17,42 @@ describe('dynamic view-context route updates', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals();
+        window.sessionStorage.clear();
         delete (window as any).APP_CONFIGS;
         document.body.innerHTML = '';
     });
 
     it('ViewManager applies a newer revision and ignores duplicates', () => {
         const vm = new ViewManager({} as any);
-        vm.init({ revision: 'rev-old', systemData: { __context__: 'web', __base__: 'web.' } });
+        vm.init({
+            revision: 'rev-old',
+            contextViews: 'web',
+            systemData: { __context__: 'web', __base__: 'web.' },
+        });
 
         expect(vm.applyViewContext({
             revision: 'rev-new',
-            views: 'themes.storefront',
-            systemData: { __context__: 'web', __base__: 'themes.storefront.' },
+            views: 'web',
+            systemData: { __context__: 'web', __base__: 'web.' },
         })).toBe(true);
         expect(vm.getContextRevision()).toBe('rev-new');
-        expect((window as any).APP_CONFIGS.view.systemData.__base__).toBe('themes.storefront.');
+        expect((window as any).APP_CONFIGS.view.systemData.__base__).toBe('web.');
         expect(vm.applyViewContext({ revision: 'rev-new' })).toBe(false);
+    });
+
+    it('ViewManager requires a document reload when the view namespace changes', () => {
+        const vm = new ViewManager({} as any);
+        vm.init({ revision: 'rev-old', contextViews: 'web' });
+
+        expect(vm.requiresReloadForViewContext({
+            revision: 'rev-new',
+            views: 'themes.storefront',
+        })).toBe(true);
+        expect(vm.applyViewContext({
+            revision: 'rev-new',
+            views: 'themes.storefront',
+        })).toBe(false);
+        expect(vm.getContextRevision()).toBe('rev-old');
     });
 
     it('Router atomically replaces routes and retries the active URL', async () => {
@@ -69,6 +89,49 @@ describe('dynamic view-context route updates', () => {
             'push',
         );
         router.destroy();
+    });
+
+    it('Router reloads the target document instead of applying a different namespace', () => {
+        const vm = {
+            requiresReloadForViewContext: vi.fn(() => true),
+            applyViewContext: vi.fn(),
+            cancelNavigation: vi.fn(),
+            getCurrentView: vi.fn(() => null),
+        } as any;
+        const router = new Router();
+        const reload = vi.fn();
+        (router as any).reloadForViewContext = reload;
+        router.setViewManager(vm);
+        router.init({ routes: [{ name: 'home', path: '/', component: 'web.pages.home' }] });
+        router.start(true);
+
+        const state = {
+            context: 'web',
+            revision: 'rev-new',
+            changed: true,
+            views: 'themes.storefront',
+            routes: [{ name: 'home', path: '/', component: 'themes.storefront.pages.home' }],
+        };
+        window.dispatchEvent(new CustomEvent('saola:view-context', { detail: state }));
+
+        expect(vm.cancelNavigation).toHaveBeenCalledOnce();
+        expect(reload).toHaveBeenCalledWith('/', state);
+        expect(vm.applyViewContext).not.toHaveBeenCalled();
+        router.destroy();
+    });
+
+    it('Router stops a repeated reload loop for the same revision and URL', () => {
+        const showError = vi.fn();
+        const router = new Router();
+        router.setViewManager({ showError } as any);
+        window.sessionStorage.setItem('saola:view-context-reload', JSON.stringify({
+            token: 'rev-new:/',
+            at: Date.now(),
+        }));
+
+        (router as any).reloadForViewContext('/', { revision: 'rev-new' });
+
+        expect(showError).toHaveBeenCalledOnce();
     });
 
     it('HttpService sends the revision and publishes a changed context', async () => {
