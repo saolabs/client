@@ -10,5 +10,10 @@ export class HelperServiceProvider extends ServiceProvider {
     register() {
         this.app.set("Helper", new HelperService(this.app), true);
     }
+    boot() {
+        if (HelperServiceProvider.config.i18n)
+            this.app.get("Helper").initTranslations(HelperServiceProvider.config.i18n);
+    }
 }
+HelperServiceProvider.config = {};
 //# sourceMappingURL=HelperServiceProvider.js.map

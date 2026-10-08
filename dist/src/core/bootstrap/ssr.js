@@ -55,6 +55,8 @@ export function readBootConfig() {
     if (!cfg || typeof cfg !== 'object')
         return null;
     const out = {};
+    if (cfg.i18n && typeof cfg.i18n === "object")
+        out.i18n = cfg.i18n;
     // view.systemData (server: __layout__/__base__/__page__/...) PHẢI tới được
     // ViewManager: compiled factory destructure `__layout__` từ systemData để
     // resolve superView (`${__layout__+"base"}`). Thiếu → 'undefinedbase' →
@@ -63,6 +65,12 @@ export function readBootConfig() {
     if (typeof cfg.container === 'string') {
         view.container = cfg.container;
     }
+    if (typeof cfg.view?.dataEndpoint === 'string')
+        view.dataEndpoint = cfg.view.dataEndpoint;
+    if (cfg.view?.fetchOptions && typeof cfg.view.fetchOptions === 'object')
+        view.fetchOptions = cfg.view.fetchOptions;
+    if (cfg.api && typeof cfg.api === 'object')
+        out.api = cfg.api;
     if (cfg.view?.systemData && typeof cfg.view.systemData === 'object') {
         view.systemData = cfg.view.systemData;
     }
@@ -88,6 +96,7 @@ export function readBootConfig() {
         out.router = {
             mode: cfg.router?.mode ?? 'history',
             base: cfg.router?.base,
+            defaultRoute: cfg.router?.defaultRoute,
             routes,
         };
     }

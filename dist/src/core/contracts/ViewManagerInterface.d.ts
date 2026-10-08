@@ -26,6 +26,8 @@ export interface ViewManagerInterface {
         systemData?: Record<string, any>;
         revision?: string;
         contextViews?: string;
+        dataEndpoint?: string;
+        fetchOptions?: Record<string, any>;
     }): void;
     /** Apply a newer server-authoritative view context. Returns true when changed. */
     applyViewContext?(state: Record<string, any>): boolean;

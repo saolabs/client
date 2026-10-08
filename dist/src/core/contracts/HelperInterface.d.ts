@@ -46,6 +46,14 @@ export interface CollectionProxyInterface {
     toString(): string;
 }
 export interface HelperInterface {
+    initTranslations(config: import('../services/TranslationService.js').TranslationConfig): void;
+    getLocale(): string;
+    setLocale(locale: string): void;
+    __(key: string, replace?: Record<string, any>, locale?: string): string;
+    trans(key: string, replace?: Record<string, any>, locale?: string): string;
+    lang(key: string, replace?: Record<string, any>, locale?: string): string;
+    choice(key: string, count: number, replace?: Record<string, any>, locale?: string): string;
+    trans_choice(key: string, count: number, replace?: Record<string, any>, locale?: string): string;
     [key: string]: any;
     app<T>(): T;
     app<T>(key: string): T;

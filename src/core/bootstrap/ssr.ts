@@ -63,6 +63,7 @@ export function readBootConfig(): Record<string, any> | null {
     if (!cfg || typeof cfg !== 'object') return null;
 
     const out: Record<string, any> = {};
+    if (cfg.i18n && typeof cfg.i18n === "object") out.i18n = cfg.i18n;
 
     // view.systemData (server: __layout__/__base__/__page__/...) PHẢI tới được
     // ViewManager: compiled factory destructure `__layout__` từ systemData để
@@ -72,6 +73,10 @@ export function readBootConfig(): Record<string, any> | null {
     if (typeof cfg.container === 'string') {
         view.container = cfg.container;
     }
+    if (typeof cfg.view?.dataEndpoint === 'string') view.dataEndpoint = cfg.view.dataEndpoint;
+    if (cfg.view?.fetchOptions && typeof cfg.view.fetchOptions === 'object') view.fetchOptions = cfg.view.fetchOptions;
+    if (cfg.api && typeof cfg.api === 'object') out.api = cfg.api;
+
     if (cfg.view?.systemData && typeof cfg.view.systemData === 'object') {
         view.systemData = cfg.view.systemData;
     }
@@ -99,6 +104,7 @@ export function readBootConfig(): Record<string, any> | null {
         out.router = {
             mode: cfg.router?.mode ?? 'history',
             base: cfg.router?.base,
+            defaultRoute: cfg.router?.defaultRoute,
             routes,
         };
     }

@@ -122,6 +122,9 @@ export class ViewManager implements ViewManagerInterface {
      * tiên → hydrateView; các route sau là CSR (SPA takeover).
      */
     private ssrBoot: SSRBootInfo | null = null;
+    /** Standalone SPA: Laravel data requests may live on a different host. */
+    private dataEndpoint: string | null = null;
+    private fetchOptions: Record<string, any> = {};
 
     /** Exact Page/Layout instance relationships exported by Blade for hydration. */
     private ssrViewData: Record<string, any> = {};
@@ -266,7 +269,9 @@ export class ViewManager implements ViewManagerInterface {
     /**
      * Initialize the ViewManager.
      */
-    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; ssr?: SSRBootInfo | null; systemData?: Record<string, any>; ssrData?: Record<string, any>; revision?: string; contextViews?: string }): void {
+    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; ssr?: SSRBootInfo | null; systemData?: Record<string, any>; ssrData?: Record<string, any>; revision?: string; contextViews?: string; dataEndpoint?: string; fetchOptions?: Record<string, any> }): void {
+        if (typeof config?.dataEndpoint === 'string') this.dataEndpoint = config.dataEndpoint;
+        if (config?.fetchOptions) this.fetchOptions = { ...config.fetchOptions };
         // SSR boot info (server-rendered): chứa view entry + viewId để route đầu
         // tiên gọi hydrateView thay vì mountView. Xem RUNTIME_CONTRACT §6 (boot).
         if (config?.ssr && config.ssr.view && config.ssr.viewId) {
@@ -797,7 +802,7 @@ export class ViewManager implements ViewManagerInterface {
             const App = app() as ApplicationInterface;
             const Http = App.Http;
             const fetchConfig = config.fetch;
-            const fetchUrl = (config.hasAwaitData && fetchConfig?.url) ? fetchConfig?.url : App.Router.getFullUrl();
+            const fetchUrl = (config.hasAwaitData && fetchConfig?.url) ? fetchConfig.url : resolveViewDataUrl(App.Router.getFullUrl(), this.dataEndpoint);
 
             // ── Case 2: Có async + có prerender → prerender skeleton trước, fetch sau ──
             if (config.hasPrerender) {
@@ -812,7 +817,7 @@ export class ViewManager implements ViewManagerInterface {
 
                 // Fire-and-forget: fetch data → re-render → swap skeleton → main
                 this.pendingAsyncRenders++;
-                Http.get(fetchUrl).then(async (response: any) => {
+                Http.get(fetchUrl, this.fetchOptions).then(async (response: any) => {
                     // Route mới hoặc manager teardown đã bắt đầu: tuyệt đối không
                     // render/mount kết quả cũ trở lại root DOM.
                     if (renderGeneration !== this.navigationGeneration
@@ -891,7 +896,7 @@ export class ViewManager implements ViewManagerInterface {
             // ── Case 3: Có async + không prerender → await fetch rồi render ──
             let asyncData: Record<string, any> = {};
             try {
-                const response = await Http.get(fetchUrl);
+                const response = await Http.get(fetchUrl, this.fetchOptions);
                 asyncData = this.extractAsyncData(response);
             } catch (err) {
                 if (!this.isNavigationCurrent(navigationGeneration)) {
@@ -941,7 +946,21 @@ export class ViewManager implements ViewManagerInterface {
      *   - layout KHÔNG đổi → không hook nào fire trên layout (giữ nguyên DOM + subscription)
      *   - layout đổi/về standalone → destroy layout chain
      */
+    private localeInvalidated = false;
+
+    invalidateLocale(): void {
+        this.cancelNavigation();
+        this.localeInvalidated = true;
+        this.pageCache.clear();
+    }
+
     async mountView(name: string, data?: Record<string, any>, route?: ActiveRouteInterface, navigationType: RouterNavigationType = 'push'): Promise<any> {
+        if (this.localeInvalidated) {
+            this.unmountAll();
+            this.store.clear();
+            this.ssrBoot = null;
+            this.localeInvalidated = false;
+        }
         // Request URI = path + query (KHÔNG hash) — Router cung cấp qua $uri
         const targetUrl = (route as any)?.$uri ?? route?.$urlPath ?? name;
 
@@ -1745,4 +1764,11 @@ export class ViewManager implements ViewManagerInterface {
     }
 
 
+}
+
+/** Remap only implicit page-data requests; explicit @await URLs keep their meaning. */
+export function resolveViewDataUrl(routeUrl: string, dataEndpoint?: string | null): string {
+    if (!dataEndpoint) return routeUrl;
+    const route = new URL(routeUrl, typeof window !== 'undefined' ? window.location.href : 'http://localhost');
+    return dataEndpoint.replace(/\/+$/, '') + route.pathname + route.search;
 }

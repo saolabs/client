@@ -47,7 +47,14 @@ export class ApiClient implements APIClientInterface {
     }
 
     init(config: Record<string, any>): void {
-        // Placeholder for any future initialization logic
+        if (typeof config.baseUrl === 'string') this.http.setBaseUrl(config.baseUrl);
+        if (typeof config.timeout === 'number') this.http.setTimeout(config.timeout);
+        for (const [name, value] of Object.entries(config.headers || {})) {
+            this.http.setHeader(name, String(value));
+        }
+        if (config.endpoints && typeof config.endpoints === 'object') {
+            this.endpoints = { ...this.endpoints, ...config.endpoints };
+        }
     }
 
     /**

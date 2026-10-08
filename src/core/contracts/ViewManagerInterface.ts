@@ -25,7 +25,7 @@ export interface ViewManagerInterface {
     /** Register a single view module */
     registerView(name: string, loader: ((...args: any[]) => any) | (() => Promise<any>)): void;
     /** Initialize with optional config */
-    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; systemData?: Record<string, any>; revision?: string; contextViews?: string }): void;
+    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; systemData?: Record<string, any>; revision?: string; contextViews?: string; dataEndpoint?: string; fetchOptions?: Record<string, any> }): void;
     /** Apply a newer server-authoritative view context. Returns true when changed. */
     applyViewContext?(state: Record<string, any>): boolean;
     /** A changed view namespace needs a full document load before it can be applied safely. */

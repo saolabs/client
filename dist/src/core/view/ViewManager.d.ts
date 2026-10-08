@@ -92,6 +92,9 @@ export declare class ViewManager implements ViewManagerInterface {
      * tiên → hydrateView; các route sau là CSR (SPA takeover).
      */
     private ssrBoot;
+    /** Standalone SPA: Laravel data requests may live on a different host. */
+    private dataEndpoint;
+    private fetchOptions;
     /** Exact Page/Layout instance relationships exported by Blade for hydration. */
     private ssrViewData;
     /** Current layout view info — reused if same layout */
@@ -171,6 +174,8 @@ export declare class ViewManager implements ViewManagerInterface {
         ssrData?: Record<string, any>;
         revision?: string;
         contextViews?: string;
+        dataEndpoint?: string;
+        fetchOptions?: Record<string, any>;
     }): void;
     /**
      * Phương án CUỐI khi không error boundary nào xử lý (xem ViewController.onError):
@@ -272,6 +277,8 @@ export declare class ViewManager implements ViewManagerInterface {
      *   - layout KHÔNG đổi → không hook nào fire trên layout (giữ nguyên DOM + subscription)
      *   - layout đổi/về standalone → destroy layout chain
      */
+    private localeInvalidated;
+    invalidateLocale(): void;
     mountView(name: string, data?: Record<string, any>, route?: ActiveRouteInterface, navigationType?: RouterNavigationType): Promise<any>;
     /** Commit the successfully mounted/hydrated chain as the only active route state. */
     private commitActiveChain;
@@ -419,5 +426,7 @@ export declare class ViewManager implements ViewManagerInterface {
     getViewStack(): ViewInterface[];
     isInitialized(): boolean;
 }
+/** Remap only implicit page-data requests; explicit @await URLs keep their meaning. */
+export declare function resolveViewDataUrl(routeUrl: string, dataEndpoint?: string | null): string;
 export {};
 //# sourceMappingURL=ViewManager.d.ts.map

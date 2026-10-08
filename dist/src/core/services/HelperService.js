@@ -1,3 +1,4 @@
+import { TranslationService } from './TranslationService.js';
 import { app } from "../helpers/app.js";
 /**
  * HelperService — PHP-compatible helper functions for SaoView runtime.
@@ -35,6 +36,7 @@ import { app } from "../helpers/app.js";
 export class HelperService {
     constructor(App) {
         this.App = null;
+        this.translations = new TranslationService();
         this.config = {};
         if (App)
             this.App = App;
@@ -50,6 +52,34 @@ export class HelperService {
     }
     setConfig(config) {
         this.config = { ...this.config, ...config };
+    }
+    initTranslations(config) {
+        this.translations.init(config);
+        this.syncLocale();
+    }
+    getLocale() { return this.translations.locale; }
+    __(key, replace = {}, locale) { return this.translations.trans(key, replace, locale); }
+    trans(key, replace = {}, locale) { return this.__(key, replace, locale); }
+    lang(key, replace = {}, locale) { return this.__(key, replace, locale); }
+    choice(key, count, replace = {}, locale) { return this.translations.choice(key, count, replace, locale); }
+    trans_choice(key, count, replace = {}, locale) { return this.choice(key, count, replace, locale); }
+    setLocale(locale) {
+        if (!this.translations.setLocale(locale))
+            return;
+        this.syncLocale();
+        this.App?.View?.invalidateLocale?.();
+        const route = this.App?.Router?.getCurrentRoute?.();
+        if (route)
+            this.App.Router.replace(route.$uri + (route.$fragment ? '#' + route.$fragment : ''));
+        if (typeof document !== 'undefined')
+            document.dispatchEvent(new CustomEvent('saola:locale-change', { detail: { locale } }));
+    }
+    syncLocale() {
+        const locale = this.getLocale();
+        if (typeof document !== 'undefined')
+            document.documentElement.lang = locale;
+        this.App?.Http?.setHeader?.('Accept-Language', locale);
+        this.App?.API?.getHttpService?.()?.setHeader?.('Accept-Language', locale);
     }
     // ─── Execution ──────────────────────────────────────────────
     /** Execute a function safely, return result or empty string on error */

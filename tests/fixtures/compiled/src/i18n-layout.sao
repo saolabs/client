@@ -1,0 +1,5 @@
+@viewtype('layout')
+<header id="translated-header">@lang('messages.title')</header>
+<main>
+@useBlock('content')
+</main>

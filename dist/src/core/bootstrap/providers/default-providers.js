@@ -77,6 +77,7 @@ export function buildDefaultProviders(config = {}) {
     // Set static config cho default providers trước khi tạo instance
     ViewServiceProvider.config = config.view || {};
     RouteServiceProvider.config = config.router || {};
+    HelperServiceProvider.config = { i18n: config.i18n };
     ApiServiceProvider.config = config.api || {};
     const App = app();
     const defaults = [

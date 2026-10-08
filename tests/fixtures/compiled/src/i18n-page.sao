@@ -1,0 +1,7 @@
+@extends('fixtures.i18n-layout')
+@block('content')
+<p id="translated-page">{{ __('messages.welcome', ['name' => 'Lan']) }}</p>
+<p id="translated-count">
+@choice('messages.apples', 2)
+</p>
+@endblock

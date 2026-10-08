@@ -65,6 +65,9 @@ export class ViewManager {
          * tiên → hydrateView; các route sau là CSR (SPA takeover).
          */
         this.ssrBoot = null;
+        /** Standalone SPA: Laravel data requests may live on a different host. */
+        this.dataEndpoint = null;
+        this.fetchOptions = {};
         /** Exact Page/Layout instance relationships exported by Blade for hydration. */
         this.ssrViewData = {};
         /** Current layout view info — reused if same layout */
@@ -102,6 +105,21 @@ export class ViewManager {
         this.viewSeq = 0;
         /** Factory đã unwrap của các view lazy — tránh await + unwrap lại mỗi lần navigate. */
         this.resolvedFactories = new Map();
+        // ─── Mount Orchestration ────────────────────────────────────
+        /**
+         * Mount view khi navigate — luồng chuẩn (ROUTE_RENDER_FLOW.md):
+         *   sweep TTL → duplicate guard → pause+cache trang cũ (standalone LẪN
+         *   page thuộc layout) → thử restore từ PageCache (theo view name + URI,
+         *   trong TTL, mọi navigation type) → mount mới
+         *   (render → mount DOM → commitData → start).
+         *
+         * Lifecycle khi RỜI trang (deactivatePage):
+         *   - page cacheable  → pause (pausing/paused) + detach DOM → PageCache
+         *   - page cache:false → destroy (stopping/stopped → unmounting/unmounted → destroyed)
+         *   - layout KHÔNG đổi → không hook nào fire trên layout (giữ nguyên DOM + subscription)
+         *   - layout đổi/về standalone → destroy layout chain
+         */
+        this.localeInvalidated = false;
         // ─── PageCache integration ──────────────────────────────────
         /** bfcache-style cache cho trang đã ghé (ROUTE_RENDER_FLOW.md §8) */
         this.pageCache = new PageCacheService();
@@ -197,6 +215,10 @@ export class ViewManager {
      * Initialize the ViewManager.
      */
     init(config) {
+        if (typeof config?.dataEndpoint === 'string')
+            this.dataEndpoint = config.dataEndpoint;
+        if (config?.fetchOptions)
+            this.fetchOptions = { ...config.fetchOptions };
         // SSR boot info (server-rendered): chứa view entry + viewId để route đầu
         // tiên gọi hydrateView thay vì mountView. Xem RUNTIME_CONTRACT §6 (boot).
         if (config?.ssr && config.ssr.view && config.ssr.viewId) {
@@ -635,7 +657,7 @@ export class ViewManager {
             const App = app();
             const Http = App.Http;
             const fetchConfig = config.fetch;
-            const fetchUrl = (config.hasAwaitData && fetchConfig?.url) ? fetchConfig?.url : App.Router.getFullUrl();
+            const fetchUrl = (config.hasAwaitData && fetchConfig?.url) ? fetchConfig.url : resolveViewDataUrl(App.Router.getFullUrl(), this.dataEndpoint);
             // ── Case 2: Có async + có prerender → prerender skeleton trước, fetch sau ──
             if (config.hasPrerender) {
                 const renderGeneration = navigationGeneration;
@@ -649,7 +671,7 @@ export class ViewManager {
                 }
                 // Fire-and-forget: fetch data → re-render → swap skeleton → main
                 this.pendingAsyncRenders++;
-                Http.get(fetchUrl).then(async (response) => {
+                Http.get(fetchUrl, this.fetchOptions).then(async (response) => {
                     // Route mới hoặc manager teardown đã bắt đầu: tuyệt đối không
                     // render/mount kết quả cũ trở lại root DOM.
                     if (renderGeneration !== this.navigationGeneration
@@ -726,7 +748,7 @@ export class ViewManager {
             // ── Case 3: Có async + không prerender → await fetch rồi render ──
             let asyncData = {};
             try {
-                const response = await Http.get(fetchUrl);
+                const response = await Http.get(fetchUrl, this.fetchOptions);
                 asyncData = this.extractAsyncData(response);
             }
             catch (err) {
@@ -750,21 +772,18 @@ export class ViewManager {
             return this.createRenderPageViewError(view, renderLevel, `Error rendering view "${view.__ctrl__.path}".`);
         }
     }
-    // ─── Mount Orchestration ────────────────────────────────────
-    /**
-     * Mount view khi navigate — luồng chuẩn (ROUTE_RENDER_FLOW.md):
-     *   sweep TTL → duplicate guard → pause+cache trang cũ (standalone LẪN
-     *   page thuộc layout) → thử restore từ PageCache (theo view name + URI,
-     *   trong TTL, mọi navigation type) → mount mới
-     *   (render → mount DOM → commitData → start).
-     *
-     * Lifecycle khi RỜI trang (deactivatePage):
-     *   - page cacheable  → pause (pausing/paused) + detach DOM → PageCache
-     *   - page cache:false → destroy (stopping/stopped → unmounting/unmounted → destroyed)
-     *   - layout KHÔNG đổi → không hook nào fire trên layout (giữ nguyên DOM + subscription)
-     *   - layout đổi/về standalone → destroy layout chain
-     */
+    invalidateLocale() {
+        this.cancelNavigation();
+        this.localeInvalidated = true;
+        this.pageCache.clear();
+    }
     async mountView(name, data, route, navigationType = 'push') {
+        if (this.localeInvalidated) {
+            this.unmountAll();
+            this.store.clear();
+            this.ssrBoot = null;
+            this.localeInvalidated = false;
+        }
         // Request URI = path + query (KHÔNG hash) — Router cung cấp qua $uri
         const targetUrl = route?.$uri ?? route?.$urlPath ?? name;
         // ── Phase 0: TTL sweep + duplicate guard ──
@@ -1476,5 +1495,12 @@ export class ViewManager {
     isInitialized() {
         return this._isInitialized;
     }
+}
+/** Remap only implicit page-data requests; explicit @await URLs keep their meaning. */
+export function resolveViewDataUrl(routeUrl, dataEndpoint) {
+    if (!dataEndpoint)
+        return routeUrl;
+    const route = new URL(routeUrl, typeof window !== 'undefined' ? window.location.href : 'http://localhost');
+    return dataEndpoint.replace(/\/+$/, '') + route.pathname + route.search;
 }
 //# sourceMappingURL=ViewManager.js.map

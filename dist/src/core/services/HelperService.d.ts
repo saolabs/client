@@ -1,3 +1,4 @@
+import { type TranslationConfig } from './TranslationService.js';
 import { CollectionProxyInterface, HelperInterface } from "../contracts/HelperInterface.js";
 import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
 /**
@@ -35,12 +36,22 @@ import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
  */
 export declare class HelperService implements HelperInterface {
     App: any;
+    private translations;
     private config;
     constructor(App?: any);
     app<T = any>(key?: any, value?: any): T | ApplicationInterface;
     make<T>(name: string, defaultValue?: T): T | undefined;
     setApp(App: any): void;
     setConfig(config: Record<string, any>): void;
+    initTranslations(config: TranslationConfig): void;
+    getLocale(): string;
+    __(key: string, replace?: Record<string, any>, locale?: string): string;
+    trans(key: string, replace?: Record<string, any>, locale?: string): string;
+    lang(key: string, replace?: Record<string, any>, locale?: string): string;
+    choice(key: string, count: number, replace?: Record<string, any>, locale?: string): string;
+    trans_choice(key: string, count: number, replace?: Record<string, any>, locale?: string): string;
+    setLocale(locale: string): void;
+    private syncLocale;
     /** Execute a function safely, return result or empty string on error */
     execute<T>(fn: () => T): T;
     /** Alias for execute with arguments */

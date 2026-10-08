@@ -1,3 +1,4 @@
+import { TranslationService, type TranslationConfig } from './TranslationService.js';
 import { CollectionProxyInterface, HelperInterface } from "../contracts/HelperInterface.js";
 import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
 import { app } from "../helpers/app.js";
@@ -37,6 +38,7 @@ import { app } from "../helpers/app.js";
  */
 export class HelperService implements HelperInterface {
     public App: any = null;
+    private translations = new TranslationService();
     private config: Record<string, any> = {};
 
     constructor(App?: any) {
@@ -58,6 +60,34 @@ export class HelperService implements HelperInterface {
 
     setConfig(config: Record<string, any>): void {
         this.config = { ...this.config, ...config };
+    }
+
+    initTranslations(config: TranslationConfig): void {
+        this.translations.init(config);
+        this.syncLocale();
+    }
+
+    getLocale(): string { return this.translations.locale; }
+    __(key: string, replace: Record<string, any> = {}, locale?: string): string { return this.translations.trans(key, replace, locale); }
+    trans(key: string, replace: Record<string, any> = {}, locale?: string): string { return this.__(key, replace, locale); }
+    lang(key: string, replace: Record<string, any> = {}, locale?: string): string { return this.__(key, replace, locale); }
+    choice(key: string, count: number, replace: Record<string, any> = {}, locale?: string): string { return this.translations.choice(key, count, replace, locale); }
+    trans_choice(key: string, count: number, replace: Record<string, any> = {}, locale?: string): string { return this.choice(key, count, replace, locale); }
+
+    setLocale(locale: string): void {
+        if (!this.translations.setLocale(locale)) return;
+        this.syncLocale();
+        this.App?.View?.invalidateLocale?.();
+        const route = this.App?.Router?.getCurrentRoute?.();
+        if (route) this.App.Router.replace(route.$uri + (route.$fragment ? '#' + route.$fragment : ''));
+        if (typeof document !== 'undefined') document.dispatchEvent(new CustomEvent('saola:locale-change', { detail: { locale } }));
+    }
+
+    private syncLocale(): void {
+        const locale = this.getLocale();
+        if (typeof document !== 'undefined') document.documentElement.lang = locale;
+        this.App?.Http?.setHeader?.('Accept-Language', locale);
+        this.App?.API?.getHttpService?.()?.setHeader?.('Accept-Language', locale);
     }
 
     // ─── Execution ──────────────────────────────────────────────
