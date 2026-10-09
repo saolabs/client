@@ -1,6 +1,6 @@
 {
   "name": "@saolabs/client",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Saola Client - Modern TypeScript Framework for Laravel. Reactive SPAs with TypeScript-first approach.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
