@@ -64,6 +64,10 @@ App.setMethod('init', function (config: Record<string, any> = {}) {
         return;
     }
 
+    if (config.shared && typeof config.shared === 'object') {
+        App.set<Record<string, any>>('SharedData', { ...config.shared });
+    }
+
     const providers = resolveProviderOrder(buildDefaultProviders(config));
     for (const provider of providers) {
         App.register(provider);
