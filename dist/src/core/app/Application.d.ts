@@ -156,6 +156,14 @@ export declare class Application implements ApplicationInterface {
     getSingletons(): Map<ServiceKey, any>;
     set<T = any>(name: any, value: T, isOne?: boolean): void;
     get<T = any>(name: any): T;
+    /**
+     * Dữ liệu package PHP chia sẻ cho client theo từng request (`Saola::share()`
+     * → `APP_CONFIGS.shared` → `App.init({ shared })`). Helper JS của package đọc
+     * ở đây thay vì tự đọc `window`, để test truyền được qua config.
+     *
+     * @example App.shared('permission', { routes: [] }).routes
+     */
+    shared<T = any>(key?: string, fallback?: T): T;
     setMethod(name: string, method: Function, isOne?: boolean): void;
 }
 //# sourceMappingURL=Application.d.ts.map

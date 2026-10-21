@@ -57,6 +57,9 @@ App.setMethod('init', function (config = {}) {
         console.warn('[Bootstrap] App already initialized.');
         return;
     }
+    if (config.shared && typeof config.shared === 'object') {
+        App.set('SharedData', { ...config.shared });
+    }
     const providers = resolveProviderOrder(buildDefaultProviders(config));
     for (const provider of providers) {
         App.register(provider);

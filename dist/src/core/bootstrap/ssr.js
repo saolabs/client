@@ -88,6 +88,10 @@ export function readBootConfig() {
     }
     // Danh sách bundle nạp rời (theme…) — server là chỗ DUY NHẤT biết theme nào
     // đang bật, nên client không đoán đường dẫn. Xem EXTENSION_ARCHITECTURE §8.
+    // Dữ liệu package chia sẻ cho client (Saola::share phía PHP), đọc qua App.shared().
+    if (cfg.shared && typeof cfg.shared === 'object' && !Array.isArray(cfg.shared)) {
+        out.shared = cfg.shared;
+    }
     if (Array.isArray(cfg.bundles)) {
         out.bundles = cfg.bundles.filter((u) => typeof u === 'string' && u !== '');
     }

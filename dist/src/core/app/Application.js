@@ -64,6 +64,7 @@ export class Application {
             'destroy',
             'getBindings',
             'getSingletons',
+            'shared',
             '__store',
         ]; // Để track dynamic properties nếu cần
         this.__store = new Map(); // Store cho dynamic properties nếu cần
@@ -331,6 +332,19 @@ export class Application {
             return this.resolve(name);
         }
         return undefined;
+    }
+    /**
+     * Dữ liệu package PHP chia sẻ cho client theo từng request (`Saola::share()`
+     * → `APP_CONFIGS.shared` → `App.init({ shared })`). Helper JS của package đọc
+     * ở đây thay vì tự đọc `window`, để test truyền được qua config.
+     *
+     * @example App.shared('permission', { routes: [] }).routes
+     */
+    shared(key, fallback) {
+        const all = (this.__store.get('SharedData')?.value ?? {});
+        if (key === undefined)
+            return all;
+        return (Object.prototype.hasOwnProperty.call(all, key) ? all[key] : fallback);
     }
     setMethod(name, method, isOne = false) {
         if (this.ownProperties.includes(name)) {

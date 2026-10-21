@@ -27,6 +27,8 @@ export interface ApplicationInterface {
     set<T = any>(name: string, method: T, isOne?: boolean): void;
     setMethod(name: string, method: Function, isOne?: boolean): void;
     get<T = any>(name: string): T;
+    /** Dữ liệu package PHP chia sẻ (`APP_CONFIGS.shared`); không có khoá thì trả `fallback`. */
+    shared<T = any>(key?: string, fallback?: T): T;
     saoType?: SaoObjectType;
     isInitialized: boolean;
     isStarted: boolean;
