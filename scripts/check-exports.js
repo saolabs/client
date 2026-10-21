@@ -13,7 +13,9 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'saola-consumer-'));
 const run = (cmd, args, cwd = temp) => execFileSync(cmd, args, {
     cwd, timeout: 30000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, npm_config_cache: path.join(temp, 'npm-cache'), npm_config_update_notifier: 'false', npm_config_offline: 'true' },
+    // `npm publish --dry-run` exports npm_config_dry_run=true to prepublishOnly; inherited here it
+    // makes the inner `npm pack` write no tarball, so the dry-run could never pass.
+    env: { ...process.env, npm_config_dry_run: 'false', npm_config_cache: path.join(temp, 'npm-cache'), npm_config_update_notifier: 'false', npm_config_offline: 'true' },
 });
 
 try {
