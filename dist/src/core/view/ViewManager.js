@@ -706,6 +706,11 @@ export class ViewManager {
                         commitView(ctrl);
                         this.blockManager.startAll();
                         this.sectionManager.startAll();
+                        // Lúc mount, prerender chưa đăng ký block nào nên start() của page
+                        // thoát sớm (không _rootTree, blocks rỗng) → page kẹt ở 'created',
+                        // pause/resume bị bỏ qua và hook `resumed` không bao giờ chạy.
+                        // Giờ block thật đã có: kích hoạt page (start() idempotent).
+                        activateView(ctrl);
                         logger.info(`[ViewManager] prerender → main swap done for "${ctrl.path}" (block content)`);
                         return;
                     }
