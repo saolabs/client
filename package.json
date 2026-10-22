@@ -1,6 +1,6 @@
 {
   "name": "@saolabs/client",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Saola Client - Modern TypeScript Framework for Laravel. Reactive SPAs with TypeScript-first approach.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -27,12 +27,12 @@
     "index.ts",
     "plugins.ts"
   ],
-    "scripts": {
-        "build": "tsc",
-        "dev": "tsc --watch",
-        "clean": "rm -rf dist",
-        "check": "npm ci --dry-run --ignore-scripts && npm audit && npm run typecheck && npm test && npm run check-exports",
-        "check-exports": "node scripts/check-exports.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "check": "npm ci --dry-run --ignore-scripts && npm audit && npm run typecheck && npm test && npm run check-exports",
+    "check-exports": "node scripts/check-exports.js",
     "prepublishOnly": "npm run clean && npm run build && npm run check-exports",
     "publish-dry-run": "npm publish --dry-run",
     "test": "vitest run",
@@ -66,8 +66,8 @@
     "typescript": "^5.0.0",
     "vitest": "^4.1.11"
   },
-    "engines": {
-        "node": "^20.0.0 || ^22.0.0 || >=24.0.0"
+  "engines": {
+    "node": "^20.0.0 || ^22.0.0 || >=24.0.0"
   },
   "directories": {
     "doc": "docs"
