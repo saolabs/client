@@ -149,6 +149,10 @@ export type ViewConfig = {
     renderLongSections?: Record<string, any>;
     renderSections?: Record<string, any>;
     prerenderSections?: Record<string, any>;
+    /** Từ `@cache(...)`: false hoặc { ttl: 0 } = không giữ trang trong PageCache; { ttl } = thời hạn riêng (ms). */
+    cache?: boolean | {
+        ttl: number;
+    };
     [key: string]: any;
 };
 export type ViewRuntimeConfig = {
