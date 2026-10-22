@@ -136,6 +136,10 @@ export class Output implements OutputInterface {
         // Chỉ cần đảm bảo markers có mặt và text đồng bộ với state hiện tại.
         // Không tạo thêm node, không clear — giữ nguyên DOM server-rendered.
         if (this.initMode === InitModes.HYDRATE && this.openTag.parentNode && this.textNode) {
+            // Chỉ lần claim đầu giữ nguyên text server. Sau đó chuyển CREATE như Html/Reactive:
+            // Output trong hàng @foreach có stateKeys rỗng, chỉ được làm mới qua render()
+            // khi reconcile gán contentFactory mới — kẹt ở HYDRATE thì hàng giữ key hiện dữ liệu cũ mãi.
+            this.initMode = InitModes.CREATE;
             return;
         }
 
