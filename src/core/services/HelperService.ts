@@ -39,6 +39,7 @@ import { app } from "../helpers/app.js";
 export class HelperService implements HelperInterface {
     public App: any = null;
     private translations = new TranslationService();
+    private languageChangeSequence = 0;
     private config: Record<string, any> = {};
 
     constructor(App?: any) {
@@ -63,11 +64,45 @@ export class HelperService implements HelperInterface {
     }
 
     initTranslations(config: TranslationConfig): void {
+        this.languageChangeSequence++;
         this.translations.init(config);
         this.syncLocale();
     }
 
     getLocale(): string { return this.translations.locale; }
+    getLanguageScope(): string | undefined { return this.translations.getScope(); }
+    applyLanguageConfig(config: TranslationConfig): void {
+        if (!config.scope || config.scope !== this.getLanguageScope()) {
+            this.initTranslations(config);
+            return;
+        }
+        // Page-data refreshes revisions without resetting the chosen locale.
+        this.translations.refresh(config);
+    }
+    text(key: string, replace: Record<string, any> | string | null = {}, defaultValue: string | null = null, locale?: string): string {
+        if (typeof replace === 'string' && defaultValue === null) defaultValue = replace;
+        return this.translations.text(key, replace && typeof replace === 'object' ? replace : {}, defaultValue, locale);
+    }
+    installLanguage(locale: string, snapshot: import('./TranslationService.js').LanguageSnapshot): boolean {
+        return this.translations.install(locale, snapshot);
+    }
+    async loadLanguage(locale: string, load: (locale: string) => Promise<import('./TranslationService.js').LanguageSnapshot>): Promise<boolean> {
+        return this.installLanguage(locale, await load(locale));
+    }
+    async changeLanguage(
+        locale: string,
+        load: (locale: string) => Promise<import('./TranslationService.js').LanguageSnapshot>,
+        canLeave: () => boolean | Promise<boolean> = () => true,
+    ): Promise<boolean> {
+        const sequence = ++this.languageChangeSequence;
+        if (!await canLeave() || sequence !== this.languageChangeSequence) return false;
+        const snapshot = await load(locale);
+        if (sequence !== this.languageChangeSequence || !await canLeave()) return false;
+        if (sequence !== this.languageChangeSequence) return false;
+        this.installLanguage(locale, snapshot);
+        this.setLocale(locale);
+        return true;
+    }
     __(key: string, replace: Record<string, any> = {}, locale?: string): string { return this.translations.trans(key, replace, locale); }
     trans(key: string, replace: Record<string, any> = {}, locale?: string): string { return this.__(key, replace, locale); }
     lang(key: string, replace: Record<string, any> = {}, locale?: string): string { return this.__(key, replace, locale); }

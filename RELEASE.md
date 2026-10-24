@@ -1,15 +1,7 @@
-# Saola Client v1.0.2
+# Saola Client v1.3.0
 
-TypeScript reactive SPA runtime with hydration, routing, helpers, bundled translations, and standalone API configuration. Includes runtime, plugins and testing exports.
+Adds scoped versioned DB language snapshots, text(), runtime load/changeLanguage with asynchronous guards and stale-request cancellation. Page-data refreshes the active catalog before rendering. Router.addNavigationGuard returns an independent disposer and restores history/hash URLs when Back is canceled.
 
-## Compatibility
+Legacy trans()/choice()/__ and Laravel-style dictionary data remain supported. Compile new .sao __() calls with saola/compiler >=3.0 and prepare catalogs with saola/core >=2.4. This coordinated release is distributed by the GitHub v1.3.0 tag with built dist; npm publication is a separate operation and is not claimed here.
 
-Node ^20, ^22 or >=24 for the build/test toolchain; browser runtime with DOM.
-
-## Validation
-
-Audit and typecheck passed; 530 tests; packed ESM/CJS dynamic-import/NodeNext consumer passed.
-
-## Release scope
-
-Coordinated v1.0.2 registry release using the tested v1.0.0 source. Package manifests are normalized to 1.0.2 for registry availability. Runtime source is unchanged from v1.0.0. Existing tags and previously published versions are preserved.
+Validation: runtime TypeScript build, packed native ESM/CJS dynamic-import/NodeNext consumer, and the ecosystem client suite including actual admin SSR/hydration, language and form guards.

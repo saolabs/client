@@ -48,6 +48,12 @@ export interface CollectionProxyInterface {
 export interface HelperInterface {
     initTranslations(config: import('../services/TranslationService.js').TranslationConfig): void;
     getLocale(): string;
+    getLanguageScope(): string | undefined;
+    applyLanguageConfig(config: import('../services/TranslationService.js').TranslationConfig): void;
+    text(key: string, replace?: Record<string, any> | string | null, defaultValue?: string | null, locale?: string): string;
+    installLanguage(locale: string, snapshot: import('../services/TranslationService.js').LanguageSnapshot): boolean;
+    loadLanguage(locale: string, load: (locale: string) => Promise<import('../services/TranslationService.js').LanguageSnapshot>): Promise<boolean>;
+    changeLanguage(locale: string, load: (locale: string) => Promise<import('../services/TranslationService.js').LanguageSnapshot>, canLeave?: () => boolean | Promise<boolean>): Promise<boolean>;
     setLocale(locale: string): void;
     __(key: string, replace?: Record<string, any>, locale?: string): string;
     trans(key: string, replace?: Record<string, any>, locale?: string): string;

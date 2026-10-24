@@ -37,6 +37,7 @@ import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
 export declare class HelperService implements HelperInterface {
     App: any;
     private translations;
+    private languageChangeSequence;
     private config;
     constructor(App?: any);
     app<T = any>(key?: any, value?: any): T | ApplicationInterface;
@@ -45,6 +46,12 @@ export declare class HelperService implements HelperInterface {
     setConfig(config: Record<string, any>): void;
     initTranslations(config: TranslationConfig): void;
     getLocale(): string;
+    getLanguageScope(): string | undefined;
+    applyLanguageConfig(config: TranslationConfig): void;
+    text(key: string, replace?: Record<string, any> | string | null, defaultValue?: string | null, locale?: string): string;
+    installLanguage(locale: string, snapshot: import('./TranslationService.js').LanguageSnapshot): boolean;
+    loadLanguage(locale: string, load: (locale: string) => Promise<import('./TranslationService.js').LanguageSnapshot>): Promise<boolean>;
+    changeLanguage(locale: string, load: (locale: string) => Promise<import('./TranslationService.js').LanguageSnapshot>, canLeave?: () => boolean | Promise<boolean>): Promise<boolean>;
     __(key: string, replace?: Record<string, any>, locale?: string): string;
     trans(key: string, replace?: Record<string, any>, locale?: string): string;
     lang(key: string, replace?: Record<string, any>, locale?: string): string;

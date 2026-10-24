@@ -1,0 +1,4 @@
+@viewtype('layout')
+<main>
+@useBlock('main')
+</main>

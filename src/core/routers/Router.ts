@@ -176,6 +176,7 @@ export class Router {
 
     /** Navigation guards */
     private _beforeEach: NavigationGuard | null = null;
+    private navigationGuards = new Set<NavigationGuard>();
     /**
      * NHIỀU hook, không phải một.
      *
@@ -387,6 +388,12 @@ export class Router {
     beforeEach(guard: NavigationGuard): this {
         this._beforeEach = guard;
         return this;
+    }
+
+    /** Add a disposable guard without replacing the host's beforeEach guard. */
+    addNavigationGuard(guard: NavigationGuard): () => void {
+        this.navigationGuards.add(guard);
+        return () => { this.navigationGuards.delete(guard); };
     }
 
     /** Đăng ký hook chạy sau mỗi lần điều hướng. Trả về hàm HUỶ đăng ký. */
@@ -656,6 +663,7 @@ export class Router {
         this.routeConfigs = {};
         this.routeCache.clear();
         this._beforeEach = null;
+        this.navigationGuards.clear();
         this.afterHooks.clear();
         this.currentRoute = null;
         this.liveRegion?.remove();
@@ -752,7 +760,18 @@ export class Router {
             // Before guard — chạy TRƯỚC khi đụng vào history: guard chặn thì URL giữ nguyên
             if (this._beforeEach) {
                 const allow = await this._beforeEach(route, from, normalizedPath);
-                if (allow === false) return;
+                if (allow === false) {
+                    if (type === 'pop') this.restoreUrlAfterFailedPop(from);
+                    return;
+                }
+            }
+            for (const guard of [...this.navigationGuards]) {
+                if (!this.navigationGuards.has(guard)) continue;
+                if (requestId !== this.navigationSequence) return;
+                if (await guard(route, from, normalizedPath) === false) {
+                    if (type === 'pop') this.restoreUrlAfterFailedPop(from);
+                    return;
+                }
             }
             if (requestId !== this.navigationSequence) return;
 
@@ -835,9 +854,9 @@ export class Router {
 
     /** Pop đã đổi address bar; render fail thì đưa URL về chain còn active. */
     private restoreUrlAfterFailedPop(from: ActiveRoute | null): void {
-        if (this.mode !== 'history' || !from) return;
+        if (!from) return;
         const target = from.$fragment ? `${from.$uri}#${from.$fragment}` : from.$uri;
-        window.history.replaceState(window.history.state, '', target);
+        window.history.replaceState(window.history.state, '', this.mode === 'hash' ? '#' + target : target);
     }
 
     /**

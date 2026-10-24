@@ -1,0 +1,4 @@
+<template>
+<p id="db-save">{{ __('save') }}</p>
+<p id="db-welcome">{{ __('welcome', ['name' => 'Lan']) }}</p>
+</template>

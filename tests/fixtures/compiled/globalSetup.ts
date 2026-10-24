@@ -14,6 +14,7 @@
  * Chạy MỘT LẦN cho cả run (không phải mỗi test file).
  */
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +66,16 @@ export default async function setup() {
         const saoPath = path.join(SRC_DIR, file);
 
         const source = readFileSync(saoPath, 'utf-8');
+        if (name === 'db-language-page') {
+            // Pin this contract fixture to the compiler under change, rather than an older
+            // Composer installation in the starter. Both use the public compile API.
+            const compilerRoot = path.resolve(HERE, '../../../../compiler');
+            const script = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: "fixtures.db-language-page", functionName: "DbLanguagePage", factoryName: "DbLanguagePage")); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
+            const result = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, compilerRoot, saoPath], { encoding: 'utf8' }));
+            writeFileSync(path.join(OUT_JS_DIR, `${name}.js`), result.js, 'utf8');
+            writeFileSync(path.join(OUT_BLADE_DIR, `${name}.blade.php`), result.blade, 'utf8');
+            continue;
+        }
         const langMatch = source.match(/<script\s+setup\b[^>]*\blang=["']?([^"'\s>]+)["']?/i);
         const lang = langMatch && ['ts', 'typescript'].includes(langMatch[1].toLowerCase()) ? 'ts' : 'js';
         const result = await builder.compileWithPhp(source, {
@@ -92,6 +103,46 @@ export default async function setup() {
     });
     writeFileSync(path.join(OUT_JS_DIR, 'getting-started.ts'), guideResult.js);
     writeFileSync(path.join(OUT_BLADE_DIR, 'getting-started.blade.php'), guideResult.blade);
+
+    // Exercise the starter's actual demo using the compiler being developed here.
+    const compilerRoot = path.resolve(HERE, '../../../../compiler');
+    const demo = path.join(SAOLA_APP_ROOT, 'resources/saola/web/views/modules/home/language-demo.sao');
+    const script = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: "web.modules.home.language-demo", functionName: "LanguageDemo", factoryName: "LanguageDemo")); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
+    const demoResult = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, compilerRoot, demo], {encoding: 'utf8'}));
+    writeFileSync(path.join(OUT_JS_DIR, 'language-demo.ts'), demoResult.js);
+    writeFileSync(path.join(OUT_BLADE_DIR, 'language-demo.blade.php'), demoResult.blade);
+
+    const adminRoot = path.resolve(HERE, '../../../../admin');
+    const adminScript = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: $argv[3], functionName: $argv[4], factoryName: $argv[4], lang: \\Saola\\Compiler\\Lang::Ts)); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
+    for (const [name, file, fn] of [
+        ['admin-page', 'pages/resource', 'AdminPage'],
+        ['admin-renderer', 'components/resource', 'AdminRenderer'],
+        ['admin-shell', 'layouts/shell', 'AdminShell'],
+        ['admin-settings-page', 'pages/settings', 'AdminSettingsPage'],
+        ['admin-settings-form', 'components/settings-form', 'AdminSettingsForm'],
+    ]) {
+        const source = path.join(adminRoot, `resources/saola/admin/views/${file}.sao`);
+        const result = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', adminScript, compilerRoot, source, `admin.${file.replace('/', '.')}`, fn], {encoding: 'utf8'}));
+        writeFileSync(path.join(OUT_JS_DIR, `${name}.ts`), result.js);
+        writeFileSync(path.join(OUT_BLADE_DIR, `${name}.blade.php`), result.blade);
+    }
+    for (const locale of ['en', 'vi']) {
+        const script = 'echo json_encode(array_replace_recursive(require $argv[1]."/lang/".$argv[2]."/admin.php", require $argv[1]."/lang/".$argv[2]."/common.php"), JSON_THROW_ON_ERROR);';
+        writeFileSync(path.join(GEN_DIR, `admin-${locale}.json`), execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, adminRoot, locale], {encoding: 'utf8'}));
+    }
+    execFileSync(process.env.SAOLA_PHP_BINARY || 'php', [path.join(adminRoot, 'vendor/bin/phpunit'), '-c', path.join(adminRoot, 'phpunit.xml'), '--filter', 'test_ssr_compiles'], {
+        cwd: adminRoot, encoding: 'utf8', env: {...process.env, SAOLA_ADMIN_PREVIEW_DIR: path.join(GEN_DIR, 'admin-ssr')},
+    });
+
+    // Boot a fresh Laravel application too: Testbench refreshes route name
+    // lookups itself and can hide late booted() registration bugs in a host.
+    const liveScript = '$_SERVER = array_merge($_SERVER, ["REQUEST_METHOD" => "GET", "REQUEST_URI" => "/control/settings", "HTTP_ACCEPT" => "application/json", "HTTP_HOST" => "localhost", "SERVER_NAME" => "localhost", "SERVER_PORT" => "80", "SCRIPT_NAME" => "/index.php"]); require $argv[1];';
+    const fresh = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', liveScript, path.join(adminRoot, 'workbench/serve-preview.php')], {
+        cwd: adminRoot, encoding: 'utf8', env: {...process.env, SAOLA_ADMIN_PREVIEW_DIR: path.join(GEN_DIR, 'admin-ssr')},
+    }));
+    if (fresh?.view !== 'admin.pages.settings' || fresh?.data?.editor?.group !== 'general') {
+        throw new Error('Fresh Laravel settings workbench did not boot: ' + JSON.stringify(fresh));
+    }
 
     console.log(`[fixtures] đã compile ${files.length} file .sao qua Builder + saola/compiler → .generated/{js,blade}`);
 }

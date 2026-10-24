@@ -754,6 +754,8 @@ export class ViewManager {
             let asyncData = {};
             try {
                 const response = await Http.get(fetchUrl, this.fetchOptions);
+                if (!this.isNavigationCurrent(navigationGeneration))
+                    return this.createRenderPageViewCancelled(view);
                 asyncData = this.extractAsyncData(response);
             }
             catch (err) {
@@ -1362,6 +1364,8 @@ export class ViewManager {
             && Object.prototype.hasOwnProperty.call(payload, 'data')
             && (Object.prototype.hasOwnProperty.call(payload, 'viewContext')
                 || Object.prototype.hasOwnProperty.call(payload, 'view'))) {
+            if (payload.i18n)
+                this.App?.Helper?.applyLanguageConfig?.(payload.i18n);
             return payload.data ?? {};
         }
         return payload;

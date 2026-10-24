@@ -1,23 +1,42 @@
 export interface TranslationConfig {
+    scope?: string;
     locale?: string;
     fallbackLocale?: string;
     messages?: Record<string, { json?: Record<string, string>; groups?: Record<string, any> }>;
+    /** Saola DB dictionaries. Kept separate from Laravel json/groups. */
+    catalogs?: Record<string, LanguageSnapshot>;
 }
 
-/** Synchronous lookup of dictionaries already present in the application bundle. */
+export interface LanguageTree { [key: string]: string | LanguageTree }
+export interface LanguageSnapshot { revision: number; messages: LanguageTree; scope?: string }
+
+/** Synchronous lookup; snapshots may be supplied at bootstrap or installed at runtime. */
 export class TranslationService {
     locale = 'en';
     fallbackLocale = 'en';
     private messages: NonNullable<TranslationConfig['messages']> = {};
+    private catalogs: Record<string, LanguageSnapshot> = {};
+    private catalogScope?: string;
+
+    getScope(): string | undefined { return this.catalogScope; }
+
+    refresh(config: TranslationConfig): void {
+        if (config.scope !== this.catalogScope) throw new Error('Language snapshot scope differs from the active catalog');
+        for (const [locale, snapshot] of Object.entries(config.catalogs || {})) this.install(locale, snapshot);
+        if (config.fallbackLocale) this.fallbackLocale = config.fallbackLocale;
+    }
 
     init(config: TranslationConfig): void {
+        this.catalogScope = config.scope;
         this.locale = config.locale || 'en';
         this.fallbackLocale = config.fallbackLocale || 'en';
         this.messages = config.messages || {};
+        this.catalogs = {};
+        for (const [locale, snapshot] of Object.entries(config.catalogs || {})) this.install(locale, snapshot);
     }
 
     setLocale(locale: string): boolean {
-        if (!Object.prototype.hasOwnProperty.call(this.messages, locale)) throw new Error(`Locale is not bundled: ${locale}`);
+        if (!Object.prototype.hasOwnProperty.call(this.messages, locale) && !Object.prototype.hasOwnProperty.call(this.catalogs, locale)) throw new Error(`Locale is not loaded: ${locale}`);
         if (locale === this.locale) return false;
         this.locale = locale;
         return true;
@@ -26,6 +45,40 @@ export class TranslationService {
     trans(key: string, replace: Record<string, any> = {}, locale = this.locale): string {
         const value = this.lookup(key, locale) ?? this.lookup(key, this.fallbackLocale) ?? key;
         return this.interpolate(value, replace);
+    }
+
+    text(key: string, replace: Record<string, any> = {}, defaultValue: string | null = null, locale = this.locale): string {
+        const value = this.lookupTree(this.catalogs[locale]?.messages, key)
+            ?? this.lookupTree(this.catalogs[this.fallbackLocale]?.messages, key) ?? defaultValue ?? key;
+        return this.interpolate(value, replace);
+    }
+
+    install(locale: string, snapshot: LanguageSnapshot): boolean {
+        if (snapshot.scope !== this.catalogScope) throw new Error('Language snapshot scope differs from the active catalog');
+        if (!Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0) throw new Error('Invalid language revision');
+        const validate = (value: any, depth = 0): LanguageTree => {
+            if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 32) throw new Error('Invalid language tree');
+            const copy: LanguageTree = Object.create(null);
+            for (const [key, child] of Object.entries(value)) {
+                if (!key || key.includes('.') || /\s/u.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key)) throw new Error('Invalid language key');
+                copy[key] = typeof child === 'string' ? child : validate(child, depth + 1);
+            }
+            return copy;
+        };
+        const messages = validate(snapshot.messages);
+        if (this.catalogs[locale] && this.catalogs[locale].revision > snapshot.revision) return false;
+        // Replace, rather than deep merge: removed keys must disappear.
+        this.catalogs = { ...this.catalogs, [locale]: { revision: snapshot.revision, messages, scope: snapshot.scope } };
+        return true;
+    }
+
+    private lookupTree(tree: LanguageTree | undefined, key: string): string | undefined {
+        let value: string | LanguageTree | undefined = tree;
+        for (const part of key.split('.')) {
+            if (!value || typeof value !== 'object' || !Object.prototype.hasOwnProperty.call(value, part)) return undefined;
+            value = value[part];
+        }
+        return typeof value === 'string' ? value : undefined;
     }
 
     choice(key: string, count: number, replace: Record<string, any> = {}, locale = this.locale): string {
@@ -77,6 +130,7 @@ export class TranslationService {
     }
 
     private interpolate(value: string, replace: Record<string, any>): string {
+        const parameters: Record<string, string> = Object.create(null);
         const keys = Object.keys(replace).sort((a, b) => b.length - a.length);
         for (const key of keys) {
             const text = String(replace[key]);
@@ -84,8 +138,12 @@ export class TranslationService {
                 [key]: text, [key.toUpperCase()]: text.toUpperCase(),
                 [key.charAt(0).toUpperCase() + key.slice(1)]: text.charAt(0).toUpperCase() + text.slice(1),
             };
-            for (const [name, content] of Object.entries(variants)) value = value.split(':' + name).join(content);
+            // Build substitutions first; inserted text must never be interpolated again.
+            Object.assign(parameters, Object.fromEntries(Object.entries(variants).map(([name, content]) => [':' + name, content])));
         }
-        return value;
+        const names = Object.keys(parameters).sort((a, b) => b.length - a.length);
+        if (!names.length) return value;
+        const pattern = new RegExp(names.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+        return value.replace(pattern, match => parameters[match]);
     }
 }

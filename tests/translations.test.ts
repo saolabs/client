@@ -9,6 +9,7 @@ import BlockManager from '../src/core/services/BlockManager';
 import { StoreService } from '../src/core/services/StoreService';
 import I18nPage from './fixtures/compiled/.generated/js/i18n-page';
 import I18nLayout from './fixtures/compiled/.generated/js/i18n-layout';
+import DbLanguagePage from './fixtures/compiled/.generated/js/db-language-page';
 
 const i18n = { locale: 'en', fallbackLocale: 'en', messages: {
     en: { json: { 'Hello world': 'Hello world' }, groups: { messages: { title: 'Guide', welcome: 'Hello :name', fallback: 'Fallback', apples: 'One apple|:count apples' }, 'pkg::labels': { title: 'Package' } } },
@@ -36,7 +37,7 @@ it('looks up PHP groups, JSON sentences, package keys, fallback and replacement 
     expect(helper.choice('messages.apples', 0)).toBe('Không có táo');
     expect(helper.choice('messages.apples', 1)).toBe('Một quả táo');
     expect(helper.trans_choice('messages.apples', 2, {}, 'en')).toBe('2 apples');
-    expect(() => helper.setLocale('fr')).toThrow('not bundled');
+    expect(() => helper.setLocale('fr')).toThrow('not loaded');
     expect(helper.getLocale()).toBe('vi');
     expect(fetch).not.toHaveBeenCalled();
 });
@@ -44,6 +45,28 @@ it('looks up PHP groups, JSON sentences, package keys, fallback and replacement 
 it('maps bundled i18n boot configuration', () => {
     (window as any).APP_CONFIGS = { i18n };
     expect(readBootConfig()?.i18n).toEqual(i18n);
+});
+
+it('renders the current compiler output against DB snapshots and loads a new locale without rebuilding', async () => {
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    const shared = app() as any;
+    shared.set('Registry', MarkerRegistry);
+    const helper = new HelperService(shared); shared.set('Helper', helper);
+    document.body.innerHTML = '<div id="app-root"></div>';
+    vm = new ViewManager(shared); shared.set('View', vm);
+    vm.init({ systemData: { __layout__: '' }, container: document.getElementById('app-root')!, registry: { 'fixtures.db-language-page': DbLanguagePage } });
+    router = new Router(shared); shared.set('Router', router);
+    router.setViewManager(vm); router.configure({ routes: [{ path: '/', component: 'fixtures.db-language-page' }] });
+    helper.initTranslations({ locale: 'en', fallbackLocale: 'en', catalogs: {
+        en: { revision: 1, messages: { save: 'Save', welcome: 'Hello :name' } },
+    } });
+    router.start();
+    await vi.waitFor(() => expect(document.querySelector('#db-save')?.textContent).toBe('Save'));
+    expect(document.querySelector('#db-welcome')?.textContent).toBe('Hello Lan');
+    await helper.loadLanguage('ja', async () => ({ revision: 1, messages: { save: '保存', welcome: ':nameさん' } }));
+    helper.setLocale('ja');
+    await vi.waitFor(() => expect(document.querySelector('#db-save')?.textContent).toBe('保存'));
+    expect(document.querySelector('#db-welcome')?.textContent).toBe('Lanさん');
 });
 
 it('renders real compiled translations and remounts page plus layout when switching locale', async () => {

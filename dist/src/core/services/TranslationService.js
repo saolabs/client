@@ -1,18 +1,32 @@
-/** Synchronous lookup of dictionaries already present in the application bundle. */
+/** Synchronous lookup; snapshots may be supplied at bootstrap or installed at runtime. */
 export class TranslationService {
     constructor() {
         this.locale = 'en';
         this.fallbackLocale = 'en';
         this.messages = {};
+        this.catalogs = {};
+    }
+    getScope() { return this.catalogScope; }
+    refresh(config) {
+        if (config.scope !== this.catalogScope)
+            throw new Error('Language snapshot scope differs from the active catalog');
+        for (const [locale, snapshot] of Object.entries(config.catalogs || {}))
+            this.install(locale, snapshot);
+        if (config.fallbackLocale)
+            this.fallbackLocale = config.fallbackLocale;
     }
     init(config) {
+        this.catalogScope = config.scope;
         this.locale = config.locale || 'en';
         this.fallbackLocale = config.fallbackLocale || 'en';
         this.messages = config.messages || {};
+        this.catalogs = {};
+        for (const [locale, snapshot] of Object.entries(config.catalogs || {}))
+            this.install(locale, snapshot);
     }
     setLocale(locale) {
-        if (!Object.prototype.hasOwnProperty.call(this.messages, locale))
-            throw new Error(`Locale is not bundled: ${locale}`);
+        if (!Object.prototype.hasOwnProperty.call(this.messages, locale) && !Object.prototype.hasOwnProperty.call(this.catalogs, locale))
+            throw new Error(`Locale is not loaded: ${locale}`);
         if (locale === this.locale)
             return false;
         this.locale = locale;
@@ -21,6 +35,43 @@ export class TranslationService {
     trans(key, replace = {}, locale = this.locale) {
         const value = this.lookup(key, locale) ?? this.lookup(key, this.fallbackLocale) ?? key;
         return this.interpolate(value, replace);
+    }
+    text(key, replace = {}, defaultValue = null, locale = this.locale) {
+        const value = this.lookupTree(this.catalogs[locale]?.messages, key)
+            ?? this.lookupTree(this.catalogs[this.fallbackLocale]?.messages, key) ?? defaultValue ?? key;
+        return this.interpolate(value, replace);
+    }
+    install(locale, snapshot) {
+        if (snapshot.scope !== this.catalogScope)
+            throw new Error('Language snapshot scope differs from the active catalog');
+        if (!Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0)
+            throw new Error('Invalid language revision');
+        const validate = (value, depth = 0) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 32)
+                throw new Error('Invalid language tree');
+            const copy = Object.create(null);
+            for (const [key, child] of Object.entries(value)) {
+                if (!key || key.includes('.') || /\s/u.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key))
+                    throw new Error('Invalid language key');
+                copy[key] = typeof child === 'string' ? child : validate(child, depth + 1);
+            }
+            return copy;
+        };
+        const messages = validate(snapshot.messages);
+        if (this.catalogs[locale] && this.catalogs[locale].revision > snapshot.revision)
+            return false;
+        // Replace, rather than deep merge: removed keys must disappear.
+        this.catalogs = { ...this.catalogs, [locale]: { revision: snapshot.revision, messages, scope: snapshot.scope } };
+        return true;
+    }
+    lookupTree(tree, key) {
+        let value = tree;
+        for (const part of key.split('.')) {
+            if (!value || typeof value !== 'object' || !Object.prototype.hasOwnProperty.call(value, part))
+                return undefined;
+            value = value[part];
+        }
+        return typeof value === 'string' ? value : undefined;
     }
     choice(key, count, replace = {}, locale = this.locale) {
         const local = this.lookup(key, locale);
@@ -79,6 +130,7 @@ export class TranslationService {
         return typeof value === 'string' ? value : undefined;
     }
     interpolate(value, replace) {
+        const parameters = Object.create(null);
         const keys = Object.keys(replace).sort((a, b) => b.length - a.length);
         for (const key of keys) {
             const text = String(replace[key]);
@@ -86,10 +138,14 @@ export class TranslationService {
                 [key]: text, [key.toUpperCase()]: text.toUpperCase(),
                 [key.charAt(0).toUpperCase() + key.slice(1)]: text.charAt(0).toUpperCase() + text.slice(1),
             };
-            for (const [name, content] of Object.entries(variants))
-                value = value.split(':' + name).join(content);
+            // Build substitutions first; inserted text must never be interpolated again.
+            Object.assign(parameters, Object.fromEntries(Object.entries(variants).map(([name, content]) => [':' + name, content])));
         }
-        return value;
+        const names = Object.keys(parameters).sort((a, b) => b.length - a.length);
+        if (!names.length)
+            return value;
+        const pattern = new RegExp(names.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+        return value.replace(pattern, match => parameters[match]);
     }
 }
 //# sourceMappingURL=TranslationService.js.map

@@ -1,7 +1,13 @@
 # @saolabs/client
 
+Coordinated admin alpha compatibility: see [release notes](RELEASE.md).
+
 Runtime TypeScript phía trình duyệt của Saola: hydration HTML do Laravel render,
 state, component, điều hướng SPA và vòng đời tài nguyên.
+
+Ngôn ngữ DB: [Language System](https://github.com/saolabs/admin/blob/main/docs/LANGUAGE_SYSTEM_PLAN.md). `App.Helper.text()` đọc `catalogs[locale] = { scope, revision, messages: tree }`; `installLanguage/loadLanguage` nạp/thay snapshot lúc chạy. `changeLanguage(locale, loader, guard)` kiểm form trước/sau fetch, bỏ yêu cầu cũ rồi chuyển locale. Page-data `i18n` cập nhật snapshot trước render, cùng scope giữ locale đã chọn. Legacy `messages.json/groups` dành cho `trans`/`choice` và helper `__` gọi trực tiếp; compiler mới hạ `__()` trong `.sao` xuống `text()`.
+
+Form có thể dùng `App.Router.addNavigationGuard(guard)` để bổ sung guard mà giữ `beforeEach` của host; API trả disposer. Gỡ guard khi pause/destroy, đăng ký lại khi resume. `false` chặn trước mount/history; Back bị chặn khôi phục URL cho cả history/hash. Guard này độc lập guard đổi ngôn ngữ; xem [Settings renderer](https://github.com/saolabs/admin/blob/main/docs/SETTINGS.md) về draft, CSRF và lifecycle.
 
 ## Bắt đầu
 

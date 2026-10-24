@@ -103,6 +103,7 @@ export declare class Router {
     private currentUri;
     /** Navigation guards */
     private _beforeEach;
+    private navigationGuards;
     /**
      * NHIỀU hook, không phải một.
      *
@@ -178,6 +179,8 @@ export declare class Router {
      */
     configure(config: RouterConfig): this;
     beforeEach(guard: NavigationGuard): this;
+    /** Add a disposable guard without replacing the host's beforeEach guard. */
+    addNavigationGuard(guard: NavigationGuard): () => void;
     /** Đăng ký hook chạy sau mỗi lần điều hướng. Trả về hàm HUỶ đăng ký. */
     afterEach(hook: AfterNavigationHook): () => void;
     /**

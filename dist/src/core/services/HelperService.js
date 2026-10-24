@@ -37,6 +37,7 @@ export class HelperService {
     constructor(App) {
         this.App = null;
         this.translations = new TranslationService();
+        this.languageChangeSequence = 0;
         this.config = {};
         if (App)
             this.App = App;
@@ -54,10 +55,44 @@ export class HelperService {
         this.config = { ...this.config, ...config };
     }
     initTranslations(config) {
+        this.languageChangeSequence++;
         this.translations.init(config);
         this.syncLocale();
     }
     getLocale() { return this.translations.locale; }
+    getLanguageScope() { return this.translations.getScope(); }
+    applyLanguageConfig(config) {
+        if (!config.scope || config.scope !== this.getLanguageScope()) {
+            this.initTranslations(config);
+            return;
+        }
+        // Page-data refreshes revisions without resetting the chosen locale.
+        this.translations.refresh(config);
+    }
+    text(key, replace = {}, defaultValue = null, locale) {
+        if (typeof replace === 'string' && defaultValue === null)
+            defaultValue = replace;
+        return this.translations.text(key, replace && typeof replace === 'object' ? replace : {}, defaultValue, locale);
+    }
+    installLanguage(locale, snapshot) {
+        return this.translations.install(locale, snapshot);
+    }
+    async loadLanguage(locale, load) {
+        return this.installLanguage(locale, await load(locale));
+    }
+    async changeLanguage(locale, load, canLeave = () => true) {
+        const sequence = ++this.languageChangeSequence;
+        if (!await canLeave() || sequence !== this.languageChangeSequence)
+            return false;
+        const snapshot = await load(locale);
+        if (sequence !== this.languageChangeSequence || !await canLeave())
+            return false;
+        if (sequence !== this.languageChangeSequence)
+            return false;
+        this.installLanguage(locale, snapshot);
+        this.setLocale(locale);
+        return true;
+    }
     __(key, replace = {}, locale) { return this.translations.trans(key, replace, locale); }
     trans(key, replace = {}, locale) { return this.__(key, replace, locale); }
     lang(key, replace = {}, locale) { return this.__(key, replace, locale); }
