@@ -36,6 +36,7 @@
     "prepublishOnly": "npm run clean && npm run build && npm run check-exports",
     "publish-dry-run": "npm publish --dry-run",
     "test": "vitest run",
+    "test:package": "vitest run --config vitest.package.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

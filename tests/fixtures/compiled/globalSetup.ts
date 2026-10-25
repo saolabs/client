@@ -120,6 +120,8 @@ export default async function setup() {
         ['admin-shell', 'layouts/shell', 'AdminShell'],
         ['admin-settings-page', 'pages/settings', 'AdminSettingsPage'],
         ['admin-settings-form', 'components/settings-form', 'AdminSettingsForm'],
+        ['admin-languages-page', 'pages/languages', 'AdminLanguagesPage'],
+        ['admin-languages-form', 'components/languages', 'AdminLanguagesForm'],
     ]) {
         const source = path.join(adminRoot, `resources/saola/admin/views/${file}.sao`);
         const result = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', adminScript, compilerRoot, source, `admin.${file.replace('/', '.')}`, fn], {encoding: 'utf8'}));

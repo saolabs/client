@@ -45,7 +45,7 @@ try {
     // Import by package name, with the exact exports and bytes delivered to users.
     fs.writeFileSync(path.join(temp, 'consumer.mjs'), `
         import assert from 'node:assert/strict';
-        import { View, HttpService, StateManager } from '@saolabs/client';
+        import { View, HttpService, StateManager, HelperService, Router } from '@saolabs/client';
         import { createPlugin } from '@saolabs/client/plugins';
         import { mount, mountView, nextFrame } from '@saolabs/client/testing';
         assert.equal(typeof View, 'function');
@@ -54,6 +54,18 @@ try {
         assert.equal(createPlugin('example', () => {}).name, 'example');
         assert.equal(typeof mount, 'function');
         assert.equal(typeof nextFrame, 'function');
+        const helper = new HelperService();
+        helper.initTranslations({scope: 'package', locale: 'en', catalogs: {
+            en: {scope: 'package', revision: 1, messages: {save: 'Save'}}
+        }});
+        assert.equal(helper.text('save'), 'Save');
+        await helper.changeLanguage('vi', async () => ({scope: 'package', revision: 1, messages: {save: 'Lưu'}}));
+        assert.equal(helper.getLocale(), 'vi');
+        assert.equal(helper.text('save'), 'Lưu');
+        const router = new Router();
+        const dispose = router.addNavigationGuard(() => false);
+        assert.equal(typeof dispose, 'function');
+        dispose(); router.destroy();
         const harness = mountView(function () { return this.wrapper(() => [this.text('packed')]); });
         assert.ok(harness.view instanceof View);
         assert.equal(harness.text(), 'packed');
@@ -71,11 +83,14 @@ try {
     run(process.execPath, ['--require', './dom.cjs', 'consumer.cjs']);
 
     fs.writeFileSync(path.join(temp, 'consumer.mts'), `
-        import { HttpService, type HttpResponse } from '@saolabs/client';
+        import { HttpService, HelperService, Router, type HttpResponse } from '@saolabs/client';
         import { createPlugin } from '@saolabs/client/plugins';
         import { mount, type Harness } from '@saolabs/client/testing';
         const result: Promise<HttpResponse<{name: string}>> = new HttpService().get('/users');
         createPlugin('typed', () => {});
+        const helper = new HelperService();
+        const translated: string = helper.text('save');
+        const removeGuard: () => void = new Router().addNavigationGuard(() => true);
         const mountView: typeof mount = mount;
         let harness: Harness | undefined;
         // @ts-expect-error URL must be a string; published declarations must keep this check.

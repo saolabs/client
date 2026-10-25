@@ -72,8 +72,9 @@ it('actual admin source renders a page definition, escapes cells, navigates and 
 });
 
 it('package renderer and shell compile to strict TypeScript', () => {
-    const files = ['admin-page', 'admin-shell', 'admin-renderer', 'admin-settings-page', 'admin-settings-form'].map(name => path.join(root, `js/${name}.ts`));
+    const files = ['admin-page', 'admin-shell', 'admin-renderer', 'admin-settings-page', 'admin-settings-form', 'admin-languages-page', 'admin-languages-form'].map(name => path.join(root, `js/${name}.ts`));
     files.push(path.resolve(__dirname, '../../../admin/resources/saola/admin/app/settings-form.ts'));
+    files.push(path.resolve(__dirname, '../../../admin/resources/saola/admin/app/language-form.ts'));
     files.push(path.resolve(__dirname, '../../../admin/resources/saola/admin/app/bundle.ts'));
     const program = ts.createProgram(files, {noEmit: true, strict: true, skipLibCheck: true,
         target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler,

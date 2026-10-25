@@ -66,13 +66,18 @@ app và theme dùng cùng một runtime; xem [bootstrap](docs/BOOTSTRAP_PROVIDER
 npm run build          # ESM JS và declarations
 npm run typecheck      # Kiểm source, không emit
 npm test               # Runtime + compile-to-mount contract tests
+npm run test:package   # Standalone boot/catalog/navigation checks, không cần sibling/PHP
 npm run check-exports  # Pack thật; kiểm 3 entry và types trong consumer tạm
 ```
 
 `check-exports` không publish. Nó kiểm native ESM, dynamic import từ CommonJS,
 mount view qua package đã đóng và TypeScript NodeNext, không dùng alias source.
-Bộ test compile fixture cần sibling `builder/`, `compiler/`, `saola/` trong
+Bộ test compile fixture cần sibling `builder/`, `compiler/`, `saola/`, `admin/` trong
 workspace hệ sinh thái. Thiếu builder là lỗi kiểm tra, không tự bỏ qua test.
+
+GitHub Actions kiểm package trên Node 20/22/24: typecheck, build, đối chiếu `dist`
+đã commit, `test:package` và consumer từ tarball thật. Bộ `npm test` đầy đủ vẫn
+chạy trong workspace hệ sinh thái; CI package không thay thế kiểm SSR/admin đó.
 
 ## Tài liệu
 
