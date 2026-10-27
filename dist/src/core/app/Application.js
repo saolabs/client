@@ -66,7 +66,10 @@ export class Application {
             'getSingletons',
             'shared',
             '__store',
+            'strictBundles',
         ]; // Để track dynamic properties nếu cần
+        /** Bật bởi config.strictBundles: ghi đè khoá bị khoá thì ném lỗi thay vì bỏ qua im lặng. */
+        this.strictBundles = false;
         this.__store = new Map(); // Store cho dynamic properties nếu cần
     }
     // ─── Transient (factory — instance mới mỗi lần) ───────────
@@ -295,10 +298,14 @@ export class Application {
     }
     set(name, value, isOne = false) {
         if (this.__store.has(name) && this.__store.get(name)?.isOverridable === false) {
+            if (this.strictBundles)
+                throw new Error(`[Application] Khoá "${String(name)}" đã bị khoá, không ghi đè được.`);
             return; // Không cho ghi đè lên thuộc tính không thể override
         }
         const isString = typeof name === 'string';
         if (isString && this.ownProperties.includes(name)) {
+            if (this.strictBundles)
+                throw new Error(`[Application] "${name}" là thuộc tính có sẵn của App, không đăng ký đè được.`);
             return; // Không cho ghi đè lên thuộc tính có sẵn
         }
         this.__store.set(name, { value, isOverridable: !isOne });

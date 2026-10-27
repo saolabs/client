@@ -6,7 +6,7 @@ export { Application } from './src/core/app/Application.js';
 export { app } from './src/core/helpers/app.js';
 export { default as App } from './src/core/bootstrap/app.js';
 export { defineBundle, loadBundles, mergeBundles, bootBundles } from './src/core/bootstrap/bundle.js';
-export type { SaolaBundle, MergedBundles, ViewFactory } from './src/core/contracts/BundleInterface.js';
+export type { SaolaBundle, MergedBundles, ViewFactory, ServiceFactory, MergeOptions } from './src/core/contracts/BundleInterface.js';
 export { ServiceProvider } from './src/core/bootstrap/providers/ServiceProvider.js';
 export { PROVIDER_NAMES, resolveProviderOrder } from './src/core/bootstrap/providers/provider-order.js';
 export type { NamedServiceProvider, ProviderName } from './src/core/bootstrap/providers/provider-order.js';

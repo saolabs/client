@@ -5,7 +5,10 @@ export default defineConfig({
     // import '@saolabs/client', mà package này CHÍNH LÀ nó. Trỏ thẳng vào src để
     // test chạy trên code nguồn thay vì dist đã build.
     resolve: {
-        alias: { '@saolabs/client': new URL('./index.ts', import.meta.url).pathname },
+        alias: {
+            '@saolabs/client': new URL('./index.ts', import.meta.url).pathname,
+            '@sao/admin': new URL('../admin/resources/saola/admin', import.meta.url).pathname,
+        },
     },
     test: {
         environment: 'jsdom',

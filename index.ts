@@ -10,7 +10,7 @@ export { default as App } from './src/core/bootstrap/app.js';
 
 // Bundle nạp rời (theme / gói mở rộng)
 export { defineBundle, loadBundles, mergeBundles, bootBundles } from './src/core/bootstrap/bundle.js';
-export type { SaolaBundle, MergedBundles, ViewFactory } from './src/core/contracts/BundleInterface.js';
+export type { SaolaBundle, MergedBundles, ViewFactory, ServiceFactory, MergeOptions } from './src/core/contracts/BundleInterface.js';
 
 // Service Provider — lớp base + hằng tên, để app và theme viết provider của mình.
 // KHÔNG export thì cả tính năng "người dùng thêm provider" chỉ dùng được nội bộ.

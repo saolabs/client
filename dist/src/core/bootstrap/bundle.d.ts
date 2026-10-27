@@ -8,7 +8,7 @@
  * docs/EXTENSION_ARCHITECTURE.md §7.
  */
 import type { ApplicationInterface } from "../contracts/ApplicationInterface.js";
-import type { MergedBundles, SaolaBundle } from "../contracts/BundleInterface.js";
+import type { MergeOptions, MergedBundles, SaolaBundle } from "../contracts/BundleInterface.js";
 /**
  * Khai báo một bundle. Chỉ là identity + kiểu — nó tồn tại để tên khoá là HỢP
  * ĐỒNG chứ không phải quy ước truyền miệng, và để IDE gợi ý được.
@@ -24,8 +24,12 @@ export declare function defineBundle(bundle: SaolaBundle): SaolaBundle;
  * Gộp nhiều manifest theo ĐÚNG THỨ TỰ mảng — không theo thứ tự resolve của
  * mạng. Bundle sau ĐÈ bundle trước ở `views`/`services`/`helpers`; `providers`
  * thì CỘNG THÊM chứ không thay, để một bundle không gỡ được provider của app.
+ *
+ * `opts.strict` bật hàng rào của hợp đồng gói context: bundle trùng khoá không
+ * có `overrides` hợp lệ, hoặc theme khai khoá ngoài phạm vi, bị BỎ NGUYÊN CẢ
+ * BUNDLE và ghi vào `failed` (không làm sập boot). Provider trùng `name` bị bỏ.
  */
-export declare function mergeBundles(bundles: Array<SaolaBundle | null | undefined>): MergedBundles;
+export declare function mergeBundles(bundles: Array<SaolaBundle | null | undefined>, opts?: MergeOptions): MergedBundles;
 /**
  * Nạp danh sách URL bundle rồi gộp lại.
  *
@@ -35,7 +39,7 @@ export declare function mergeBundles(bundles: Array<SaolaBundle | null | undefin
  * Một URL hỏng KHÔNG làm sập boot: ghi vào `failed` rồi đi tiếp. Theme lỗi thì
  * site chạy bằng view gốc, còn hơn trắng trang.
  */
-export declare function loadBundles(urls: string[] | null | undefined): Promise<MergedBundles>;
+export declare function loadBundles(urls: string[] | null | undefined, opts?: MergeOptions): Promise<MergedBundles>;
 /** Chạy `boot()` của các bundle, sau khi App đã init. Lỗi một cái không chặn cái sau. */
 export declare function bootBundles(merged: MergedBundles, app: ApplicationInterface): void;
 //# sourceMappingURL=bundle.d.ts.map

@@ -26,11 +26,12 @@ const SYSTEM_SERVICE_KEYS = new Set(['Store', 'Storage', 'Event', 'Http', 'View'
  * services: { Auth: AuthService, Toast: ToastService }
  * → 2 providers, mỗi cái dependsOn ['core'], register = app.set(name, new Class(app))
  */
-function servicesFromMap(map: Record<string, any>): ServiceProviderInterface[] {
+function servicesFromMap(map: Record<string, any>, strict = false): ServiceProviderInterface[] {
     const appInstance = app<ApplicationInterface>();
     return Object.entries(map)
         .filter(([name]) => {
             if (SYSTEM_SERVICE_KEYS.has(name)) {
+                if (strict) throw new Error(`[Bootstrap] Không được ghi đè service hệ thống "${name}" qua config.services.`);
                 console.warn(`[Bootstrap] Cannot override system service "${name}" via config.services. Ignored.`);
                 return false;
             }
@@ -44,7 +45,9 @@ function servicesFromMap(map: Record<string, any>): ServiceProviderInterface[] {
                 // không phải class — `new` vô điều kiện sẽ ném "is not a
                 // constructor". Chỉ dựng khi thật sự là class.
                 const isClass = typeof value === 'function' && value.prototype;
-                appInstance.set(name, isClass ? new value(appInstance) : value);
+                // Dạng `{ factory }`: mỗi Application dựng instance riêng.
+                const isFactory = !!value && typeof value === 'object' && typeof value.factory === 'function';
+                appInstance.set(name, isClass ? new value(appInstance) : isFactory ? value.factory(appInstance) : value);
             }
         }));
 }
@@ -92,6 +95,8 @@ export function buildDefaultProviders(config: Record<string, any> = {}): NamedSe
     HelperServiceProvider.config = { i18n: config.i18n };
     ApiServiceProvider.config = config.api || {};
     const App = app<ApplicationInterface>();
+    const strict = !!config.strictBundles;
+    App.strictBundles = strict;
     const defaults: NamedServiceProvider[] = [
         CoreServiceProvider,
         ViewServiceProvider,
@@ -102,7 +107,7 @@ export function buildDefaultProviders(config: Record<string, any> = {}): NamedSe
 
     // config.services: { Name: Class } → auto-wrap providers
     const serviceProviders = config.services
-        ? servicesFromMap(config.services)
+        ? servicesFromMap(config.services, strict)
         : [];
 
     // config.helpers: { tên: fn } → một provider phụ thuộc `helper`
@@ -118,6 +123,7 @@ export function buildDefaultProviders(config: Record<string, any> = {}): NamedSe
             )
             .filter(p => {
                 if (SYSTEM_PROVIDER_NAMES.has(p.name as any)) {
+                    if (strict) throw new Error(`[Bootstrap] Không được ghi đè provider hệ thống "${p.name}".`);
                     console.warn(`[Bootstrap] Cannot override system provider "${p.name}". Ignored.`);
                     return false;
                 }

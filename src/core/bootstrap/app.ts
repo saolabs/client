@@ -111,7 +111,13 @@ App.setMethod('start', async function (config?: Record<string, any>) {
         // Bundle nạp rời (theme…): server phát danh sách URL trong
         // APP_CONFIGS.bundles. Phải await TRƯỚC init để view/service/provider
         // của chúng có mặt lúc provider boot và lúc render route đầu.
-        bundles = await loadBundles(cfg.bundles);
+        bundles = await loadBundles(cfg.bundles, {
+            strict: !!cfg.strictBundles,
+            overridable: cfg.overridable,
+            themeNamespaces: cfg.themeNamespaces,
+            bundleKinds: cfg.bundleKinds,
+            initialBundle: cfg.strictBundles ? {name: 'application source', services: cfg.services, helpers: cfg.helpers, providers: cfg.providers} : undefined,
+        });
         cfg.view = {
             ...(cfg.view || {}),
             // Bundle nạp sau ĐÈ registry của app — đúng ngữ nghĩa overlay theme.
@@ -119,7 +125,7 @@ App.setMethod('start', async function (config?: Record<string, any>) {
         };
         cfg.services = { ...(cfg.services || {}), ...bundles.services };
         cfg.helpers = { ...(cfg.helpers || {}), ...bundles.helpers };
-        cfg.providers = [...(cfg.providers || []), ...bundles.providers];
+        cfg.providers = cfg.strictBundles ? bundles.providers : [...(cfg.providers || []), ...bundles.providers];
 
         App.init(cfg);
         bootBundles(bundles, App);

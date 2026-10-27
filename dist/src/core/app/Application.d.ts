@@ -63,6 +63,8 @@ export declare class Application implements ApplicationInterface {
     /** Đã boot chưa */
     private booted;
     private ownProperties;
+    /** Bật bởi config.strictBundles: ghi đè khoá bị khoá thì ném lỗi thay vì bỏ qua im lặng. */
+    strictBundles: boolean;
     __store: Map<any, {
         isOverridable: boolean;
         value: any;

@@ -22,6 +22,11 @@ const editor = (): LanguageEditor => fixture('languages-page-en.json').data.lang
 const response = (data: any, status = 200) => new Response(JSON.stringify(data), {status, headers: {'Content-Type': 'application/json'}});
 const file = (json: string, name = 'ja.11111111-1111-4111-8111-111111111111.json') => ({name, size: new TextEncoder().encode(json).length, text: async () => json}) as File;
 const preview = {batch: '22222222-2222-4222-8222-222222222222', locale: 'en', status: 'preview', changes: {'admin.users.title': ''}, untranslated: []};
+async function selectHeaderLanguage(code: string): Promise<void> {
+    (document.querySelector('#admin-language-toggle') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(document.querySelector(`.sa-admin-languages button[data-locale="${code}"]`)).not.toBeNull());
+    (document.querySelector(`.sa-admin-languages button[data-locale="${code}"]`) as HTMLButtonElement).click();
+}
 let vm: ViewManager | undefined; let router: Router | undefined;
 afterEach(() => {
     vm?.destroy(); router?.destroy(); vm = undefined; router = undefined;
@@ -129,7 +134,7 @@ it('hydrates real Laravel language markup, guards navigation and UI language cha
     const ssr = JSON.parse(doc.querySelector('script[data-ref="saola-ssr"]')!.textContent!);
     document.body.innerHTML = doc.body.innerHTML; window.history.replaceState({}, '', '/control/languages?locale=vi');
     const shared = app() as any; shared.set('Registry', MarkerRegistry);
-    const helper = new HelperService(shared); shared.set('Helper', helper); shared.set('AdminUI', new AdminUI()); helper.initTranslations(config.i18n);
+    const helper = new HelperService(shared); shared.set('Helper', helper); shared.set('AdminUI', new AdminUI(shared)); shared.set('Admin', shared.make('AdminUI')); helper.initTranslations(config.i18n);
     shared.set('Http', {setHeader: vi.fn(), get: vi.fn(async (url: string) => ({data: fixture(url.includes('/languages') ? `languages-page-${helper.getLocale()}.json` : `page-${helper.getLocale()}.json`)}))});
     const writes: any[] = []; let server = editor();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
@@ -145,8 +150,8 @@ it('hydrates real Laravel language markup, guards navigation and UI language cha
     });
     vm = new ViewManager(shared); shared.set('View', vm);
     vm.init({container: '#app-root', systemData: config.view.systemData, ssrData: config.view.ssrData, ssr, registry: {
-        'admin.pages.languages': LanguagesPage, 'admin.components.languages': LanguagesRenderer,
-        'admin.layouts.shell': Shell, 'admin.pages.resource': Page, 'admin.components.resource': Resource,
+        'admin.classic.pages.languages': LanguagesPage, 'admin.classic.components.languages': LanguagesRenderer,
+        'admin.classic.layouts.shell': Shell, 'admin.classic.pages.resource': Page, 'admin.classic.components.resource': Resource,
     }});
     router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure(config.router); router.start();
     await vi.waitFor(() => expect(vm!.getCurrentView()).not.toBeNull());
@@ -155,14 +160,16 @@ it('hydrates real Laravel language markup, guards navigation and UI language cha
     (document.querySelector('#language-new-name') as HTMLInputElement).value = '日本語';
     code.closest('form')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     await vi.waitFor(() => expect((document.querySelector('#language-save') as HTMLButtonElement).disabled).toBe(false));
-    ([...document.querySelectorAll('.sa-admin-languages button')].find(button => button.textContent === 'en') as HTMLButtonElement).click();
+    await selectHeaderLanguage('en');
     await vi.waitFor(() => expect(document.querySelector('#language-notice')?.textContent).toContain('lưu hoặc bỏ'));
     expect(helper.getLocale()).toBe('vi');
+    expect(document.querySelector('#language-notice')?.getAttribute('data-kind')).toBe('warning');
     await router.navigate('/control'); expect(window.location.pathname).toBe('/control/languages');
     const select = document.querySelector('#language-content-default') as HTMLSelectElement;
     select.value = 'ja'; select.dispatchEvent(new Event('change', {bubbles: true}));
     document.querySelector('#language-save')!.closest('form')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     await vi.waitFor(() => expect(document.querySelector('#language-notice')?.textContent).toBe(helper.text('admin.languages.saved')));
+    expect(document.querySelector('#language-notice')?.getAttribute('data-kind')).toBe('success');
     expect(JSON.parse(writes[0].body).contentDefault).toBe('ja');
     expect((document.querySelector('#language-target') as HTMLSelectElement).options).toHaveLength(3);
     expect((document.querySelector('#language-ui-default') as HTMLSelectElement).options).toHaveLength(2);
@@ -185,5 +192,9 @@ it('hydrates real Laravel language markup, guards navigation and UI language cha
     expect(JSON.parse(writes[2].body)).toEqual({publish: false}); expect(JSON.parse(writes[3].body)).toEqual({publish: true});
     await router.navigate('/control');
     await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Tổng quan'));
+    expect([...document.querySelectorAll('.sa-admin-nav-item[aria-current="page"]')].map(link => link.textContent?.trim())).toEqual(['Tổng quan']);
+    await router.navigate('/control/languages');
+    await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Ngôn ngữ'));
+    expect([...document.querySelectorAll('.sa-admin-nav-item[aria-current="page"]')].map(link => link.textContent?.trim())).toEqual(['Ngôn ngữ']);
     expect(document.querySelectorAll('.saola-admin')).toHaveLength(1);
 });

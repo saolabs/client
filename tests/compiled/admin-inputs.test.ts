@@ -1,0 +1,113 @@
+import {afterEach, beforeEach, expect, it, vi} from 'vitest';
+import {readFileSync} from 'node:fs';
+import path from 'node:path';
+import {ResourceManager} from '../../../admin/resources/saola/admin/app/resource-manager';
+import {AdminUI} from '../../../admin/resources/saola/admin/app/bundle';
+import {app} from '../../src/core/helpers/app';
+import {HelperService} from '../../src/core/services/HelperService';
+import {ViewManager} from '../../src/core/view/ViewManager';
+import {Router} from '../../src/core/routers/Router';
+import MarkerRegistry from '../../src/core/services/MarkerRegistry';
+import BlockManager from '../../src/core/services/BlockManager';
+import {StoreService} from '../../src/core/services/StoreService';
+import Page from '../fixtures/compiled/.generated/js/admin-page';
+import Shell from '../fixtures/compiled/.generated/js/admin-shell';
+import Manager from '../fixtures/compiled/.generated/js/admin-manager';
+import Input from '../fixtures/compiled/.generated/js/admin-input';
+import Media from '../fixtures/compiled/.generated/js/admin-media-library';
+import MaterialPage from '../fixtures/compiled/.generated/js/material-admin-page';
+import MaterialShell from '../fixtures/compiled/.generated/js/material-admin-shell';
+import MaterialManager from '../fixtures/compiled/.generated/js/material-admin-manager';
+import MaterialInput from '../fixtures/compiled/.generated/js/material-admin-input';
+import MaterialMedia from '../fixtures/compiled/.generated/js/material-admin-media-library';
+
+const root = path.join(__dirname, '../fixtures/compiled/.generated');
+const fixture = () => JSON.parse(readFileSync(path.join(root, 'input-fixtures/editor.json'), 'utf8'));
+const response = (body: any, status = 200) => new Response(JSON.stringify(body), {status, headers: {'Content-Type': 'application/json'}});
+let vm: ViewManager | undefined, router: Router | undefined;
+beforeEach(() => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), clear: () => values.clear()});
+});
+afterEach(() => {
+    router?.destroy(); vm?.destroy(); vm = undefined; router = undefined;
+    BlockManager.destroy(); StoreService.instance('ViewManager').clear(); document.body.innerHTML = ''; window.history.replaceState({}, '', '/');
+    window.localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals();
+});
+
+it('normalizes typed values, compares multiple selections by value and preserves invalid JSON drafts/array validation errors', async () => {
+    const metadata = fixture(); const manager = new ResourceManager(metadata);
+    manager.change('many', ['a']); expect(manager.dirty).toBe(false);
+    manager.change('many', ['a', 'b']); expect(manager.dirty).toBe(true);
+    manager.change('many', ['a']); expect(manager.dirty).toBe(false);
+    manager.change('price', '0'); expect(manager.dirty).toBe(true);
+    manager.change('document', '{invalid');
+    const send = vi.fn().mockResolvedValue(response({errors: {'tags.1': ['Too long.'], document: ['Invalid JSON.']}}, 422));
+    await manager.save(send);
+    expect(manager.errors.tags).toBe('Too long.');
+    expect(manager.fields.find(field => field.key === 'document')?.value).toBe('{invalid');
+    expect(manager.fields.find(field => field.key === 'price')?.value).toBe(0);
+    manager.discard(); expect(manager.dirty).toBe(false);
+    expect(manager.fields.find(field => field.key === 'many')?.value).toEqual(['a']);
+});
+
+it.each(['classic', 'material'])('%s input templates keep drafts across tabs, support editor tools and media, submit typed payloads and reveal server errors', async theme => {
+    const base = `admin.${theme}.`; const metadata = fixture(); const writes: any[] = [];
+    const captured: ResourceManager[] = [];
+    const shared = app() as any; shared.set('Registry', MarkerRegistry); const helper = new HelperService(shared); shared.set('Helper', helper);
+    const ui = new AdminUI(shared); const create = ui.createResourceManager.bind(ui);
+    vi.spyOn(ui, 'createResourceManager').mockImplementation(data => { const manager = create(data); captured.push(manager); return manager; });
+    shared.set('AdminUI', ui); shared.set('Admin', ui);
+    const scope = 'admin:inputs'; const messages = JSON.parse(readFileSync(path.join(root, 'admin-en.json'), 'utf8'));
+    const i18n = {scope, locale: 'en', fallbackLocale: 'en', catalogs: {en: {scope, revision: 1, messages}}}; helper.initTranslations(i18n);
+    shared.set('Http', {setHeader: vi.fn(), get: vi.fn(async () => ({data: {view: base + 'pages.resource', i18n,
+        data: {page: {schema: 1, titleKey: 'admin.resource.records', fields: [], columns: [], rows: []}, management: metadata,
+            currentPage: 'inputs', navigation: [], locales: [], dictionaryPattern: '', account: {}, brand: 'Admin', uiLocale: 'en'}}}))});
+    const media = JSON.parse(readFileSync(path.join(root, 'admin-ssr/media-api.json'), 'utf8')); const picked = media.data.items[0];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
+        if (String(url).includes('/_api/media/')) return response({item: picked});
+        if (String(url).includes('/_api/media')) return response(media);
+        writes.push(JSON.parse(String(options?.body))); return response({errors: {body: ['Fix content.']}}, 422);
+    });
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    document.body.innerHTML = '<div id="app-root"></div>'; window.history.replaceState({}, '', '/control/inputs/1/edit');
+    vm = new ViewManager(shared); shared.set('View', vm);
+    const views = theme === 'classic' ? [Page, Shell, Manager, Input, Media] : [MaterialPage, MaterialShell, MaterialManager, MaterialInput, MaterialMedia];
+    vm.init({container: '#app-root', systemData: {__base__: base}, registry: Object.fromEntries(['pages.resource', 'layouts.shell', 'components.manager', 'components.input', 'components.media-library'].map((name, index) => [base + name, views[index]]))});
+    router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure({routes: [{path: '/control/inputs/1/edit', component: base + 'pages.resource'}]}); router.start();
+    await vi.waitFor(() => expect(document.querySelector('#resource-field-name')).not.toBeNull());
+    const input = (key: string, value: string) => { const node = document.getElementById('resource-field-' + key) as HTMLInputElement; node.value = value; node.dispatchEvent(new Event('input', {bubbles: true})); return node; };
+    input('name', 'Draft name'); input('price', '12.5'); input('day', '2026-10-26'); input('tags', 'one, two');
+    const radio = document.querySelector('#resource-field-choice input[value="b"]') as HTMLInputElement; radio.click();
+    const check = document.querySelector('#resource-field-many input[value="b"]') as HTMLInputElement; check.click();
+    await vi.waitFor(() => expect(captured.at(-1)!.fields.find(field => field.key === 'many')?.value).toEqual(['a', 'b']));
+    expect(captured.at(-1)!.fields.find(field => field.key === 'choice')?.value).toBe('b');
+    expect(ui.canChangeLanguage()).toBe(false);
+    const tab = async (key: string) => { (document.getElementById('resource-tab-' + key) as HTMLButtonElement).click(); await vi.waitFor(() => expect(document.getElementById('resource-section-' + key)).not.toBeNull()); };
+    await tab('content'); input('body', 'Hello');
+    const body = document.getElementById('resource-field-body') as HTMLTextAreaElement; body.setSelectionRange(0, 5);
+    ([...document.querySelectorAll('.sa-admin-editor-toolbar button')].find(node => node.textContent === 'Bold') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(captured.at(-1)!.fields.find(field => field.key === 'body')?.value).toBe('<strong>Hello</strong>'));
+    input('document', '{"active":false}');
+    ([...document.querySelectorAll('button')].find(node => node.textContent === 'Format JSON') as HTMLButtonElement).click();
+    expect((document.getElementById('resource-field-document') as HTMLTextAreaElement).value).toContain('\n');
+    ([...document.querySelectorAll('.sa-admin-media-field button')].find(node => node.textContent === 'Choose media') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(document.querySelectorAll('.sa-admin-media-tile')).toHaveLength(1));
+    (document.querySelector('.sa-admin-media-tile') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect((document.querySelector('#media-select') as HTMLButtonElement).disabled).toBe(false));
+    (document.querySelector('#media-select') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
+    expect(captured.at(-1)!.fields.find(field => field.key === 'image')?.value).toBe(picked.url);
+    await tab('main');
+    expect((document.getElementById('resource-field-name') as HTMLInputElement).value).toBe('Draft name');
+    expect((document.getElementById('resource-field-tags') as HTMLInputElement).value).toBe('one, two');
+    (document.querySelector('.sa-admin-resource-editor form') as HTMLFormElement).dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+    await vi.waitFor(() => expect(document.getElementById('resource-error-body')?.textContent).toBe('Fix content.'));
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe('resource-field-body'));
+    expect(writes[0].values).toMatchObject({name: 'Draft name', price: 12.5, choice: 'b', many: ['a', 'b'], tags: ['one', 'two'], body: '<strong>Hello</strong>', image: picked.url});
+    expect(document.querySelector('#resource-tab-content')?.getAttribute('aria-selected')).toBe('true');
+    ([...document.querySelectorAll('.sa-admin-form-actions button')].find(node => node.textContent === 'Discard changes') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(captured.at(-1)!.dirty).toBe(false));
+    await tab('main'); expect((document.getElementById('resource-field-name') as HTMLInputElement).value).toBe('Visible');
+    expect(ui.canChangeLanguage()).toBe(true);
+});

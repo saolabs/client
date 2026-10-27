@@ -1,4 +1,4 @@
-import {afterEach, expect, it, vi} from 'vitest';
+import {beforeEach, afterEach, expect, it, vi} from 'vitest';
 import path from 'node:path';
 import {readFileSync} from 'node:fs';
 import {SettingsForm, type Editor} from '../../../admin/resources/saola/admin/app/settings-form';
@@ -28,11 +28,21 @@ const editor = (): Editor => ({group: 'general', contentLocale: 'vi', endpoint: 
     ]});
 const saved = (initial: Editor, values: any = {}, localized: any = {}) => ({data: {...initial.document, revision: 1, values, localized},
     canUpdate: true, schema: {fields: Object.fromEntries(initial.fields.map(field => [field.key, {...field, default: field.value}]))}});
+async function selectHeaderLanguage(code: string): Promise<void> {
+    (document.querySelector('#admin-language-toggle') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(document.querySelector(`.sa-admin-languages button[data-locale="${code}"]`)).not.toBeNull());
+    (document.querySelector(`.sa-admin-languages button[data-locale="${code}"]`) as HTMLButtonElement).click();
+}
+beforeEach(() => {
+    const saved = new Map<string, string>();
+    vi.stubGlobal('localStorage', {getItem: (key: string) => saved.get(key) ?? null, setItem: (key: string, value: string) => saved.set(key, value), clear: () => saved.clear()});
+});
 let vm: ViewManager | undefined; let router: Router | undefined;
 afterEach(() => {
     vm?.destroy(); router?.destroy(); vm = undefined; router = undefined;
     BlockManager.destroy(); StoreService.instance('ViewManager').clear();
     document.body.innerHTML = ''; window.history.replaceState({}, '', '/'); vi.restoreAllMocks();
+    window.localStorage.clear(); vi.unstubAllGlobals();
 });
 
 it('sends only edited fields with explicit empty/false/zero, original revision, CSRF and content locale', async () => {
@@ -55,6 +65,29 @@ it('does not materialize untouched fallbacks and rejects an incomplete number be
     form.change('count', 11); send.mockResolvedValue(response(saved(initial, {count: 11})));
     await form.save(send);
     expect(JSON.parse(send.mock.calls[0][1].body)).toEqual({revision: 0, patch: {values: {count: 11}}});
+});
+
+it('saves a global group without a content locale or localized patch and accepts global responses', async () => {
+    const initial = editor();
+    initial.group = 'system'; initial.endpoint = '/control/settings/system'; initial.contentLocale = '';
+    initial.document = {...initial.document, group: 'system', contentLocales: [], defaultLocale: ''};
+    initial.fields = initial.fields.filter(field => !field.localized);
+    const form = new SettingsForm(initial); form.change('enabled', false);
+    const send = vi.fn().mockResolvedValue(response(saved(initial, {enabled: false})));
+    await form.save(send);
+    expect(JSON.parse(send.mock.calls[0][1].body)).toEqual({revision: 0, patch: {values: {enabled: false}}});
+    expect(form.notice).toBe('admin.settings.saved'); expect(form.dirty).toBe(false); expect(form.revision).toBe(1);
+});
+
+it('loads updated select options from the schema when a shared group is reloaded', async () => {
+    const initial = editor(); initial.contentLocale = '';
+    initial.document = {...initial.document, contentLocales: [], defaultLocale: ''};
+    initial.fields = [{key: 'zone', labelKey: 'zone', type: 'select', localized: false, present: true,
+        value: 'UTC', options: [{value: 'UTC', label: 'UTC'}], maxLength: 200, min: '', max: ''}];
+    const form = new SettingsForm(initial);
+    await form.reload(vi.fn().mockResolvedValue(response({data: {...initial.document, values: {zone: 'Asia/Ho_Chi_Minh'}}, canUpdate: true,
+        schema: {fields: {zone: {type: 'select', default: 'UTC', options: {UTC: 'UTC', 'Asia/Ho_Chi_Minh': 'Asia/Ho_Chi_Minh'}}}}})));
+    expect(form.fields[0].value).toBe('Asia/Ho_Chi_Minh'); expect(form.fields[0].options).toHaveLength(2);
 });
 
 it('preserves input after field errors, conflict and network failure; never silently overwrites a newer revision', async () => {
@@ -105,7 +138,7 @@ it('hydrates the actual settings SSR form, guards route/UI/content locale change
     document.body.innerHTML = doc.body.innerHTML;
     window.history.replaceState({}, '', '/control/settings?content_locale=vi');
     const shared = app() as any; shared.set('Registry', MarkerRegistry);
-    const helper = new HelperService(shared); shared.set('Helper', helper); shared.set('AdminUI', new AdminUI()); helper.initTranslations(config.i18n);
+    const helper = new HelperService(shared); shared.set('Helper', helper); shared.set('AdminUI', new AdminUI(shared)); shared.set('Admin', shared.make('AdminUI')); helper.initTranslations(config.i18n);
     const httpGet = vi.fn(async (url: string) => {
         const page = fixture(url.includes('/settings') ? `settings-page-${helper.getLocale()}.json` : `page-${helper.getLocale()}.json`);
         if (url.includes('/settings') && requests.length) {
@@ -126,18 +159,25 @@ it('hydrates the actual settings SSR form, guards route/UI/content locale change
     });
     vm = new ViewManager(shared); shared.set('View', vm);
     vm.init({container: '#app-root', systemData: config.view.systemData, ssrData: config.view.ssrData, ssr, registry: {
-        'admin.pages.settings': SettingsPage, 'admin.components.settings-form': SettingsRenderer,
-        'admin.layouts.shell': Shell, 'admin.pages.resource': Page, 'admin.components.resource': Resource,
+        'admin.classic.pages.settings': SettingsPage, 'admin.classic.components.settings-form': SettingsRenderer,
+        'admin.classic.layouts.shell': Shell, 'admin.classic.pages.resource': Page, 'admin.classic.components.resource': Resource,
     }});
     router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure(config.router);
     const hostGuard = vi.fn(() => true); router.beforeEach(hostGuard); router.start();
     await vi.waitFor(() => expect(vm!.getCurrentView()).not.toBeNull());
     const input = document.querySelector('#setting-website_name') as HTMLInputElement;
     expect(input.value).toBe('Workbench');
+    expect(document.querySelector('#settings-group-navigation')?.classList.contains('sa-admin-settings-tabs')).toBe(true);
+    expect(document.querySelectorAll('#settings-group-navigation a')).toHaveLength(3);
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings a[aria-current="page"]')?.textContent).toBe('Website'));
     input.value = 'Tên mới'; input.dispatchEvent(new Event('input', {bubbles: true}));
     await vi.waitFor(() => expect((document.querySelector('#settings-save') as HTMLButtonElement).disabled).toBe(false));
-    const switchEn = () => [...document.querySelectorAll('.sa-admin-languages button')].find(button => button.textContent === 'en') as HTMLButtonElement;
-    switchEn().click();
+    const tab = new URL((document.querySelector('#settings-group-navigation a[href*="group=branding"]') as HTMLAnchorElement).href);
+    await router.navigate(tab.pathname + tab.search);
+    await vi.waitFor(() => expect(document.querySelector('#settings-notice')?.textContent).toContain('lưu hoặc bỏ'));
+    expect((document.querySelector('#setting-website_name') as HTMLInputElement).value).toBe('Tên mới');
+    expect(window.location.search).not.toContain('branding');
+    await selectHeaderLanguage('en');
     await vi.waitFor(() => expect(document.querySelector('#settings-notice')?.textContent).toContain('lưu hoặc bỏ'));
     expect(helper.getLocale()).toBe('vi');
     const select = document.querySelector('#settings-content-locale') as HTMLSelectElement;
@@ -147,14 +187,157 @@ it('hydrates the actual settings SSR form, guards route/UI/content locale change
     expect(window.location.pathname).toBe('/control/settings'); expect(input.value).toBe('Tên mới');
     (document.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     await vi.waitFor(() => expect(document.querySelector('#settings-notice')?.textContent).toContain('Đã lưu'));
+    expect(document.querySelector('#settings-notice')?.getAttribute('data-kind')).toBe('success');
     expect(JSON.parse(requests[0].body)).toEqual({revision: 0, patch: {localized: {vi: {website_name: 'Tên mới'}}}});
     router.navigate('/control');
     await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Tổng quan'));
     router.navigate('/control/settings?content_locale=vi');
     await vi.waitFor(() => expect(document.querySelector('#setting-website_name')).not.toBeNull());
-    switchEn().click();
-    await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Website settings'));
+    await selectHeaderLanguage('en');
+    await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Website information'));
     expect((document.querySelector('#settings-content-locale') as HTMLSelectElement).value).toBe('vi');
     expect((document.querySelector('#setting-website_name') as HTMLInputElement).value).toBe('Tên mới');
     expect(document.querySelectorAll('.saola-admin')).toHaveLength(1);
+});
+
+it('hydrates submenu disclosure, switches settings categories and restores the active child on cached navigation', async () => {
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    const doc = new DOMParser().parseFromString(readFileSync(path.join(root, 'public/settings-vi.html'), 'utf8'), 'text/html');
+    const script = [...doc.querySelectorAll('script')].find(script => script.textContent?.startsWith('window.APP_CONFIGS='))!.textContent!;
+    const config = JSON.parse(script.replace('window.APP_CONFIGS=', '').replace(/;$/, ''));
+    const ssr = JSON.parse(doc.querySelector('script[data-ref="saola-ssr"]')!.textContent!);
+    document.body.innerHTML = doc.body.innerHTML; window.history.replaceState({}, '', '/control/settings?content_locale=vi');
+    const shared = app() as any; shared.set('Registry', MarkerRegistry);
+    const helper = new HelperService(shared); shared.set('Helper', helper); shared.set('AdminUI', new AdminUI(shared)); shared.set('Admin', shared.make('AdminUI')); helper.initTranslations(config.i18n);
+    shared.set('Http', {setHeader: vi.fn(), get: vi.fn(async (url: string) => ({data: fixture(url.includes('group=system') ? 'system-page-vi.json' : 'settings-page-vi.json')}))});
+    vm = new ViewManager(shared); shared.set('View', vm);
+    vm.init({container: '#app-root', systemData: config.view.systemData, ssrData: config.view.ssrData, ssr, registry: {
+        'admin.classic.pages.settings': SettingsPage, 'admin.classic.components.settings-form': SettingsRenderer, 'admin.classic.layouts.shell': Shell,
+    }});
+    router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure(config.router); router.start();
+    await vi.waitFor(() => expect(vm!.getCurrentView()).not.toBeNull());
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings a[aria-current="page"]')?.textContent).toBe('Website'));
+    const toggle = () => document.querySelector('button[aria-controls="admin-submenu-settings"]') as HTMLButtonElement;
+    toggle().click(); await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings')).toBeNull());
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    // Desktop hover also works on hybrid devices whose primary input reports no hover.
+    vi.stubGlobal('matchMedia', () => ({matches: false}));
+    toggle().closest('.sa-admin-nav-group')!.dispatchEvent(new MouseEvent('mouseenter'));
+    await vi.waitFor(() => expect(document.querySelectorAll('#admin-submenu-settings a')).toHaveLength(2));
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    expect(document.querySelector('.sa-admin-flyout-title')).toBeNull();
+    toggle().closest('.sa-admin-nav-group')!.dispatchEvent(new MouseEvent('mouseleave'));
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings')).toBeNull());
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    toggle().click(); await vi.waitFor(() => expect(document.querySelectorAll('#admin-submenu-settings a')).toHaveLength(2));
+    toggle().closest('.sa-admin-nav-group')!.dispatchEvent(new MouseEvent('mouseleave'));
+    await vi.waitFor(() => expect(document.querySelectorAll('#admin-submenu-settings a')).toHaveLength(2));
+    const system = new URL((document.querySelector('#admin-submenu-settings a[href*="group=system"]') as HTMLAnchorElement).href);
+    await router.navigate(system.pathname + system.search);
+    await vi.waitFor(() => expect(document.querySelector('[data-settings-group]')?.getAttribute('data-settings-group')).toBe('system'));
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings a[aria-current="page"]')?.textContent).toBe('Hệ thống'));
+    expect(document.querySelectorAll('#settings-group-navigation a')).toHaveLength(2);
+    expect(document.querySelector('#settings-group-navigation a[aria-current="page"]')?.textContent).toBe('Vận hành');
+    expect(document.querySelector('#settings-content-locale')).toBeNull();
+    await router.navigate('/control/settings?content_locale=vi');
+    await vi.waitFor(() => expect(document.querySelector('[data-settings-group]')?.getAttribute('data-settings-group')).toBe('general'));
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings a[aria-current="page"]')?.textContent).toBe('Website'));
+    expect(document.querySelectorAll('#settings-group-navigation a')).toHaveLength(3);
+    expect(document.querySelectorAll('.saola-admin')).toHaveLength(1);
+    expect(toggle().classList.contains('is-active')).toBe(true);
+    expect(toggle().closest('.sa-admin-nav-group')?.classList.contains('is-side-flyout')).toBe(false);
+    expect(document.querySelectorAll('.sa-admin-nav-icon').length).toBeGreaterThan(3);
+    // On a different page the same group must float sideways, even if it was open before.
+    shared.make('AdminUI').setCurrentPage('workspace');
+    await vi.waitFor(() => expect(toggle().classList.contains('is-active')).toBe(false));
+    expect(document.querySelector('#admin-submenu-settings')).toBeNull();
+    toggle().closest('.sa-admin-nav-group')!.dispatchEvent(new MouseEvent('mouseenter'));
+    await vi.waitFor(() => expect(toggle().closest('.sa-admin-nav-group')?.classList.contains('is-side-flyout')).toBe(true));
+    expect(document.querySelectorAll('#admin-submenu-settings a')).toHaveLength(2);
+    expect(document.querySelector('.sa-admin-flyout-title')).toBeNull();
+    toggle().closest('.sa-admin-nav-group')!.dispatchEvent(new MouseEvent('mouseleave'));
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings')).toBeNull());
+    toggle().click();
+    await vi.waitFor(() => expect(toggle().closest('.sa-admin-nav-group')?.classList.contains('is-side-flyout')).toBe(true));
+    (document.querySelector('#admin-submenu-settings a') as HTMLAnchorElement).focus();
+    expect(document.querySelector('#admin-submenu-settings')).not.toBeNull();
+    document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings')).toBeNull());
+    shared.make('AdminUI').setCurrentPage('settings.website');
+    await vi.waitFor(() => expect(toggle().classList.contains('is-active')).toBe(true));
+    expect(toggle().closest('.sa-admin-nav-group')?.classList.contains('is-side-flyout')).toBe(false);
+    (document.querySelector('#admin-menu-toggle') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(document.querySelector('.saola-admin')?.classList.contains('is-sidebar-compact')).toBe(true));
+    expect(document.querySelector('#admin-submenu-settings')).toBeNull();
+    const group = toggle().closest('.sa-admin-nav-group') as HTMLElement;
+    group.dispatchEvent(new FocusEvent('focusin', {bubbles: true}));
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings')).not.toBeNull());
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    expect(toggle().classList.contains('is-active')).toBe(true);
+    expect(document.querySelector('#admin-submenu-settings a[aria-current="page"]')?.textContent).toBe('Website');
+    document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings')).toBeNull());
+    expect(document.activeElement).toBe(toggle());
+    group.dispatchEvent(new MouseEvent('mouseenter'));
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings')).not.toBeNull());
+    expect(document.querySelector('.sa-admin-flyout-title')?.textContent).toBe('Thiết lập');
+    expect(document.activeElement).toBe(toggle());
+    group.dispatchEvent(new MouseEvent('mouseleave'));
+    await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings')).toBeNull());
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    const leaf = document.querySelector('.sa-admin-nav-item[href]') as HTMLAnchorElement;
+    leaf.closest('.sa-admin-nav-group')!.dispatchEvent(new MouseEvent('mouseenter'));
+    await vi.waitFor(() => expect(document.querySelector('.sa-admin-flyout-label')?.textContent).toBe(leaf.getAttribute('aria-label')));
+    expect(window.location.pathname).toBe('/control/settings');
+    leaf.closest('.sa-admin-nav-group')!.dispatchEvent(new MouseEvent('mouseleave'));
+    await vi.waitFor(() => expect(document.querySelector('.sa-admin-flyout-label')).toBeNull());
+    vi.stubGlobal('innerWidth', 390);
+    window.dispatchEvent(new Event('resize'));
+    group.dispatchEvent(new MouseEvent('mouseenter'));
+    await vi.waitFor(() => expect(document.querySelector('.saola-admin')?.classList.contains('is-sidebar-compact')).toBe(false));
+    expect(document.querySelector('.sa-admin-flyout-title')).toBeNull();
+});
+
+it.each(['classic', 'material'])('%s settings exposes field errors, restores native inputs on discard and distinguishes successful feedback', async theme => {
+    const base = `admin.${theme}.`;
+    const [ThemePage, ThemeForm, ThemeShell] = theme === 'classic' ? [SettingsPage, SettingsRenderer, Shell]
+        : [(await import('../fixtures/compiled/.generated/js/material-admin-settings-page')).default,
+            (await import('../fixtures/compiled/.generated/js/material-admin-settings-form')).default,
+            (await import('../fixtures/compiled/.generated/js/material-admin-shell')).default];
+    const envelope = fixture('settings-page-vi.json'); envelope.view = base + 'pages.settings';
+    const shared = app() as any; shared.set('Registry', MarkerRegistry);
+    const helper = new HelperService(shared); shared.set('Helper', helper); const ui = new AdminUI(shared); shared.set('AdminUI', ui); shared.set('Admin', ui); helper.initTranslations(envelope.i18n);
+    shared.set('Http', {setHeader: vi.fn(), get: vi.fn(async () => ({data: envelope}))});
+    let reject = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
+        if (reject) return response({errors: {'patch.localized.vi.website_name': ['Invalid name.']}}, 422);
+        const result = fixture('settings-api.json'); result.data.revision = 1;
+        result.data.localized = {vi: {website_name: JSON.parse(String(options?.body)).patch.localized.vi.website_name}};
+        return response(result);
+    });
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    document.body.innerHTML = '<div id="app-root"></div>'; window.history.replaceState({}, '', '/control/settings?content_locale=vi');
+    vm = new ViewManager(shared); shared.set('View', vm);
+    vm.init({container: '#app-root', systemData: {__base__: base}, registry: {
+        [base + 'pages.settings']: ThemePage, [base + 'components.settings-form']: ThemeForm, [base + 'layouts.shell']: ThemeShell,
+    }});
+    router = new Router(shared); shared.set('Router', router); router.setViewManager(vm);
+    router.configure({routes: [{path: '/control/settings', component: base + 'pages.settings'}]}); router.start();
+    await vi.waitFor(() => expect(document.getElementById('setting-website_name')).not.toBeNull());
+    const field = document.getElementById('setting-website_name') as HTMLInputElement;
+    const initial = field.value; field.value = 'Bad draft'; field.dispatchEvent(new Event('input', {bubbles: true}));
+    document.querySelector('form[data-settings-group]')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+    await vi.waitFor(() => expect(field.getAttribute('aria-invalid')).toBe('true'));
+    await vi.waitFor(() => expect(document.activeElement).toBe(field));
+    expect(document.getElementById('settings-notice')?.getAttribute('data-kind')).toBe('error');
+    expect(field.value).toBe('Bad draft');
+    (document.getElementById('settings-discard') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect((document.getElementById('setting-website_name') as HTMLInputElement).value).toBe(initial));
+    expect(document.getElementById('setting-website_name')).not.toBe(field);
+    expect(ui.canChangeLanguage()).toBe(true);
+    const next = document.getElementById('setting-website_name') as HTMLInputElement;
+    next.value = 'Good name'; next.dispatchEvent(new Event('input', {bubbles: true})); reject = false;
+    document.querySelector('form[data-settings-group]')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+    await vi.waitFor(() => expect(document.getElementById('settings-notice')?.getAttribute('data-kind')).toBe('success'));
+    expect(next.getAttribute('aria-invalid')).toBe('false'); expect(ui.canChangeLanguage()).toBe(true);
 });

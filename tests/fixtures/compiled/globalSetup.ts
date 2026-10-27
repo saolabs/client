@@ -106,7 +106,12 @@ export default async function setup() {
 
     // Exercise the starter's actual demo using the compiler being developed here.
     const compilerRoot = path.resolve(HERE, '../../../../compiler');
-    const demo = path.join(SAOLA_APP_ROOT, 'resources/saola/web/views/modules/home/language-demo.sao');
+    const starterConfig = JSON.parse(readFileSync(path.join(SAOLA_APP_ROOT, 'sao.config.json'), 'utf8'));
+    const demoRelative = 'modules/home/language-demo.sao';
+    const demoSources = Object.values(starterConfig.contexts.web.views) as string[];
+    const demo = demoSources.map(source => path.resolve(SAOLA_APP_ROOT, starterConfig.paths.saoView, source, demoRelative))
+        .find(source => existsSync(source));
+    if (!demo) throw new Error('Starter view mappings must contain the language demo source.');
     const script = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: "web.modules.home.language-demo", functionName: "LanguageDemo", factoryName: "LanguageDemo")); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
     const demoResult = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, compilerRoot, demo], {encoding: 'utf8'}));
     writeFileSync(path.join(OUT_JS_DIR, 'language-demo.ts'), demoResult.js);
@@ -114,26 +119,46 @@ export default async function setup() {
 
     const adminRoot = path.resolve(HERE, '../../../../admin');
     const adminScript = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: $argv[3], functionName: $argv[4], factoryName: $argv[4], lang: \\Saola\\Compiler\\Lang::Ts)); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
+    for (const theme of ['classic', 'material']) {
     for (const [name, file, fn] of [
         ['admin-page', 'pages/resource', 'AdminPage'],
         ['admin-renderer', 'components/resource', 'AdminRenderer'],
+        ['admin-manager', 'components/manager', 'AdminManager'],
+        ['admin-input', 'components/input', 'AdminInput'],
         ['admin-shell', 'layouts/shell', 'AdminShell'],
         ['admin-settings-page', 'pages/settings', 'AdminSettingsPage'],
         ['admin-settings-form', 'components/settings-form', 'AdminSettingsForm'],
         ['admin-languages-page', 'pages/languages', 'AdminLanguagesPage'],
         ['admin-languages-form', 'components/languages', 'AdminLanguagesForm'],
+        ['admin-media-page', 'pages/media', 'AdminMediaPage'],
+        ['admin-media-library', 'components/media-library', 'AdminMediaLibrary'],
     ]) {
-        const source = path.join(adminRoot, `resources/saola/admin/views/${file}.sao`);
-        const result = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', adminScript, compilerRoot, source, `admin.${file.replace('/', '.')}`, fn], {encoding: 'utf8'}));
-        writeFileSync(path.join(OUT_JS_DIR, `${name}.ts`), result.js);
-        writeFileSync(path.join(OUT_BLADE_DIR, `${name}.blade.php`), result.blade);
+        const source = path.join(adminRoot, `resources/saola/admin/themes/${theme}/views/${file}.sao`);
+        const result = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', adminScript, compilerRoot, source, `admin.${theme}.${file.replace('/', '.')}`, fn], {encoding: 'utf8'}));
+        writeFileSync(path.join(OUT_JS_DIR, `${theme === 'classic' ? '' : 'material-'}${name}.ts`), result.js);
+        writeFileSync(path.join(OUT_BLADE_DIR, `${theme === 'classic' ? '' : 'material-'}${name}.blade.php`), result.blade);
     }
+    }
+    const uiRoot = path.join(adminRoot, 'resources/saola/admin/themes/material/views/components/ui');
+    for (const file of readdirSync(uiRoot).filter(file => file.endsWith('.sao'))) {
+        const name = file.replace(/\.sao$/, '');
+        const result = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', adminScript, compilerRoot,
+            path.join(uiRoot, file), `admin.material.components.ui.${name}`, 'Ui' + pascalCase(name)], {encoding: 'utf8'}));
+        writeFileSync(path.join(OUT_JS_DIR, `ui-${name}.ts`), result.js);
+        writeFileSync(path.join(OUT_BLADE_DIR, `ui-${name}.blade.php`), result.blade);
+    }
+    const uiPage = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', adminScript, compilerRoot,
+        path.join(adminRoot, 'resources/saola/admin/themes/material/views/pages/ui-library.sao'), 'admin.material.pages.ui-library', 'UiLibraryPage'], {encoding: 'utf8'}));
+    writeFileSync(path.join(OUT_JS_DIR, 'ui-library-page.ts'), uiPage.js);
     for (const locale of ['en', 'vi']) {
         const script = 'echo json_encode(array_replace_recursive(require $argv[1]."/lang/".$argv[2]."/admin.php", require $argv[1]."/lang/".$argv[2]."/common.php"), JSON_THROW_ON_ERROR);';
         writeFileSync(path.join(GEN_DIR, `admin-${locale}.json`), execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, adminRoot, locale], {encoding: 'utf8'}));
     }
     execFileSync(process.env.SAOLA_PHP_BINARY || 'php', [path.join(adminRoot, 'vendor/bin/phpunit'), '-c', path.join(adminRoot, 'phpunit.xml'), '--filter', 'test_ssr_compiles'], {
         cwd: adminRoot, encoding: 'utf8', env: {...process.env, SAOLA_ADMIN_PREVIEW_DIR: path.join(GEN_DIR, 'admin-ssr')},
+    });
+    execFileSync(process.env.SAOLA_PHP_BINARY || 'php', [path.join(adminRoot, 'vendor/bin/phpunit'), '--filter', 'test_presets_project_groups_options_and_values'], {
+        cwd: adminRoot, encoding: 'utf8', env: {...process.env, SAOLA_ADMIN_INPUT_FIXTURES: path.join(GEN_DIR, 'input-fixtures')},
     });
 
     // Boot a fresh Laravel application too: Testbench refreshes route name
@@ -142,7 +167,7 @@ export default async function setup() {
     const fresh = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', liveScript, path.join(adminRoot, 'workbench/serve-preview.php')], {
         cwd: adminRoot, encoding: 'utf8', env: {...process.env, SAOLA_ADMIN_PREVIEW_DIR: path.join(GEN_DIR, 'admin-ssr')},
     }));
-    if (fresh?.view !== 'admin.pages.settings' || fresh?.data?.editor?.group !== 'general') {
+    if (fresh?.view !== 'admin.classic.pages.settings' || fresh?.data?.editor?.group !== 'general') {
         throw new Error('Fresh Laravel settings workbench did not boot: ' + JSON.stringify(fresh));
     }
 
