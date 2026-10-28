@@ -732,6 +732,13 @@ export class Html implements HtmlInterface {
         if (this.isSingleElement()) {
             return this.element;
         }
+        // Editors own their inner DOM, selection and composition state. Reconcile the
+        // host's attributes/events normally, but leave an explicitly declared island alone.
+        if (this.element.hasAttribute('data-sao-preserve-children')) {
+            this.initMode = InitModes.CREATE;
+            this.maybeRunEnter();
+            return this.element;
+        }
         if (this.config.content) {
             this.renderTextContent();
             return this.element;
