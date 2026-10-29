@@ -94,6 +94,7 @@ export declare class Html implements HtmlInterface {
     private composing;
     private isStarted;
     render(): HTMLElement;
+    private applyOptionSelection;
     private renderTextContent;
     /** Đã chạy enter rồi — re-render không được chạy lại. */
     private _entered;

@@ -18,6 +18,7 @@ import MaterialShell from '../fixtures/compiled/.generated/js/material-admin-she
 import Input from '../fixtures/compiled/.generated/js/admin-input';
 import MaterialInput from '../fixtures/compiled/.generated/js/material-admin-input';
 import MaterialManager from '../fixtures/compiled/.generated/js/material-admin-manager';
+import {adminInputs} from '../fixtures/compiled/admin-input-registry';
 
 const response = (body: any, status = 200) => new Response(JSON.stringify(body), {status, headers: {'Content-Type': 'application/json'}});
 const metadata = (mode: Management['mode'] = 'list'): Management => ({schema: 1, key: 'categories', titleKey: 'admin.resource.records', mode,
@@ -79,7 +80,7 @@ it('keeps the filtered list destination after save and prevents a second acknowl
     expect(write).toHaveBeenCalledTimes(1); expect(form.redirect).toBe(data.listUrl); expect(form.canSave).toBe(false);
     const editData = metadata('edit'); editData.listUrl = data.listUrl;
     const edit = new ResourceManager(editData); const reload = vi.fn().mockResolvedValue(response({schema: 1, resource: editData}));
-    await edit.reload(reload); expect(reload.mock.calls[0][0]).toBe(editData.endpoint + '?q=New&per_page=10&page=2');
+    await edit.reload(reload); expect(reload.mock.calls[0][0]).toBe(editData.listUrl);
 });
 
 it('normalizes integer DOM input without false dirty state and sends null for a cleared nullable value', async () => {
@@ -113,7 +114,7 @@ it('uses all selected revisions, refreshes counts with the same filter and does 
 });
 
 it.each(['classic', 'material'])('renders %s list/form, guards drafts, escapes values and refreshes the cached list after save', async (theme) => {
-    const prefix = 'admin.' + theme + '.';
+    const prefix = 'admin.themes.' + theme + '.';
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     const shared = app() as any; shared.set('Registry', MarkerRegistry);
     const helper = new HelperService(shared); shared.set('Helper', helper); const ui = new AdminUI(shared); shared.set('AdminUI', ui); shared.set('Admin', ui);
@@ -135,7 +136,7 @@ it.each(['classic', 'material'])('renders %s list/form, guards drafts, escapes v
     });
     document.body.innerHTML = '<div id="app-root"></div>'; window.history.replaceState({}, '', '/control/categories');
     vm = new ViewManager(shared); shared.set('View', vm);
-    vm.init({container: '#app-root', systemData: {__base__: prefix}, registry: {[prefix + 'pages.resource']: theme === 'classic' ? Page : MaterialPage, [prefix + 'layouts.shell']: theme === 'classic' ? Shell : MaterialShell, [prefix + 'components.input']: theme === 'classic' ? Input : MaterialInput, [prefix + 'components.manager']: theme === 'classic' ? Manager : MaterialManager}});
+    vm.init({container: '#app-root', systemData: {__base__: prefix}, registry: {...adminInputs(theme), [prefix + 'pages.resource']: theme === 'classic' ? Page : MaterialPage, [prefix + 'layouts.shell']: theme === 'classic' ? Shell : MaterialShell, [prefix + 'components.input']: theme === 'classic' ? Input : MaterialInput, [prefix + 'components.manager']: theme === 'classic' ? Manager : MaterialManager}});
     router = new Router(shared); shared.set('Router', router); router.setViewManager(vm);
     router.configure({routes: [{path: '/control/categories', component: prefix + 'pages.resource'}, {path: '/control/categories/create', component: prefix + 'pages.resource'}]}); router.start();
     await vi.waitFor(() => expect(document.querySelector('tbody')?.textContent).toContain('<b>Plain text</b>'));

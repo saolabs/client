@@ -1,3 +1,9 @@
+# Saola Client v1.5.1
+
+Applies declared option selection after mounting and hydration so native selects retain the correct configured value. Updates compiled admin fixtures and input registry coverage.
+
+Validation: TypeScript, 622 runtime/compiled tests, build and 12 packaged consumer tests passed. Includes built dist in the GitHub tag used by consumer applications.
+
 # Saola Client v1.3.0
 
 Adds scoped versioned DB language snapshots, text(), runtime load/changeLanguage with asynchronous guards and stale-request cancellation. Page-data refreshes the active catalog before rendering. Router.addNavigationGuard returns an independent disposer and restores history/hash URLs when Back is canceled.

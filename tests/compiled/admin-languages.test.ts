@@ -13,6 +13,7 @@ import {StoreService} from '../../src/core/services/StoreService';
 import LanguagesPage from '../fixtures/compiled/.generated/js/admin-languages-page';
 import LanguagesRenderer from '../fixtures/compiled/.generated/js/admin-languages-form';
 import Page from '../fixtures/compiled/.generated/js/admin-page';
+import Manager from '../fixtures/compiled/.generated/js/admin-manager';
 import Resource from '../fixtures/compiled/.generated/js/admin-renderer';
 import Shell from '../fixtures/compiled/.generated/js/admin-shell';
 
@@ -45,7 +46,7 @@ it('adds locale metadata and sends a revision with strict flags, CSRF and no dic
     const body = JSON.parse(options.body);
     expect(endpoint).toBe('/control/_api/languages');
     expect(body.revision).toBe(0); expect(body.contentDefault).toBe('ja');
-    expect(body.locales.at(-1)).toEqual({code: 'ja', name: '日本語', uiEnabled: true, contentEnabled: true});
+    expect(body.locales.at(-1)).toEqual({code: 'ja', name: '日本語', country: '', currency: '', uiEnabled: true, contentEnabled: true});
     expect(body.locales[0]).not.toHaveProperty('revision');
     expect(options.headers['X-CSRF-TOKEN']).toBe(initial.csrfToken); expect(options.credentials).toBe('same-origin');
     expect(form.dirty).toBe(false); expect(form.document.revision).toBe(1); expect(initial.document.revision).toBe(0);
@@ -150,8 +151,8 @@ it('hydrates real Laravel language markup, guards navigation and UI language cha
     });
     vm = new ViewManager(shared); shared.set('View', vm);
     vm.init({container: '#app-root', systemData: config.view.systemData, ssrData: config.view.ssrData, ssr, registry: {
-        'admin.classic.pages.languages': LanguagesPage, 'admin.classic.components.languages': LanguagesRenderer,
-        'admin.classic.layouts.shell': Shell, 'admin.classic.pages.resource': Page, 'admin.classic.components.resource': Resource,
+        'admin.themes.classic.pages.languages': LanguagesPage, 'admin.themes.classic.components.languages': LanguagesRenderer,
+        'admin.themes.classic.layouts.shell': Shell, 'admin.themes.classic.pages.resource': Page, 'admin.themes.classic.components.manager': Manager, 'admin.themes.classic.components.resource': Resource,
     }});
     router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure(config.router); router.start();
     await vi.waitFor(() => expect(vm!.getCurrentView()).not.toBeNull());
@@ -164,7 +165,7 @@ it('hydrates real Laravel language markup, guards navigation and UI language cha
     await vi.waitFor(() => expect(document.querySelector('#language-notice')?.textContent).toContain('lưu hoặc bỏ'));
     expect(helper.getLocale()).toBe('vi');
     expect(document.querySelector('#language-notice')?.getAttribute('data-kind')).toBe('warning');
-    await router.navigate('/control'); expect(window.location.pathname).toBe('/control/languages');
+    await router.navigate('/control/members'); expect(window.location.pathname).toBe('/control/languages');
     const select = document.querySelector('#language-content-default') as HTMLSelectElement;
     select.value = 'ja'; select.dispatchEvent(new Event('change', {bubbles: true}));
     document.querySelector('#language-save')!.closest('form')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
@@ -190,9 +191,9 @@ it('hydrates real Laravel language markup, guards navigation and UI language cha
     expect((document.querySelector('#language-ui-default') as HTMLSelectElement).options).toHaveLength(3);
     expect(JSON.parse(writes[1].body).json).toBe('{"admin":{"users":{"title":"<img src=x onerror=alert(1)>"}}}');
     expect(JSON.parse(writes[2].body)).toEqual({publish: false}); expect(JSON.parse(writes[3].body)).toEqual({publish: true});
-    await router.navigate('/control');
-    await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Tổng quan'));
-    expect([...document.querySelectorAll('.sa-admin-nav-item[aria-current="page"]')].map(link => link.textContent?.trim())).toEqual(['Tổng quan']);
+    await router.navigate('/control/members');
+    await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Người dùng'));
+    expect([...document.querySelectorAll('.sa-admin-nav-item[aria-current="page"]')].map(link => link.textContent?.trim())).toEqual(['Người dùng']);
     await router.navigate('/control/languages');
     await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Ngôn ngữ'));
     expect([...document.querySelectorAll('.sa-admin-nav-item[aria-current="page"]')].map(link => link.textContent?.trim())).toEqual(['Ngôn ngữ']);

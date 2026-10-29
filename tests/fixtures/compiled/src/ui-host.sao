@@ -3,7 +3,7 @@
 <template>
     <div>
         <output id="ui-log">{{ log }}</output>
-        <div id="first-ui">@include('admin.material.components.ui.' + kind, {data: data, on$action: (id) => setLog('action:' + id), on$change: (value) => setLog('change:' + value), on$close: () => setLog('closed')})</div>
-        @if(second !== null)<div id="second-ui">@include('admin.material.components.ui.' + kind, {data: second})</div>@endif
+        <div id="first-ui">@include('admin.themes.material.components.ui.' + kind, {data: data, on$action: (id) => setLog('action:' + id), on$change: (value) => setLog('change:' + value), on$close: () => setLog('closed')})</div>
+        @if(second !== null)<div id="second-ui">@include('admin.themes.material.components.ui.' + kind, {data: second})</div>@endif
     </div>
 </template>

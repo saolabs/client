@@ -20,6 +20,7 @@ import MaterialShell from '../fixtures/compiled/.generated/js/material-admin-she
 import MaterialManager from '../fixtures/compiled/.generated/js/material-admin-manager';
 import MaterialInput from '../fixtures/compiled/.generated/js/material-admin-input';
 import MaterialMedia from '../fixtures/compiled/.generated/js/material-admin-media-library';
+import {adminInputs} from '../fixtures/compiled/admin-input-registry';
 
 const root = path.join(__dirname, '../fixtures/compiled/.generated');
 const fixture = () => JSON.parse(readFileSync(path.join(root, 'input-fixtures/editor.json'), 'utf8'));
@@ -52,7 +53,7 @@ it('normalizes typed values, compares multiple selections by value and preserves
 });
 
 it.each(['classic', 'material'])('%s input templates keep drafts across tabs, support editor tools and media, submit typed payloads and reveal server errors', async theme => {
-    const base = `admin.${theme}.`; const metadata = fixture(); const writes: any[] = [];
+    const base = `admin.themes.${theme}.`; const metadata = fixture(); const writes: any[] = [];
     const captured: ResourceManager[] = [];
     const shared = app() as any; shared.set('Registry', MarkerRegistry); const helper = new HelperService(shared); shared.set('Helper', helper);
     const ui = new AdminUI(shared); const create = ui.createResourceManager.bind(ui);
@@ -73,7 +74,7 @@ it.each(['classic', 'material'])('%s input templates keep drafts across tabs, su
     document.body.innerHTML = '<div id="app-root"></div>'; window.history.replaceState({}, '', '/control/inputs/1/edit');
     vm = new ViewManager(shared); shared.set('View', vm);
     const views = theme === 'classic' ? [Page, Shell, Manager, Input, Media] : [MaterialPage, MaterialShell, MaterialManager, MaterialInput, MaterialMedia];
-    vm.init({container: '#app-root', systemData: {__base__: base}, registry: Object.fromEntries(['pages.resource', 'layouts.shell', 'components.manager', 'components.input', 'components.media-library'].map((name, index) => [base + name, views[index]]))});
+    vm.init({container: '#app-root', systemData: {__base__: base}, registry: {...adminInputs(theme), ...Object.fromEntries(['pages.resource', 'layouts.shell', 'components.manager', 'components.input', 'components.media-library'].map((name, index) => [base + name, views[index]]))}});
     router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure({routes: [{path: '/control/inputs/1/edit', component: base + 'pages.resource'}]}); router.start();
     await vi.waitFor(() => expect(document.querySelector('#resource-field-name')).not.toBeNull());
     const input = (key: string, value: string) => { const node = document.getElementById('resource-field-' + key) as HTMLInputElement; node.value = value; node.dispatchEvent(new Event('input', {bubbles: true})); return node; };

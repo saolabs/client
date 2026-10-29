@@ -10,6 +10,7 @@ import MarkerRegistry from '../../src/core/services/MarkerRegistry';
 import BlockManager from '../../src/core/services/BlockManager';
 import {StoreService} from '../../src/core/services/StoreService';
 import Page from '../fixtures/compiled/.generated/js/admin-page';
+import Manager from '../fixtures/compiled/.generated/js/admin-manager';
 import Shell from '../fixtures/compiled/.generated/js/admin-shell';
 import Renderer from '../fixtures/compiled/.generated/js/admin-renderer';
 import {AdminUI} from '../../../admin/resources/saola/admin/app/bundle';
@@ -39,7 +40,7 @@ it.each(['classic', 'material'])('%s uses the shared shell actions, guards langu
     const [ThemePage, ThemeShell, ThemeRenderer] = theme === 'material'
         ? await Promise.all([import('../fixtures/compiled/.generated/js/material-admin-page'), import('../fixtures/compiled/.generated/js/material-admin-shell'), import('../fixtures/compiled/.generated/js/material-admin-renderer')]).then(modules => modules.map(module => module.default))
         : [Page, Shell, Renderer];
-    const base = `admin.${theme}.`;
+    const base = `admin.themes.${theme}.`;
     const attributes = ['data-layout', 'data-topbar', 'data-sidebar', 'data-bs-theme', 'data-sidebar-size'];
     const previous = attributes.map(key => document.documentElement.getAttribute(key));
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
@@ -199,7 +200,7 @@ it('hydrates actual Laravel-rendered admin markup and switches locale without du
     const config = JSON.parse(configScript.replace('window.APP_CONFIGS=', '').replace(/;$/, ''));
     const ssr = JSON.parse(doc.querySelector('script[data-ref="saola-ssr"]')!.textContent!);
     document.body.innerHTML = doc.body.innerHTML;
-    window.history.replaceState({}, '', '/control');
+    window.history.replaceState({}, '', '/control/members');
     const shared = app() as any; shared.set('Registry', MarkerRegistry);
     const helper = new HelperService(shared); shared.set('Helper', helper); shared.set('AdminUI', new AdminUI(shared)); shared.set('Admin', shared.make('AdminUI'));
     helper.initTranslations(config.i18n);
@@ -207,13 +208,13 @@ it('hydrates actual Laravel-rendered admin markup and switches locale without du
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({ok: true, json: async () => JSON.parse(readFileSync(path.join(root, 'admin-ssr/dictionary-en.json'), 'utf8'))} as Response);
     vm = new ViewManager(shared); shared.set('View', vm);
     vm.init({container: '#app-root', systemData: config.view.systemData, ssrData: config.view.ssrData, ssr, registry: {
-        'admin.classic.pages.resource': Page, 'admin.classic.layouts.shell': Shell, 'admin.classic.components.resource': Renderer,
+        'admin.themes.classic.pages.resource': Page, 'admin.themes.classic.components.manager': Manager, 'admin.themes.classic.layouts.shell': Shell, 'admin.themes.classic.components.resource': Renderer,
     }});
     router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure(config.router);
     router.start();
     await vi.waitFor(() => expect(vm!.getCurrentView()).not.toBeNull());
     await selectHeaderLanguage('en');
-    await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Overview'));
+    await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Users'));
     expect(document.querySelectorAll('.saola-admin')).toHaveLength(1);
     expect(document.querySelector('#app-root')?.textContent).not.toMatch(/Tổng quan/);
     const outsideText = [...document.body.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join('').trim();
@@ -232,7 +233,7 @@ it('hydrates the host user directory, paginates, changes UI language and submits
     const config = JSON.parse(configScript.replace('window.APP_CONFIGS=', '').replace(/;$/, ''));
     const ssr = JSON.parse(doc.querySelector('script[data-ref="saola-ssr"]')!.textContent!);
     document.body.innerHTML = doc.body.innerHTML;
-    window.history.replaceState({}, '', '/control/users?locale=vi&per_page=10');
+    window.history.replaceState({}, '', '/control/members?locale=vi&per_page=10');
     const shared = app() as any; shared.set('Registry', MarkerRegistry);
     const helper = new HelperService(shared); shared.set('Helper', helper); shared.set('AdminUI', new AdminUI(shared)); shared.set('Admin', shared.make('AdminUI'));
     helper.initTranslations(config.i18n);
@@ -245,20 +246,20 @@ it('hydrates the host user directory, paginates, changes UI language and submits
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({ok: true, json: async () => fixture('dictionary-en.json')} as Response);
     vm = new ViewManager(shared); shared.set('View', vm);
     vm.init({container: '#app-root', systemData: config.view.systemData, ssrData: config.view.ssrData, ssr, registry: {
-        'admin.classic.pages.resource': Page, 'admin.classic.layouts.shell': Shell, 'admin.classic.components.resource': Renderer,
+        'admin.themes.classic.pages.resource': Page, 'admin.themes.classic.components.manager': Manager, 'admin.themes.classic.layouts.shell': Shell, 'admin.themes.classic.components.resource': Renderer,
     }});
     router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure(config.router); router.start();
     await vi.waitFor(() => expect(vm!.getCurrentView()).not.toBeNull());
     expect(document.querySelector('#admin-page-title')?.textContent).toBe('Người dùng');
     expect(document.querySelectorAll('tbody tr')).toHaveLength(10);
-    expect((document.querySelector('#resource-size') as HTMLSelectElement).value).toBe('10');
+    await vi.waitFor(() => expect((document.querySelector('#managed-size') as HTMLSelectElement).value).toBe('10'));
     expect(document.querySelector('dl')).toBeNull();
     await selectHeaderLanguage('en');
     await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Users'));
     (document.querySelector('a[rel="next"]') as HTMLAnchorElement).click();
     await vi.waitFor(() => expect(document.querySelector('tbody tr')?.textContent).toContain('Member 11'));
     expect(new URL(window.location.href).searchParams.get('page')).toBe('2');
-    const search = document.querySelector('#resource-search') as HTMLInputElement;
+    const search = document.querySelector('#managed-search') as HTMLInputElement;
     search.value = 'Member 02';
     document.querySelector('.sa-admin-list-filters')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     await vi.waitFor(() => expect(document.querySelectorAll('tbody tr')).toHaveLength(1));

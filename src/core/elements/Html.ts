@@ -757,6 +757,7 @@ export class Html implements HtmlInterface {
             if (children && children.length > 0) {
                 hydrateElementList(this, children);
             }
+            this.applyOptionSelection();
             this.initMode = InitModes.CREATE;
             return this.element;
         }
@@ -775,9 +776,19 @@ export class Html implements HtmlInterface {
             }
         }
         for (const node of Array.from(this.element.childNodes)) if (!keep.has(node)) node.remove();
+        this.applyOptionSelection();
         if (this.isStarted) for (const child of children as any[]) child.start?.();
         this.maybeRunEnter();
         return this.element;
+    }
+
+    private applyOptionSelection(): void {
+        const selected = this.config.props?.selected;
+        if (this.tagName.toLowerCase() !== 'option' || !selected) return;
+        // Insertion into a select may choose an option automatically. Apply the
+        // declared selection again after its DOM and text children are mounted.
+        (this.element as HTMLOptionElement).selected = Boolean(selected.type === 'binding'
+            ? selected.factory?.() : selected.value);
     }
 
     private renderTextContent(): void {

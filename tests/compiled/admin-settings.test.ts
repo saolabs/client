@@ -13,6 +13,7 @@ import {StoreService} from '../../src/core/services/StoreService';
 import SettingsPage from '../fixtures/compiled/.generated/js/admin-settings-page';
 import SettingsRenderer from '../fixtures/compiled/.generated/js/admin-settings-form';
 import Page from '../fixtures/compiled/.generated/js/admin-page';
+import Manager from '../fixtures/compiled/.generated/js/admin-manager';
 import Resource from '../fixtures/compiled/.generated/js/admin-renderer';
 import Shell from '../fixtures/compiled/.generated/js/admin-shell';
 
@@ -159,8 +160,8 @@ it('hydrates the actual settings SSR form, guards route/UI/content locale change
     });
     vm = new ViewManager(shared); shared.set('View', vm);
     vm.init({container: '#app-root', systemData: config.view.systemData, ssrData: config.view.ssrData, ssr, registry: {
-        'admin.classic.pages.settings': SettingsPage, 'admin.classic.components.settings-form': SettingsRenderer,
-        'admin.classic.layouts.shell': Shell, 'admin.classic.pages.resource': Page, 'admin.classic.components.resource': Resource,
+        'admin.themes.classic.pages.settings': SettingsPage, 'admin.themes.classic.components.settings-form': SettingsRenderer,
+        'admin.themes.classic.layouts.shell': Shell, 'admin.themes.classic.pages.resource': Page, 'admin.themes.classic.components.manager': Manager, 'admin.themes.classic.components.resource': Resource,
     }});
     router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure(config.router);
     const hostGuard = vi.fn(() => true); router.beforeEach(hostGuard); router.start();
@@ -168,7 +169,7 @@ it('hydrates the actual settings SSR form, guards route/UI/content locale change
     const input = document.querySelector('#setting-website_name') as HTMLInputElement;
     expect(input.value).toBe('Workbench');
     expect(document.querySelector('#settings-group-navigation')?.classList.contains('sa-admin-settings-tabs')).toBe(true);
-    expect(document.querySelectorAll('#settings-group-navigation a')).toHaveLength(3);
+    expect(document.querySelectorAll('#settings-group-navigation a')).toHaveLength(4);
     await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings a[aria-current="page"]')?.textContent).toBe('Website'));
     input.value = 'Tên mới'; input.dispatchEvent(new Event('input', {bubbles: true}));
     await vi.waitFor(() => expect((document.querySelector('#settings-save') as HTMLButtonElement).disabled).toBe(false));
@@ -182,15 +183,15 @@ it('hydrates the actual settings SSR form, guards route/UI/content locale change
     expect(helper.getLocale()).toBe('vi');
     const select = document.querySelector('#settings-content-locale') as HTMLSelectElement;
     select.value = 'en'; select.dispatchEvent(new Event('change', {bubbles: true})); expect(select.value).toBe('vi');
-    router.navigate('/control');
+    router.navigate('/control/members');
     await vi.waitFor(() => expect(hostGuard.mock.calls.length).toBeGreaterThan(1));
     expect(window.location.pathname).toBe('/control/settings'); expect(input.value).toBe('Tên mới');
     (document.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     await vi.waitFor(() => expect(document.querySelector('#settings-notice')?.textContent).toContain('Đã lưu'));
     expect(document.querySelector('#settings-notice')?.getAttribute('data-kind')).toBe('success');
     expect(JSON.parse(requests[0].body)).toEqual({revision: 0, patch: {localized: {vi: {website_name: 'Tên mới'}}}});
-    router.navigate('/control');
-    await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Tổng quan'));
+    router.navigate('/control/members');
+    await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Người dùng'));
     router.navigate('/control/settings?content_locale=vi');
     await vi.waitFor(() => expect(document.querySelector('#setting-website_name')).not.toBeNull());
     await selectHeaderLanguage('en');
@@ -212,7 +213,7 @@ it('hydrates submenu disclosure, switches settings categories and restores the a
     shared.set('Http', {setHeader: vi.fn(), get: vi.fn(async (url: string) => ({data: fixture(url.includes('group=system') ? 'system-page-vi.json' : 'settings-page-vi.json')}))});
     vm = new ViewManager(shared); shared.set('View', vm);
     vm.init({container: '#app-root', systemData: config.view.systemData, ssrData: config.view.ssrData, ssr, registry: {
-        'admin.classic.pages.settings': SettingsPage, 'admin.classic.components.settings-form': SettingsRenderer, 'admin.classic.layouts.shell': Shell,
+        'admin.themes.classic.pages.settings': SettingsPage, 'admin.themes.classic.components.settings-form': SettingsRenderer, 'admin.themes.classic.layouts.shell': Shell,
     }});
     router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure(config.router); router.start();
     await vi.waitFor(() => expect(vm!.getCurrentView()).not.toBeNull());
@@ -242,7 +243,7 @@ it('hydrates submenu disclosure, switches settings categories and restores the a
     await router.navigate('/control/settings?content_locale=vi');
     await vi.waitFor(() => expect(document.querySelector('[data-settings-group]')?.getAttribute('data-settings-group')).toBe('general'));
     await vi.waitFor(() => expect(document.querySelector('#admin-submenu-settings a[aria-current="page"]')?.textContent).toBe('Website'));
-    expect(document.querySelectorAll('#settings-group-navigation a')).toHaveLength(3);
+    expect(document.querySelectorAll('#settings-group-navigation a')).toHaveLength(4);
     expect(document.querySelectorAll('.saola-admin')).toHaveLength(1);
     expect(toggle().classList.contains('is-active')).toBe(true);
     expect(toggle().closest('.sa-admin-nav-group')?.classList.contains('is-side-flyout')).toBe(false);
@@ -299,7 +300,7 @@ it('hydrates submenu disclosure, switches settings categories and restores the a
 });
 
 it.each(['classic', 'material'])('%s settings exposes field errors, restores native inputs on discard and distinguishes successful feedback', async theme => {
-    const base = `admin.${theme}.`;
+    const base = `admin.themes.${theme}.`;
     const [ThemePage, ThemeForm, ThemeShell] = theme === 'classic' ? [SettingsPage, SettingsRenderer, Shell]
         : [(await import('../fixtures/compiled/.generated/js/material-admin-settings-page')).default,
             (await import('../fixtures/compiled/.generated/js/material-admin-settings-form')).default,

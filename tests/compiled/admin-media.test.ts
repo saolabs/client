@@ -99,7 +99,7 @@ it('hydrates real branding SSR, opens the shared picker and saves its selected U
     });
     vm = new ViewManager(shared); shared.set('View', vm);
     vm.init({container: '#app-root', systemData: config.view.systemData, ssrData: config.view.ssrData, ssr, registry: {
-        'admin.classic.pages.settings': SettingsPage, 'admin.classic.components.settings-form': SettingsRenderer, 'admin.classic.components.media-library': MediaRenderer, 'admin.classic.layouts.shell': Shell,
+        'admin.themes.classic.pages.settings': SettingsPage, 'admin.themes.classic.components.settings-form': SettingsRenderer, 'admin.themes.classic.components.media-library': MediaRenderer, 'admin.themes.classic.layouts.shell': Shell,
     }});
     router = new Router(shared); shared.set('Router', router); router.setViewManager(vm); router.configure(config.router); router.start();
     await vi.waitFor(() => expect(vm!.getCurrentView()).not.toBeNull());
@@ -128,7 +128,7 @@ it.each(['classic', 'material'])('%s media page has a compact search group and o
     const helper = new HelperService(shared); shared.set('Helper', helper); shared.set('AdminUI', new AdminUI(shared)); shared.set('Admin', shared.make('AdminUI'));
     const scope = 'admin:media-layout'; const messages = JSON.parse(readFileSync(path.join(root, '../admin-en.json'), 'utf8'));
     const i18n = {scope, locale: 'en', fallbackLocale: 'en', catalogs: {en: {scope, revision: 1, messages}}}; helper.initTranslations(i18n);
-    const base = `admin.${theme}.`; let count = 0;
+    const base = `admin.themes.${theme}.`; let count = 0;
     shared.set('Http', {setHeader: vi.fn(), get: vi.fn(async () => ({data: {view: base + 'pages.media', i18n,
         data: {mediaEditor: {...editor(), initial: {items: [], total: 0, page: 1, perPage: 24}}, navigation: [], currentPage: 'media',
             brand: 'Admin', locales: [], dictionaryPattern: '', uiLocale: 'en', account: {}}}}))});

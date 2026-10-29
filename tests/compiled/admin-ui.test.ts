@@ -14,7 +14,7 @@ import Host from '../fixtures/compiled/.generated/js/ui-host';
 import UiPage from '../fixtures/compiled/.generated/js/ui-library-page';
 import Shell from '../fixtures/compiled/.generated/js/material-admin-shell';
 
-const base = 'admin.material.';
+const base = 'admin.themes.material.';
 const modules = import.meta.glob('../fixtures/compiled/.generated/js/ui-*.ts', {eager: true}) as Record<string, {default: any}>;
 const registry = Object.fromEntries(Object.entries(modules).filter(([file]) => !/ui-(host|library-page)\.ts$/.test(file))
     .map(([file, value]) => [base + 'components.ui.' + path.basename(file).replace(/^ui-/, '').replace(/\.ts$/, ''), value.default]));
