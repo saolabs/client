@@ -41,6 +41,11 @@ export class TranslationService {
             ?? this.lookupTree(this.catalogs[this.fallbackLocale]?.messages, key) ?? defaultValue ?? key;
         return this.interpolate(value, replace);
     }
+    /** The catalogs this app holds, as the server reads them back: `<scope>;<locale>=<revision>;…` ('' while none is loaded). */
+    held() {
+        const parts = Object.entries(this.catalogs).map(([locale, snapshot]) => `${locale}=${snapshot.revision}`);
+        return this.catalogScope && parts.length ? [this.catalogScope, ...parts].join(';') : '';
+    }
     install(locale, snapshot) {
         if (snapshot.scope !== this.catalogScope)
             throw new Error('Language snapshot scope differs from the active catalog');

@@ -59,6 +59,8 @@ export declare class HelperService implements HelperInterface {
     trans_choice(key: string, count: number, replace?: Record<string, any>, locale?: string): string;
     setLocale(locale: string): void;
     private syncLocale;
+    /** Tells the server which dictionaries this app already holds, so page data does not carry them again. */
+    private syncHeld;
     /** Execute a function safely, return result or empty string on error */
     execute<T>(fn: () => T): T;
     /** Alias for execute with arguments */

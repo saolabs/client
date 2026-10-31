@@ -78,13 +78,16 @@ export class HelperService implements HelperInterface {
         }
         // Page-data refreshes revisions without resetting the chosen locale.
         this.translations.refresh(config);
+        this.syncHeld();
     }
     text(key: string, replace: Record<string, any> | string | null = {}, defaultValue: string | null = null, locale?: string): string {
         if (typeof replace === 'string' && defaultValue === null) defaultValue = replace;
         return this.translations.text(key, replace && typeof replace === 'object' ? replace : {}, defaultValue, locale);
     }
     installLanguage(locale: string, snapshot: import('./TranslationService.js').LanguageSnapshot): boolean {
-        return this.translations.install(locale, snapshot);
+        const installed = this.translations.install(locale, snapshot);
+        this.syncHeld();
+        return installed;
     }
     async loadLanguage(locale: string, load: (locale: string) => Promise<import('./TranslationService.js').LanguageSnapshot>): Promise<boolean> {
         return this.installLanguage(locale, await load(locale));
@@ -123,6 +126,15 @@ export class HelperService implements HelperInterface {
         if (typeof document !== 'undefined') document.documentElement.lang = locale;
         this.App?.Http?.setHeader?.('Accept-Language', locale);
         this.App?.API?.getHttpService?.()?.setHeader?.('Accept-Language', locale);
+        this.syncHeld();
+    }
+
+    /** Tells the server which dictionaries this app already holds, so page data does not carry them again. */
+    private syncHeld(): void {
+        const held = this.translations.held();
+        if (!held) return;
+        this.App?.Http?.setHeader?.('X-Saola-Language', held);
+        this.App?.API?.getHttpService?.()?.setHeader?.('X-Saola-Language', held);
     }
 
     // ─── Execution ──────────────────────────────────────────────

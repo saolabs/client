@@ -68,6 +68,7 @@ export class HelperService {
         }
         // Page-data refreshes revisions without resetting the chosen locale.
         this.translations.refresh(config);
+        this.syncHeld();
     }
     text(key, replace = {}, defaultValue = null, locale) {
         if (typeof replace === 'string' && defaultValue === null)
@@ -75,7 +76,9 @@ export class HelperService {
         return this.translations.text(key, replace && typeof replace === 'object' ? replace : {}, defaultValue, locale);
     }
     installLanguage(locale, snapshot) {
-        return this.translations.install(locale, snapshot);
+        const installed = this.translations.install(locale, snapshot);
+        this.syncHeld();
+        return installed;
     }
     async loadLanguage(locale, load) {
         return this.installLanguage(locale, await load(locale));
@@ -115,6 +118,15 @@ export class HelperService {
             document.documentElement.lang = locale;
         this.App?.Http?.setHeader?.('Accept-Language', locale);
         this.App?.API?.getHttpService?.()?.setHeader?.('Accept-Language', locale);
+        this.syncHeld();
+    }
+    /** Tells the server which dictionaries this app already holds, so page data does not carry them again. */
+    syncHeld() {
+        const held = this.translations.held();
+        if (!held)
+            return;
+        this.App?.Http?.setHeader?.('X-Saola-Language', held);
+        this.App?.API?.getHttpService?.()?.setHeader?.('X-Saola-Language', held);
     }
     // ─── Execution ──────────────────────────────────────────────
     /** Execute a function safely, return result or empty string on error */

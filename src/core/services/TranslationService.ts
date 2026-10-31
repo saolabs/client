@@ -53,6 +53,12 @@ export class TranslationService {
         return this.interpolate(value, replace);
     }
 
+    /** The catalogs this app holds, as the server reads them back: `<scope>;<locale>=<revision>;…` ('' while none is loaded). */
+    held(): string {
+        const parts = Object.entries(this.catalogs).map(([locale, snapshot]) => `${locale}=${snapshot.revision}`);
+        return this.catalogScope && parts.length ? [this.catalogScope, ...parts].join(';') : '';
+    }
+
     install(locale: string, snapshot: LanguageSnapshot): boolean {
         if (snapshot.scope !== this.catalogScope) throw new Error('Language snapshot scope differs from the active catalog');
         if (!Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0) throw new Error('Invalid language revision');

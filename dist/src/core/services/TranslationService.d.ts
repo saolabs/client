@@ -30,6 +30,8 @@ export declare class TranslationService {
     setLocale(locale: string): boolean;
     trans(key: string, replace?: Record<string, any>, locale?: string): string;
     text(key: string, replace?: Record<string, any>, defaultValue?: string | null, locale?: string): string;
+    /** The catalogs this app holds, as the server reads them back: `<scope>;<locale>=<revision>;…` ('' while none is loaded). */
+    held(): string;
     install(locale: string, snapshot: LanguageSnapshot): boolean;
     private lookupTree;
     choice(key: string, count: number, replace?: Record<string, any>, locale?: string): string;

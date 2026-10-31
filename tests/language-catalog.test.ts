@@ -95,3 +95,20 @@ it('only applies the latest requested language and cancels pending changes on co
     expect(await pending).toBe(false);
     expect(helper.text('save')).toBe('New context');
 });
+
+it('declares the dictionaries it holds so page data is not sent them again, and keeps them when a response omits them', () => {
+    const helper = new HelperService();
+    const headers: Record<string, string> = {};
+    (helper as any).App = { Http: { setHeader: (name: string, value: string) => { headers[name] = value; } } };
+    const scope = 'admin:abc';
+    helper.initTranslations({ locale: 'vi', fallbackLocale: 'en', scope, catalogs: {
+        vi: { revision: 7, scope, messages: { save: 'Lưu' } }, en: { revision: 3, scope, messages: { save: 'Save' } } } });
+    expect(headers['X-Saola-Language']).toBe('admin:abc;vi=7;en=3');
+    // A page-data response for a client that already holds both: nothing to install, nothing lost.
+    helper.applyLanguageConfig({ locale: 'vi', fallbackLocale: 'en', scope, catalogs: {} });
+    expect(helper.text('save')).toBe('Lưu');
+    // A newer revision travels and the declaration follows it.
+    helper.applyLanguageConfig({ locale: 'vi', fallbackLocale: 'en', scope, catalogs: { vi: { revision: 8, scope, messages: { save: 'Lưu lại' } } } });
+    expect(helper.text('save')).toBe('Lưu lại');
+    expect(headers['X-Saola-Language']).toBe('admin:abc;vi=8;en=3');
+});
