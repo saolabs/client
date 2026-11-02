@@ -1,0 +1,11 @@
+<script setup>
+@useAuth()
+function clear(){set__auth__(null);}
+</script>
+<template>
+<header id="auth-header">
+    <span id="auth-name">{{ __auth__ ? __auth__.name : 'Guest' }}</span>
+    @if(__auth__)<b id="auth-member">{{ __auth__.username }}</b>@else<i id="auth-guest">Guest</i>@endif
+    <button id="auth-clear" @click(clear())>Clear local auth</button>
+</header>
+</template>

@@ -113,6 +113,22 @@ Google/GitHub credentials and the application-owned social user resolver.
 
 ## Reactive views
 
+Compiler 3.4.0+ also supports `@useAuth` (aliases `@useAuth()`, `@useauth`,
+`@useauth()`) at view scope or in `<script setup>`. It declares writable state
+`__auth__` with setter `set__auth__(...)`, automatically follows AuthService
+changes, and releases the subscription on view destruction. For example:
+
+```sao
+@useAuth
+<template>
+    @if(__auth__)<span>{{ __auth__.name }}</span>@else<span>Guest</span>@endif
+</template>
+```
+
+The setter affects the local view only; the next service change restores the
+current user. This uses the existing client 1.6.0 subscription runtime. SSR uses
+Core 2.8.0's safe user projection. See [directive details](../../compiler/docs/USE_AUTH.md).
+
 With the updated compiler and client runtime, auth reads in template text,
 attributes, classes, styles, include props and conditions subscribe to `App.Auth`
 changes automatically. `@auth`, `@guest`, `@elseauth` and `@elseguest` support an
