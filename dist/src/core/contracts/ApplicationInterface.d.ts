@@ -8,6 +8,7 @@ import type { LoggerServiceInterface } from "./LoggerServiceInterface.js";
 import type { HeadServiceInterface } from "./HeadServiceInterface.js";
 import { APIClientInterface } from "./ApiInterface.js";
 import type { ServiceProviderInterface } from "./ServiceProviderInterface.js";
+import type { AuthService } from '../services/AuthService.js';
 import { SaoObjectType } from "../types/utils.js";
 export interface ApplicationInterface {
     [key: string]: any;
@@ -35,6 +36,7 @@ export interface ApplicationInterface {
     View: ViewManagerInterface;
     Router: RouterInterface;
     Helper: HelperInterface;
+    Auth: AuthService;
     Events: EventServiceInterface;
     Http: HttpServiceInterface;
     API: APIClientInterface;

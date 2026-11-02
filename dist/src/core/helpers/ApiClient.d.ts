@@ -16,7 +16,7 @@ export declare class ApiClient implements APIClientInterface {
     private endpoints;
     constructor();
     /**
-     * Setup default headers including CSRF token
+     * Setup default headers. HttpService reads the current CSRF token per request.
      * @private
      */
     private setupDefaultHeaders;

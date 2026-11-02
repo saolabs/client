@@ -278,6 +278,9 @@ export class Application {
     // ─── Cleanup ────────────────────────────────────────────────
     /** Xóa toàn bộ bindings, singletons, aliases, __store. Reset container. */
     flush() {
+        // Stop pending auth requests before resetting the container they belong to.
+        const auth = this.__store.get('Auth')?.value ?? this.singletons.get('Auth');
+        auth?.destroy?.();
         this.bindings.clear();
         this.singletons.clear();
         this.aliases.clear();

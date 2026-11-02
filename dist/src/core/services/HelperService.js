@@ -1,5 +1,6 @@
 import { TranslationService } from './TranslationService.js';
 import { app } from "../helpers/app.js";
+import { AuthService } from './AuthService.js';
 /**
  * HelperService — PHP-compatible helper functions for SaoView runtime.
  *
@@ -42,6 +43,14 @@ export class HelperService {
         if (App)
             this.App = App;
     }
+    auth(guard) {
+        const application = this.App ?? app();
+        if (!application.has('Auth'))
+            application.instance('Auth', AuthService.fromSnapshot(application.shared('auth')));
+        return application.get('Auth').guard(guard);
+    }
+    /** Compatibility for previously compiled @auth/@guest views. */
+    isAuth(guard) { return this.auth(guard).check(); }
     app(key, value) {
         return app(key, value);
     }

@@ -1,4 +1,7 @@
 import devtools from "../devtools/hook.js";
+import { DependencyTracker } from '../services/ReactiveDependency.js';
+import { AuthService } from '../services/AuthService.js';
+import { app } from '../helpers/app.js';
 /**
  * StateManager — manages reactive state for a ViewController.
  *
@@ -41,6 +44,7 @@ export class StateManager {
         this.ownProperties = ['__', 'on', 'off', 'unsubscribe'];
         this.computedNodes = new Map();
         this.computedDependents = new Map();
+        this.authUnsubscribe = null;
         // ─── Pause / Resume (dirty tracking) ────────────────────────
         // Thiết kế: ROUTE_RENDER_FLOW.md §7, §8.2-8.3.
         // Khi paused: state VẪN nhận giá trị mới, nhưng không notify listener —
@@ -227,6 +231,7 @@ export class StateManager {
         const existing = this.states[key];
         if (existing && !existing.__computed__)
             throw new Error(`[ViewState] State already exists: ${key}`);
+        this.computedNodes.get(key)?.tracker.destroy();
         for (const dep of this.computedNodes.get(key)?.deps ?? []) {
             const dependents = this.computedDependents.get(dep);
             dependents?.delete(key);
@@ -236,6 +241,10 @@ export class StateManager {
         let cache;
         let dirty = true;
         let evaluating = false;
+        const tracker = new DependencyTracker(() => {
+            dirty = true;
+            this.enqueueChange(key);
+        });
         const slot = {
             key,
             __computed__: true,
@@ -248,7 +257,7 @@ export class StateManager {
                         throw new Error(`[ViewState] Recursive computed read: ${key}`);
                     evaluating = true;
                     try {
-                        cache = fn();
+                        cache = tracker.evaluate(fn);
                         dirty = false;
                     }
                     finally {
@@ -262,7 +271,7 @@ export class StateManager {
         });
         this.states[key] = slot;
         this.setters[key] = slot.setValue;
-        this.computedNodes.set(key, { deps: [...new Set(deps)], dirty: () => { dirty = true; } });
+        this.computedNodes.set(key, { deps: [...new Set(deps)], dirty: () => { dirty = true; }, tracker });
         for (const dep of deps) {
             if (!this.computedDependents.has(dep))
                 this.computedDependents.set(dep, new Set());
@@ -366,6 +375,24 @@ export class StateManager {
                 this.subscriptions.set(k, records = new Set());
             records.add(record);
         }
+        if (keys.has('@auth') && !this.authUnsubscribe) {
+            const application = this.controller?.App ?? app();
+            if (!application.has('Auth')) {
+                application.instance('Auth', AuthService.fromSnapshot(application.shared('auth')));
+            }
+            this.authUnsubscribe = application.get('Auth').subscribe(() => this.enqueueChange('@auth'));
+        }
+        // Hydration may claim an SSR text node without evaluating its factory.
+        // Observed computed values still need their service dependencies connected.
+        try {
+            for (const k of keys)
+                if (this.computedNodes.has(k))
+                    this.getStateByKey(k);
+        }
+        catch (error) {
+            this.removeSubscription(record);
+            throw error;
+        }
         return () => this.removeSubscription(record);
     }
     removeSubscription(record) {
@@ -377,6 +404,10 @@ export class StateManager {
             records?.delete(record);
             if (records?.size === 0)
                 this.subscriptions.delete(k);
+        }
+        if (!this.subscriptions.has('@auth')) {
+            this.authUnsubscribe?.();
+            this.authUnsubscribe = null;
         }
     }
     unsubscribe(key, callback) {
@@ -1024,6 +1055,10 @@ export class StateManager {
             cancelAnimationFrame(this.flushRAF);
             this.flushRAF = null;
         }
+        this.authUnsubscribe?.();
+        this.authUnsubscribe = null;
+        for (const node of this.computedNodes.values())
+            node.tracker.destroy();
         this.computedNodes.clear();
         this.computedDependents.clear();
         this.versions.clear();

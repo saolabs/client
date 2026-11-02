@@ -10,7 +10,7 @@ export class ApiClient {
         this.endpoints = this.loadEndpoints();
     }
     /**
-     * Setup default headers including CSRF token
+     * Setup default headers. HttpService reads the current CSRF token per request.
      * @private
      */
     setupDefaultHeaders() {
@@ -18,16 +18,6 @@ export class ApiClient {
         this.http.setHeader('Accept', 'application/json');
         this.http.setHeader('X-Requested-With', 'XMLHttpRequest');
         this.http.setHeader('X-DATA-TYPE', 'json');
-        // Get CSRF token from meta tag (SSR support)
-        if (typeof document !== 'undefined') {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]');
-            if (csrfToken) {
-                const token = csrfToken.getAttribute('content');
-                if (token) {
-                    this.http.setHeader('X-CSRF-TOKEN', token);
-                }
-            }
-        }
     }
     init(config) {
         if (typeof config.baseUrl === 'string')

@@ -1,4 +1,5 @@
 import { ApplicationInterface } from "./ApplicationInterface.js";
+import type { AuthService } from '../services/AuthService.js';
 export interface CollectionProxyInterface {
     all(): any[];
     toArray(): any[];
@@ -46,6 +47,8 @@ export interface CollectionProxyInterface {
     toString(): string;
 }
 export interface HelperInterface {
+    auth(guard?: string | null): AuthService;
+    isAuth(guard?: string | null): boolean;
     initTranslations(config: import('../services/TranslationService.js').TranslationConfig): void;
     getLocale(): string;
     getLanguageScope(): string | undefined;

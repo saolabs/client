@@ -2,6 +2,7 @@ import { TranslationService, type TranslationConfig } from './TranslationService
 import { CollectionProxyInterface, HelperInterface } from "../contracts/HelperInterface.js";
 import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
 import { app } from "../helpers/app.js";
+import { AuthService } from './AuthService.js';
 
 /**
  * HelperService — PHP-compatible helper functions for SaoView runtime.
@@ -45,6 +46,15 @@ export class HelperService implements HelperInterface {
     constructor(App?: any) {
         if (App) this.App = App;
     }
+
+    auth(guard?: string | null): AuthService {
+        const application = this.App ?? app();
+        if (!application.has('Auth')) application.instance('Auth', AuthService.fromSnapshot(application.shared('auth')));
+        return application.get('Auth').guard(guard);
+    }
+
+    /** Compatibility for previously compiled @auth/@guest views. */
+    isAuth(guard?: string | null): boolean { return this.auth(guard).check(); }
 
     app<T = any>(key?: any, value?: any): T | ApplicationInterface 
     {

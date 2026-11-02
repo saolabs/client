@@ -1,6 +1,9 @@
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import type { StateManagerInterface, ViewStateInterface, StateItem, StateListener } from "../contracts/ViewStateInterface.js";
 import devtools from "../devtools/hook.js";
+import { DependencyTracker } from '../services/ReactiveDependency.js';
+import { AuthService } from '../services/AuthService.js';
+import { app } from '../helpers/app.js';
 
 type MutationChannel = {
     notify: (() => void) | null;
@@ -188,8 +191,9 @@ export class StateManager implements StateManagerInterface {
         return this.useState(value, key)[1];
     }
 
-    private computedNodes = new Map<string, { deps: string[]; dirty: () => void }>();
+    private computedNodes = new Map<string, { deps: string[]; dirty: () => void; tracker: DependencyTracker }>();
     private computedDependents = new Map<string | number, Set<string>>();
+    private authUnsubscribe: (() => void) | null = null;
 
     /** Invalidate the dependency graph synchronously; evaluation remains lazy. */
     private invalidateComputed(key: string | number, notify = true): void {
@@ -234,6 +238,7 @@ export class StateManager implements StateManagerInterface {
         if (deps.some(dep => reaches(dep))) throw new Error(`[ViewState] Computed dependency cycle: ${key}`);
         const existing = this.states[key] as any;
         if (existing && !existing.__computed__) throw new Error(`[ViewState] State already exists: ${key}`);
+        this.computedNodes.get(key)?.tracker.destroy();
         for (const dep of this.computedNodes.get(key)?.deps ?? []) {
             const dependents = this.computedDependents.get(dep);
             dependents?.delete(key);
@@ -242,6 +247,10 @@ export class StateManager implements StateManagerInterface {
         let cache: T;
         let dirty = true;
         let evaluating = false;
+        const tracker = new DependencyTracker(() => {
+            dirty = true;
+            this.enqueueChange(key);
+        });
         const slot: any = {
             key,
             __computed__: true,
@@ -252,7 +261,7 @@ export class StateManager implements StateManagerInterface {
                 if (dirty) {
                     if (evaluating) throw new Error(`[ViewState] Recursive computed read: ${key}`);
                     evaluating = true;
-                    try { cache = fn(); dirty = false; }
+                    try { cache = tracker.evaluate(fn); dirty = false; }
                     finally { evaluating = false; }
                 }
                 return cache;
@@ -262,7 +271,7 @@ export class StateManager implements StateManagerInterface {
         });
         this.states[key] = slot;
         this.setters[key] = slot.setValue;
-        this.computedNodes.set(key, { deps: [...new Set(deps)], dirty: () => { dirty = true; } });
+        this.computedNodes.set(key, { deps: [...new Set(deps)], dirty: () => { dirty = true; }, tracker });
         for (const dep of deps) {
             if (!this.computedDependents.has(dep)) this.computedDependents.set(dep, new Set());
             this.computedDependents.get(dep)!.add(key);
@@ -367,6 +376,21 @@ export class StateManager implements StateManagerInterface {
             if (!records) this.subscriptions.set(k, records = new Set());
             records.add(record);
         }
+        if (keys.has('@auth') && !this.authUnsubscribe) {
+            const application = this.controller?.App ?? app();
+            if (!application.has('Auth')) {
+                application.instance('Auth', AuthService.fromSnapshot(application.shared('auth')));
+            }
+            this.authUnsubscribe = (application.get('Auth') as AuthService).subscribe(() => this.enqueueChange('@auth'));
+        }
+        // Hydration may claim an SSR text node without evaluating its factory.
+        // Observed computed values still need their service dependencies connected.
+        try {
+            for (const k of keys) if (this.computedNodes.has(k)) this.getStateByKey(k);
+        } catch (error) {
+            this.removeSubscription(record);
+            throw error;
+        }
         return () => this.removeSubscription(record);
     }
 
@@ -377,6 +401,10 @@ export class StateManager implements StateManagerInterface {
             const records = this.subscriptions.get(k);
             records?.delete(record);
             if (records?.size === 0) this.subscriptions.delete(k);
+        }
+        if (!this.subscriptions.has('@auth')) {
+            this.authUnsubscribe?.();
+            this.authUnsubscribe = null;
         }
     }
 
@@ -1079,6 +1107,9 @@ export class StateManager implements StateManagerInterface {
             cancelAnimationFrame(this.flushRAF);
             this.flushRAF = null;
         }
+        this.authUnsubscribe?.();
+        this.authUnsubscribe = null;
+        for (const node of this.computedNodes.values()) node.tracker.destroy();
         this.computedNodes.clear();
         this.computedDependents.clear();
         this.versions.clear();

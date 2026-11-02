@@ -27,6 +27,7 @@
  * const router = app.make('router');
  */
 import type { ApplicationInterface, ServiceKey, ServiceFactory, ServiceBinding } from '../contracts/ApplicationInterface.js';
+import type { AuthService } from '../services/AuthService.js';
 import type { ServiceProviderInterface } from '../contracts/ServiceProviderInterface.js';
 import type { ViewManagerInterface, RouterInterface } from '../contracts/utils.js';
 import type { HelperInterface } from '../contracts/HelperInterface.js';
@@ -45,6 +46,7 @@ export declare class Application implements ApplicationInterface {
     View: ViewManagerInterface;
     Router: RouterInterface;
     Helper: HelperInterface;
+    Auth: AuthService;
     Events: EventServiceInterface;
     Http: HttpServiceInterface;
     API: APIClientInterface;

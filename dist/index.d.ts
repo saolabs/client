@@ -4,6 +4,7 @@
  */
 export { Application } from './src/core/app/Application.js';
 export { app } from './src/core/helpers/app.js';
+export { auth } from './src/core/helpers/auth.js';
 export { default as App } from './src/core/bootstrap/app.js';
 export { defineBundle, loadBundles, mergeBundles, bootBundles } from './src/core/bootstrap/bundle.js';
 export type { SaolaBundle, MergedBundles, ViewFactory, ServiceFactory, MergeOptions } from './src/core/contracts/BundleInterface.js';
@@ -17,6 +18,12 @@ export { StoreService } from './src/core/services/StoreService.js';
 export { StorageService } from './src/core/services/StorageService.js';
 export { LoggerService } from './src/core/services/LoggerService.js';
 export { HelperService, CollectionProxy } from './src/core/services/HelperService.js';
+export { AuthService } from './src/core/services/AuthService.js';
+export { AuthClient } from './src/core/services/AuthClient.js';
+export type { AuthClientConfig, AuthClientOptions, AuthProviderInfo } from './src/core/services/AuthClient.js';
+export { trackDependency } from './src/core/services/ReactiveDependency.js';
+export type { ReactiveDependency } from './src/core/services/ReactiveDependency.js';
+export type { AuthUser, AuthSnapshot, AuthEvent, AuthChange } from './src/core/services/AuthService.js';
 export { BlockManagerService, BlockManager } from './src/core/services/BlockManager.js';
 export { MarkerRegistry, MarkerRegistryService } from './src/core/services/MarkerRegistry.js';
 export { PageCache, PageCacheService, detachWrapperDOM } from './src/core/services/PageCache.js';

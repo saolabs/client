@@ -66,12 +66,12 @@ export default async function setup() {
         const saoPath = path.join(SRC_DIR, file);
 
         const source = readFileSync(saoPath, 'utf-8');
-        if (name === 'db-language-page') {
+        if (['db-language-page', 'auth-reactivity'].includes(name)) {
             // Pin this contract fixture to the compiler under change, rather than an older
             // Composer installation in the starter. Both use the public compile API.
             const compilerRoot = path.resolve(HERE, '../../../../compiler');
-            const script = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: "fixtures.db-language-page", functionName: "DbLanguagePage", factoryName: "DbLanguagePage")); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
-            const result = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, compilerRoot, saoPath], { encoding: 'utf8' }));
+            const script = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: $argv[3], functionName: $argv[4], factoryName: $argv[4])); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
+            const result = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, compilerRoot, saoPath, viewPath, fnName], { encoding: 'utf8' }));
             writeFileSync(path.join(OUT_JS_DIR, `${name}.js`), result.js, 'utf8');
             writeFileSync(path.join(OUT_BLADE_DIR, `${name}.blade.php`), result.blade, 'utf8');
             continue;

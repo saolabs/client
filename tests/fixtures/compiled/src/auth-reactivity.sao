@@ -1,0 +1,15 @@
+@computed(user = auth().user())
+@computed(displayName = user ? user.name : 'Guest')
+<template>
+<header id="header">
+    <span id="computed">{{ displayName }}</span>
+    <span id="direct">{{ auth().check() ? auth().user().name : 'Guest' }}</span>
+    <button id="action" @disabled(auth().guest()) @class({'member': auth().check()}) title="{{ auth().check() ? auth().user().username : 'Guest' }}">Action</button>
+    @auth
+        <b id="member">{{ auth().user().name }}</b>
+    @else
+        <a id="guest">Sign in</a>
+    @endauth
+    @guest('admin')<i id="admin-guest">No admin</i>@else<i id="admin">Admin</i>@endguest
+</header>
+</template>

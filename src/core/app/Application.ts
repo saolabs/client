@@ -28,6 +28,7 @@
  */
 
 import type { ApplicationInterface, ServiceKey, ServiceFactory, ServiceBinding } from '../contracts/ApplicationInterface.js';
+import type { AuthService } from '../services/AuthService.js';
 import type { ServiceProviderInterface } from '../contracts/ServiceProviderInterface.js';
 import type { ViewManagerInterface, RouterInterface } from '../contracts/utils.js';
 import type { HelperInterface } from '../contracts/HelperInterface.js';
@@ -50,6 +51,7 @@ export class Application implements ApplicationInterface {
     declare View: ViewManagerInterface;
     declare Router: RouterInterface;
     declare Helper: HelperInterface;
+    declare Auth: AuthService;
     declare Events: EventServiceInterface;
     declare Http: HttpServiceInterface;
     declare API: APIClientInterface;
@@ -346,6 +348,9 @@ export class Application implements ApplicationInterface {
 
     /** Xóa toàn bộ bindings, singletons, aliases, __store. Reset container. */
     flush(): void {
+        // Stop pending auth requests before resetting the container they belong to.
+        const auth = this.__store.get('Auth')?.value ?? this.singletons.get('Auth');
+        auth?.destroy?.();
         this.bindings.clear();
         this.singletons.clear();
         this.aliases.clear();

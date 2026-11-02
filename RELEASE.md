@@ -1,3 +1,11 @@
+# Saola Client v1.6.0
+
+Adds App.Auth and auth() with shared SSR state, guard-aware events and reactive computed dependencies. App.Auth.client provides same-origin session login/logout/refresh and Google/GitHub redirects using the Core Auth API. Includes CSRF rotation across existing HTTP/API instances, serialized auth mutations, stale-response protection and cleanup on application reset.
+
+Pairs with saola/core 2.8.0 and saola/compiler 3.3.0. Applications can keep custom authentication and report confirmed changes through App.Auth. See docs/AUTH.md. Built dist is included in this release.
+
+Validation: 647 client tests, TypeScript build and packaged native ESM/CJS/NodeNext export checks.
+
 # Saola Client v1.5.2
 
 Declares the language dictionaries the app holds (`X-Saola-Language`, kept in step on init, page-data refresh and language install) so a server on saola/core ≥ 2.7.1 stops re-sending them with every page. A page-data `i18n` without catalogs leaves the installed ones untouched.

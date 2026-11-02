@@ -5,6 +5,8 @@ export * from "./HeadService.js";
 export * from "./SectionManager.js";
 export * from "./LoggerService.js";
 export * from './HelperService.js';
+export * from './AuthService.js';
+export * from './AuthClient.js';
 export * from './HttpService.js';
 export * from './MarkerRegistry.js';
 export * from "./StoreService.js";

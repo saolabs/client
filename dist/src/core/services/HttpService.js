@@ -14,6 +14,8 @@
  *       return http;
  *   });
  */
+import { app } from '../helpers/app.js';
+import { AuthService } from './AuthService.js';
 // ─── HttpService ────────────────────────────────────────────────
 export class HttpService {
     constructor() {
@@ -141,9 +143,27 @@ export class HttpService {
             if (!group)
                 this.pending.set(requestKey, group = new Set());
             group.add(controller);
+            const auth = app.has('Auth') ? app('Auth') : null;
+            const authRevision = auth?.revision;
+            // Read at send time: session login/logout rotates Laravel's CSRF token.
+            if (typeof window !== 'undefined' && urlObj.origin === window.location.origin
+                && !['GET', 'HEAD', 'OPTIONS'].includes(config.method)) {
+                const headers = config.headers ?? (config.headers = {});
+                const explicit = Object.keys(headers).some(key => ['x-csrf-token', 'x-xsrf-token'].includes(key.toLowerCase()));
+                const token = auth?.client.csrfToken ?? document.querySelector('meta[name="csrf-token"]')?.content;
+                if (!explicit && token)
+                    headers['X-CSRF-TOKEN'] = token;
+            }
             const raw = await fetch(fullUrl, config);
             const responseData = await raw.json().catch(() => ({}));
             controller.signal.throwIfAborted();
+            // Only our own server may synchronize auth; an older request cannot undo a newer login/logout.
+            if (auth && !auth.isTransitioning && auth.revision === authRevision && typeof window !== 'undefined'
+                && urlObj.origin === window.location.origin
+                && (!raw.url || new URL(raw.url).origin === window.location.origin)
+                && AuthService.isSnapshot(responseData?.auth)) {
+                auth.sync(responseData.auth);
+            }
             const viewContext = responseData?.viewContext;
             const currentContext = typeof window !== 'undefined'
                 ? window.APP_CONFIGS?.view?.systemData?.__context__

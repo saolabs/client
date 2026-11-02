@@ -79,6 +79,7 @@ export declare class StateManager implements StateManagerInterface {
     register(key: string | number, value?: any): (newValue: any) => void;
     private computedNodes;
     private computedDependents;
+    private authUnsubscribe;
     /** Invalidate the dependency graph synchronously; evaluation remains lazy. */
     private invalidateComputed;
     /**
