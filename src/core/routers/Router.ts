@@ -15,6 +15,8 @@
  */
 
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
+import {app as application} from '../helpers/app.js';
+import {ClientMiddlewareRegistry, type ClientMiddlewareConfig} from './ClientMiddleware.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -177,6 +179,9 @@ export class Router {
     /** Navigation guards */
     private _beforeEach: NavigationGuard | null = null;
     private navigationGuards = new Set<NavigationGuard>();
+    private middleware = new ClientMiddlewareRegistry();
+    private middlewareAbort: AbortController | null = null;
+    private middlewareRedirects = 0;
     /**
      * NHIỀU hook, không phải một.
      *
@@ -317,6 +322,9 @@ export class Router {
             const { children, ...own } = route;
             const path = Router.joinRoutePath(parentPath, route.path ?? '');
             const meta = { ...parentMeta, ...(route.meta ?? {}) };
+            if (parentMeta.middleware && route.meta?.middleware) {
+                meta.middleware = [...parentMeta.middleware, ...route.meta.middleware];
+            }
 
             const flatChildren = children && children.length
                 ? this.flattenRouteTree(children, path, meta)
@@ -349,7 +357,9 @@ export class Router {
         }
         for (const route of this.flattenRouteTree(routes)) {
             const component = route.component || route.view || '';
-            this.addRoute(route.path, component, route.meta || {});
+            // Preserve legacy flattened option keys while keeping the named route
+            // and its actual meta object available to middleware and guards.
+            this.addRoute(route.path, component, {...route.meta, name:route.name, meta:route.meta});
             if (route.name) {
                 this.addRouteConfig(route);
             }
@@ -395,6 +405,9 @@ export class Router {
         this.navigationGuards.add(guard);
         return () => { this.navigationGuards.delete(guard); };
     }
+
+    /** Register project aliases/groups/global middleware. Returns a disposer. */
+    useMiddleware(config: ClientMiddlewareConfig): () => void { return this.middleware.register(config); }
 
     /** Đăng ký hook chạy sau mỗi lần điều hướng. Trả về hàm HUỶ đăng ký. */
     afterEach(hook: AfterNavigationHook): () => void {
@@ -551,7 +564,7 @@ export class Router {
         }
 
         const initialPath = this.mode === 'history'
-            ? (window.location.pathname + window.location.search)
+            ? (window.location.pathname + window.location.search + window.location.hash)
             : (window.location.hash.substring(1) || this.defaultRoute);
 
         // Set initial active route (without mounting view)
@@ -578,6 +591,7 @@ export class Router {
      * Stop the router — remove event listeners.
      */
     stop(): void {
+        this.middlewareAbort?.abort();
         window.removeEventListener('popstate', this._handlePopState);
         window.removeEventListener('hashchange', this._handlePopState);
         document.removeEventListener('click', this._handleAutoNavigation);
@@ -664,6 +678,7 @@ export class Router {
         this.routeCache.clear();
         this._beforeEach = null;
         this.navigationGuards.clear();
+        this.middleware.clear();
         this.afterHooks.clear();
         this.currentRoute = null;
         this.liveRegion?.remove();
@@ -710,7 +725,9 @@ export class Router {
      * Đang navigate dở → ghi nhận request MỚI NHẤT, xử lý sau khi xong
      * (không drop im lặng như trước).
      */
-    private requestNavigation(path: string, type: NavigationType): void {
+    private requestNavigation(path: string, type: NavigationType, middlewareRedirect = false): void {
+        this.middlewareAbort?.abort();
+        if (!middlewareRedirect) this.middlewareRedirects = 0;
         const request: NavigationRequest = { id: ++this.navigationSequence, path, type };
         if (this.isNavigating) {
             this.pendingNavigation = request;
@@ -734,6 +751,8 @@ export class Router {
         this.isNavigating = true;
         // Khai ngoài try: `finally` phải nhả được kể cả khi render ném giữa chừng.
         let releaseHeight: () => void = () => {};
+        const middlewareAbort = new AbortController();
+        this.middlewareAbort = middlewareAbort;
 
         try {
             const { pathname, queryString, fragment } = this.splitLocation(path);
@@ -751,11 +770,39 @@ export class Router {
                 return;
             }
 
-            const { route, params } = match;
+            const { route: matchedRoute, params } = match;
+            let route = matchedRoute;
             const from = this.currentRoute;
+
+            const viewName = route.component || route.view;
+            const vm = this.viewManager ?? this.App?.View;
+            const viewMiddleware = viewName ? vm?.getViewMiddleware?.(viewName) ?? [] : [];
+            if (viewMiddleware.length) {
+                const declared = route.meta?.middleware ?? [];
+                if (!Array.isArray(declared)) throw new TypeError('Route meta.middleware must be an array.');
+                route = {...route, meta:{...route.meta, middleware:[...declared, ...viewMiddleware]}};
+            }
 
             // Create ActiveRoute
             const activeRoute = new ActiveRoute(route, normalizedPath, params, query, fragment, uri);
+
+            // Run before any page fetch, factory, mount/hydration or history commit.
+            if (this.middleware.has(route)) {
+                const result = await this.middleware.run({app:this.App ?? application(), router:this,
+                    to:{...route, params, query}, from, url:path, signal:middlewareAbort.signal});
+                if (middlewareAbort.signal.aborted || requestId !== this.navigationSequence) return;
+                if (result !== true) {
+                    if (type === 'pop') this.restoreUrlAfterFailedPop(from);
+                    if (result && typeof result === 'object') {
+                        const url = new URL(result.redirect, window.location.origin);
+                        if (url.origin !== window.location.origin || url.username || url.password) throw new Error('Client middleware redirects must stay on the current origin.');
+                        const destination = url.pathname + url.search + url.hash;
+                        if (destination === path || ++this.middlewareRedirects > 8) throw new Error('Client middleware redirect loop.');
+                        this.requestNavigation(destination, result.replace === false ? 'push' : 'replace', true);
+                    }
+                    return;
+                }
+            }
 
             // Before guard — chạy TRƯỚC khi đụng vào history: guard chặn thì URL giữ nguyên
             if (this._beforeEach) {
@@ -838,8 +885,12 @@ export class Router {
                 }
             }
         } catch (error) {
-            console.error('[Router] Navigation error:', error);
+            if (!middlewareAbort.signal.aborted) {
+                if (type === 'pop') this.restoreUrlAfterFailedPop(this.currentRoute);
+                console.error('[Router] Navigation error:', error);
+            }
         } finally {
+            if (this.middlewareAbort === middlewareAbort) this.middlewareAbort = null;
             releaseHeight();
             this.isNavigating = false;
             if (requestId === this.navigationSequence) this.activeNavigationUrl = null;

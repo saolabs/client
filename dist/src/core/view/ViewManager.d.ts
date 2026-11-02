@@ -196,6 +196,8 @@ export declare class ViewManager implements ViewManagerInterface {
     private resolveRegistryKey;
     hasView(name: string): boolean;
     exists(name: string): boolean;
+    /** Read compiler/builder metadata without invoking setup or importing a lazy chunk. */
+    getViewMiddleware(name: string): readonly string[];
     /**
      * generateViewId — tạo unique ID cho mỗi view instance.
      *

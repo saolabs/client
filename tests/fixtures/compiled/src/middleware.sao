@@ -1,0 +1,6 @@
+@middleware('requireLogin')
+@cache({ttl: 60000})
+<script setup>
+App.Helper.recordMiddlewareSetup();
+</script>
+<template><p id="middleware-protected">Protected content</p></template>

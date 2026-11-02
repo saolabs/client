@@ -35,6 +35,7 @@ export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext
 export { ResourceScope } from './src/core/view/ResourceScope.js';
 // Router
 export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
+export { authMiddleware, guestMiddleware } from './src/core/routers/ClientMiddleware.js';
 // Elements
 export { Reactive } from './src/core/elements/Reactive.js';
 export { Block } from './src/core/elements/Block.js';

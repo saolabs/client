@@ -1,5 +1,7 @@
 # Authentication state
 
+For checks before entering a client route, see [Client middleware](./CLIENT_MIDDLEWARE.md).
+
 Core exports `APP_CONFIGS.shared.auth` on the first page and an `auth` snapshot
 on SPA page-data responses. The default Core provider initializes `App.Auth`
 before any view or helper is created. No token or user is persisted in browser

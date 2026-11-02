@@ -329,6 +329,18 @@ export class ViewManager {
     exists(name) {
         return this.hasView(name);
     }
+    /** Read compiler/builder metadata without invoking setup or importing a lazy chunk. */
+    getViewMiddleware(name) {
+        const key = this.resolveRegistryKey(name);
+        const factory = this.viewRegistry[key] ?? this.resolvedFactories.get(key);
+        const middleware = factory?.middleware;
+        if (middleware === undefined)
+            return [];
+        if (!Array.isArray(middleware) || middleware.some(ref => typeof ref !== 'string')) {
+            throw new TypeError(`Invalid middleware metadata on view "${name}".`);
+        }
+        return [...middleware];
+    }
     /**
      * generateViewId — tạo unique ID cho mỗi view instance.
      *

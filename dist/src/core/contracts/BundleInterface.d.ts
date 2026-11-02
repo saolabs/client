@@ -1,5 +1,6 @@
 import type { ApplicationInterface } from "./ApplicationInterface.js";
 import type { ServiceProviderInterface } from "./ServiceProviderInterface.js";
+import type { ClientMiddlewareConfig } from "../routers/ClientMiddleware.js";
 /** Factory view mà registry nhận: đồng bộ, hoặc lazy trả Promise<module>. */
 export type ViewFactory = ((...args: any[]) => any) | (() => Promise<any>);
 /**
@@ -18,6 +19,8 @@ export interface SaolaBundle {
     services?: Record<string, any>;
     /** { tên: fn } → gộp vào App.Helper. */
     helpers?: Record<string, any>;
+    /** Project route middleware, registered automatically before bundle boot and Router start. */
+    middleware?: ClientMiddlewareConfig;
     /** { 'dot.path': factory } → View.setViewRegistry(). Nạp sau ĐÈ nạp trước. */
     views?: Record<string, ViewFactory>;
     /**
@@ -59,6 +62,8 @@ export interface MergedBundles {
     helpers: Record<string, any>;
     views: Record<string, ViewFactory>;
     boots: Array<(app: ApplicationInterface) => void>;
+    /** Optional for compatibility with previously materialized bundle manifests. */
+    middleware?: ClientMiddlewareConfig[];
     /** Tên (hoặc URL) của bundle đã nạp được. */
     loaded: string[];
     /** [url, thông điệp lỗi] — nạp hỏng thì bỏ qua, KHÔNG làm sập boot. */

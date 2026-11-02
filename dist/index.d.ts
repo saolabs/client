@@ -37,6 +37,8 @@ export type { ViewUserConfig } from './src/core/view/View.js';
 export { ResourceScope } from './src/core/view/ResourceScope.js';
 export type { WatchCallback, WatchContext, WatchOptions, Cleanup } from './src/core/view/ResourceScope.js';
 export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
+export { authMiddleware, guestMiddleware } from './src/core/routers/ClientMiddleware.js';
+export type { ClientMiddlewareContext, ClientMiddlewareResult, ClientMiddleware, ClientMiddlewareHandler, ClientMiddlewareRef, ClientMiddlewareConfig, AuthMiddlewareOptions } from './src/core/routers/ClientMiddleware.js';
 export { Reactive } from './src/core/elements/Reactive.js';
 export { Block } from './src/core/elements/Block.js';
 export { BlockOutlet } from './src/core/elements/BlockOutlet.js';

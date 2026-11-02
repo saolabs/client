@@ -40,6 +40,6 @@ export declare function mergeBundles(bundles: Array<SaolaBundle | null | undefin
  * site chạy bằng view gốc, còn hơn trắng trang.
  */
 export declare function loadBundles(urls: string[] | null | undefined, opts?: MergeOptions): Promise<MergedBundles>;
-/** Chạy `boot()` của các bundle, sau khi App đã init. Lỗi một cái không chặn cái sau. */
+/** Register middleware before any boot hook can navigate; then run the bundle hooks. */
 export declare function bootBundles(merged: MergedBundles, app: ApplicationInterface): void;
 //# sourceMappingURL=bundle.d.ts.map

@@ -52,6 +52,9 @@ export type { WatchCallback, WatchContext, WatchOptions, Cleanup } from './src/c
 
 // Router
 export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
+export {authMiddleware, guestMiddleware} from './src/core/routers/ClientMiddleware.js';
+export type {ClientMiddlewareContext, ClientMiddlewareResult, ClientMiddleware, ClientMiddlewareHandler,
+    ClientMiddlewareRef, ClientMiddlewareConfig, AuthMiddlewareOptions} from './src/core/routers/ClientMiddleware.js';
 
 // Elements
 export { Reactive } from './src/core/elements/Reactive.js';

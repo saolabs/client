@@ -14,6 +14,7 @@
  *   - Browser back/forward handling
  */
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
+import { type ClientMiddlewareConfig } from './ClientMiddleware.js';
 export interface RouteDefinition {
     /** URL pattern: '/users/{id}', '/posts/{page?}' */
     path: string;
@@ -104,6 +105,9 @@ export declare class Router {
     /** Navigation guards */
     private _beforeEach;
     private navigationGuards;
+    private middleware;
+    private middlewareAbort;
+    private middlewareRedirects;
     /**
      * NHIỀU hook, không phải một.
      *
@@ -181,6 +185,8 @@ export declare class Router {
     beforeEach(guard: NavigationGuard): this;
     /** Add a disposable guard without replacing the host's beforeEach guard. */
     addNavigationGuard(guard: NavigationGuard): () => void;
+    /** Register project aliases/groups/global middleware. Returns a disposer. */
+    useMiddleware(config: ClientMiddlewareConfig): () => void;
     /** Đăng ký hook chạy sau mỗi lần điều hướng. Trả về hàm HUỶ đăng ký. */
     afterEach(hook: AfterNavigationHook): () => void;
     /**

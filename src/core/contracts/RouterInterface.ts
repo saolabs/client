@@ -1,4 +1,5 @@
 import type { ViewManagerInterface } from "./ViewManagerInterface.js";
+import type {ClientMiddlewareConfig} from '../routers/ClientMiddleware.js';
 
 // ─── Router Interface ────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ export interface RouterInterface {
     getCurrentRoute(): ActiveRouteInterface | null;
     /** Navigation guards */
     beforeEach(guard: (to: ActiveRouteInterface, from: ActiveRouteInterface, urlPath: string) => boolean | Promise<boolean>): this;
+    useMiddleware(config: ClientMiddlewareConfig): () => void;
     /** Đăng ký hook sau điều hướng; trả về hàm huỷ đăng ký. Nhiều hook cùng sống được. */
     afterEach(hook: (to: ActiveRouteInterface, from: ActiveRouteInterface) => void): () => void;
     /** Start listening to URL changes */

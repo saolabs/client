@@ -104,6 +104,7 @@ export function mergeBundles(bundles: Array<SaolaBundle | null | undefined>, opt
         if (bundle.services) Object.assign(out.services, bundle.services);
         if (bundle.helpers) Object.assign(out.helpers, bundle.helpers);
         if (bundle.views) Object.assign(out.views, bundle.views);
+        if (bundle.middleware) (out.middleware ??= []).push(bundle.middleware);
         for (const [group, map] of [['services', bundle.services], ['helpers', bundle.helpers], ['views', bundle.views]] as const) {
             for (const key of Object.keys(map ?? {})) owners.set(`${group}:${key}`, name);
         }
@@ -165,8 +166,16 @@ export async function loadBundles(urls: string[] | null | undefined, opts: Merge
     return merged;
 }
 
-/** Chạy `boot()` của các bundle, sau khi App đã init. Lỗi một cái không chặn cái sau. */
+/** Register middleware before any boot hook can navigate; then run the bundle hooks. */
 export function bootBundles(merged: MergedBundles, app: ApplicationInterface): void {
+    const installed: Array<() => void> = [];
+    try {
+        for (const middleware of merged.middleware ?? []) installed.push(app.Router.useMiddleware(middleware));
+    } catch (error) {
+        // A malformed or duplicate policy must not silently boot an unguarded app.
+        for (const off of installed.reverse()) off();
+        throw error;
+    }
     for (const boot of merged.boots) {
         try {
             boot(app);

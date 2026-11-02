@@ -1,3 +1,17 @@
+# Saola Client v1.7.0
+
+Adds client route middleware with project-owned aliases, groups, parameters,
+async cancellation and SPA redirects. Declare middleware directly through
+`defineBundle({middleware})`, or register it manually on the Router. Compiled
+`@middleware(...)` page metadata is checked before setup, hydration and cache
+restoration. Route policies precede page policies.
+
+Use saola/core 2.9.0 for module `clientMiddleware()` declarations, compiler
+3.5.0 for the `.sao` directive and builder 1.5.0 for lazy-loader metadata.
+Server authorization remains independent. See docs/CLIENT_MIDDLEWARE.md.
+
+Validation: 665 client tests, TypeScript and packed ESM/CJS/NodeNext exports.
+
 # Saola Client v1.6.0
 
 Adds App.Auth and auth() with shared SSR state, guard-aware events and reactive computed dependencies. App.Auth.client provides same-origin session login/logout/refresh and Google/GitHub redirects using the Core Auth API. Includes CSRF rotation across existing HTTP/API instances, serialized auth mutations, stale-response protection and cleanup on application reset.

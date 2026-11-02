@@ -19,6 +19,8 @@ export interface ViewManagerInterface {
     setViewRegistry(registry: Record<string, ((...args: any[]) => any) | (() => Promise<any>)>): void;
     /** Register a single view module */
     registerView(name: string, loader: ((...args: any[]) => any) | (() => Promise<any>)): void;
+    /** Static middleware aliases for a routed view, available before factory execution. */
+    getViewMiddleware?(name: string): readonly string[];
     /** Initialize with optional config */
     init(config?: {
         container?: HTMLElement | string;
