@@ -30,12 +30,16 @@ it('hydrates the reserved state and updates it through auth events and its ordin
     expect(root.querySelector('#auth-name')).toBe(name);
     // @useAuth itself owns exactly one service subscription, without @computed.
     expect((auth as any).context.listeners.size).toBe(1);
+    expect((vm.getCurrentView()!.__ctrl__.states.__ as any).subscriptions.has('@auth')).toBe(false);
     (root.querySelector('#auth-clear') as HTMLButtonElement).click(); await nextFrame();
     expect(name?.textContent).toBe('Guest'); expect(auth.id()).toBe(1);
-    auth.setUser({id:1,name:'Updated',username:'updated'}); await nextFrame(); await nextFrame();
+    auth.setUser({id:1,name:'Updated',username:'updated'});
+    expect(vm.getCurrentView()!.__ctrl__.states.__.getStateByKey('__auth__')?.name).toBe('Updated');
+    await nextFrame(); await nextFrame();
     expect(name?.textContent).toBe('Updated');
     const manager = vm.getCurrentView()!.__ctrl__.states.__;
     manager.pause(); auth.logout(); await nextFrame();
+    expect(manager.getStateByKey('__auth__')).toBeNull();
     expect(name?.textContent).toBe('Updated');
     manager.resume(); await nextFrame(); await nextFrame();
     expect(name?.textContent).toBe('Guest'); expect(root.querySelector('#auth-guest')).not.toBeNull();
