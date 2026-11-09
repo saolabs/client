@@ -1244,6 +1244,17 @@ export class ViewManager {
                 return null;
             }
             this.blockManager.restorePageContent(pageView.__ctrl__.viewId, entry.outletContents);
+            // render() không chạy lại khi restore → extendView() không gọi: layout dùng
+            // chung còn giữ dữ liệu @extends của trang trước. Áp lại dữ liệu của trang này.
+            // Lưu ý: updateData chỉ GỘP — khoá trang không truyền vẫn giữ giá trị cũ
+            // (mặc định @vars nằm trong closure compiled), nên trang nên truyền tường minh.
+            for (const v of entry.views) {
+                const ctrl = v.__ctrl__;
+                const superView = ctrl.superView;
+                if (superView && ctrl.superViewData && layoutChain.some(l => l.__ctrl__ === superView)) {
+                    superView.updateData?.(ctrl.superViewData);
+                }
+            }
             for (const v of entry.views) {
                 v.__ctrl__.resume();
             }

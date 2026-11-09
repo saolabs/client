@@ -1,3 +1,15 @@
+# Saola Client v1.7.1
+
+Fixes a page restored from PageCache leaving the shared layout with the
+previous page's `@extends` data (for example `side: false` of an editor page
+hiding the side panel of the list page). A restored page does not re-render, so
+the data it passed to `extendView()` is now kept and re-applied to its layout.
+Data is still merged: keys a page omits keep the layout's current value, so pass
+layout options explicitly.
+
+Validation: 666 client tests (2 pre-existing compiled admin-settings failures
+unrelated), TypeScript build.
+
 # Saola Client v1.7.0
 
 Adds client route middleware with project-owned aliases, groups, parameters,

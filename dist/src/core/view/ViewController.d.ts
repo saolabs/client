@@ -57,6 +57,8 @@ export declare class ViewController implements ViewControllerInterface {
     superView: ViewControllerInterface | null;
     /** Path to layout (super) view — e.g. 'layouts.main' */
     superViewPath: string | null;
+    /** Data last passed to the layout by `@extends` — re-applied when the page is restored from PageCache (render() does not run then). */
+    superViewData: Record<string, any> | null;
     /** Whether this controller IS a layout */
     isSuperView: boolean;
     /** For layouts: the original page view's controller (for block mounting) */

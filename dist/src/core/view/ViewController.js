@@ -72,6 +72,8 @@ export class ViewController {
         this.superView = null;
         /** Path to layout (super) view — e.g. 'layouts.main' */
         this.superViewPath = null;
+        /** Data last passed to the layout by `@extends` — re-applied when the page is restored from PageCache (render() does not run then). */
+        this.superViewData = null;
         /** Whether this controller IS a layout */
         this.isSuperView = false;
         /** For layouts: the original page view's controller (for block mounting) */
@@ -1352,6 +1354,7 @@ export class ViewController {
     }
     extendView(path, data = {}) {
         this.superViewPath = path;
+        this.superViewData = data;
         // Sync: render() trả superView ngay (xem ViewManager.resolveViewSync).
         const superView = this.App.View?.resolveViewSync(path, data, true);
         if (superView) {
