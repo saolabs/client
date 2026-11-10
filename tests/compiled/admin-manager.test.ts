@@ -156,7 +156,7 @@ it.each(['classic', 'material'])('renders %s list/form, guards drafts, escapes v
     expect(input.getAttribute('aria-invalid')).toBe('true');
     // The controller focuses after two animation frames, after reactive DOM updates.
     await vi.waitFor(() => expect(document.activeElement).toBe(input));
-    expect((document.querySelector('#resource-notice') as HTMLElement).textContent).toContain('Choose another name.');
+    expect(document.querySelector('.sa-admin-notification:last-child .sa-admin-notification-text')?.textContent).toContain('Choose another name.');
     input.value = 'Another name'; input.dispatchEvent(new Event('input', {bubbles: true}));
     (input.form as HTMLFormElement).dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     await vi.waitFor(() => expect(window.location.pathname).toBe('/control/categories'));

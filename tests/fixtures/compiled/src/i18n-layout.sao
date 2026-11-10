@@ -1,5 +1,5 @@
 @viewtype('layout')
-<header id="translated-header">@lang('messages.title')</header>
+<header id="translated-header">{{ trans('messages.title') }}</header>
 <main>
 @useBlock('content')
 </main>

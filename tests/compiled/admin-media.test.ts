@@ -113,7 +113,7 @@ it('hydrates real branding SSR, opens the shared picker and saves its selected U
     expect((document.querySelector('#setting-logo_url') as HTMLInputElement).value).toBe(picked.url);
     expect(ui.canChangeLanguage()).toBe(false); expect(writes).toHaveLength(0);
     (document.querySelector('form[data-settings-group]') as HTMLFormElement).dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
-    await vi.waitFor(() => expect(document.querySelector('#settings-notice')?.textContent).toContain('Đã lưu'));
+    await vi.waitFor(() => expect(document.querySelector('.sa-admin-notification:last-child .sa-admin-notification-text')?.textContent).toContain('Đã lưu'));
     expect(JSON.parse(writes[0].body)).toEqual({revision: 0, patch: {values: {logo_url: picked.url}}});
     expect(ui.canChangeLanguage()).toBe(true); expect(document.querySelectorAll('.saola-admin')).toHaveLength(1);
 });

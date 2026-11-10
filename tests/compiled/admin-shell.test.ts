@@ -163,7 +163,7 @@ it.each(['classic', 'material'])('%s uses the shared shell actions, guards langu
     const logoutEvent = new Event('submit', {bubbles: true, cancelable: true}); logout.dispatchEvent(logoutEvent);
     expect(logoutEvent.defaultPrevented).toBe(true);
     await selectHeaderLanguage('vi');
-    await vi.waitFor(() => expect(document.querySelector('[role="alert"]')?.textContent).toContain('Save or discard'));
+    await vi.waitFor(() => expect(document.querySelector('.sa-admin-notification[data-kind="warning"] .sa-admin-notification-text')?.textContent).toContain('Save or discard'));
     expect(fetch).not.toHaveBeenCalled(); dispose();
     await selectHeaderLanguage('vi');
     await vi.waitFor(() => expect(document.querySelector('#admin-page-title')?.textContent).toBe('Tổng quan'));

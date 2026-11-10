@@ -137,7 +137,7 @@ it('hydrates the actual Laravel catalogue with the same template components and 
     expect(document.querySelectorAll('.saola-admin')).toHaveLength(1);
     expect(document.querySelectorAll('#ui-cards .card')).toHaveLength(4);
     expect(document.querySelector('#ui-cards .card')).toBe(originalCard);
-    click('#ui-cards button'); await vi.waitFor(() => expect(document.querySelector('[role="status"]')?.textContent).toBe('submit'));
+    click('#ui-cards button'); await vi.waitFor(() => expect(document.querySelector('.sa-admin-notification[data-kind="info"] .sa-admin-notification-text')?.textContent).toBe('submit'));
 });
 
 it('all compiled UI templates typecheck with the public App.Admin API', () => {
