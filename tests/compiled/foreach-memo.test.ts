@@ -6,8 +6,8 @@ import { ViewController } from '../../src/core/view/ViewController';
 /**
  * `@foreach` giữ nguyên dòng không đổi (11/11/2026) — output compiler THẬT.
  *
- * Đo bằng số lần `html()` được gọi trong một lượt render: mỗi dòng chạy lại là
- * một lần gọi cho `<li>`. Mỗi test dưới đây là một lý do BUỘC phải chạy lại;
+ * Đo bằng số lần dựng dòng (`__fused()`) được gọi trong một lượt render: mỗi dòng
+ * chạy lại là một lần gọi cho `<li>`. Mỗi test dưới đây là một lý do BUỘC phải chạy lại;
  * thiếu một cái là UI hiển thị dữ liệu cũ mà không có gì báo.
  */
 let h: Harness;
@@ -21,7 +21,8 @@ beforeEach(async () => {
     const mod = await import(/* @vite-ignore */ path.join(__dirname, '../fixtures/compiled/.generated/js/memo-rows.js'));
     h = mount(mod.default);
     flush();
-    html = vi.spyOn(h.ctrl as any, 'html');
+    // Dòng của fixture này được gộp: mỗi dòng chạy lại là một lần `__fused()`.
+    html = vi.spyOn(h.ctrl as any, '__fused');
     // Lượt đầu sau mount: để lại dấu cho các lượt sau đối chiếu.
     view().replace(view().current().slice()); flush();
 });
@@ -71,7 +72,8 @@ it('state bị CHỤP trong tham số event đổi → lượt danh sách kế t
     h = mount(mod.default);
     flush();
     html.mockRestore();
-    html = vi.spyOn(h.ctrl as any, 'html');
+    // Dòng của fixture này được gộp: mỗi dòng chạy lại là một lần `__fused()`.
+    html = vi.spyOn(h.ctrl as any, '__fused');
     const rows = view().current();
     view().replace(rows.slice()); flush();
 

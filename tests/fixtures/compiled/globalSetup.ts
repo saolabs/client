@@ -66,7 +66,7 @@ export default async function setup() {
         const saoPath = path.join(SRC_DIR, file);
 
         const source = readFileSync(saoPath, 'utf-8');
-        if (['db-language-page', 'auth-reactivity', 'use-auth', 'middleware', 'memo-rows', 'memo-captured'].includes(name)) {
+        if (['db-language-page', 'auth-reactivity', 'use-auth', 'middleware', 'memo-rows', 'memo-captured', 'fused-rows'].includes(name)) {
             // Pin this contract fixture to the compiler under change, rather than an older
             // Composer installation in the starter. Both use the public compile API.
             const compilerRoot = path.resolve(HERE, '../../../../compiler');
@@ -74,6 +74,13 @@ export default async function setup() {
             const result = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, compilerRoot, saoPath, viewPath, fnName], { encoding: 'utf8' }));
             writeFileSync(path.join(OUT_JS_DIR, `${name}.js`), result.js, 'utf8');
             writeFileSync(path.join(OUT_BLADE_DIR, `${name}.blade.php`), result.blade, 'utf8');
+            // Cùng nguồn, tắt dòng gộp của @foreach: để so hai đường dựng dòng
+            // (foreach-fused-row.test) và giữ vùng phủ cho nhân bản khuôn phía client.
+            const plain = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, compilerRoot, saoPath, viewPath, fnName],
+                { encoding: 'utf8', env: { ...process.env, SAOC_NO_FUSE: '1' } }));
+            if (plain.blade !== result.blade) throw new Error(`Dòng gộp không được đổi Blade: ${name}`);
+            mkdirSync(path.join(GEN_DIR, 'js-nofuse'), { recursive: true });
+            writeFileSync(path.join(GEN_DIR, 'js-nofuse', `${name}.js`), plain.js, 'utf8');
             continue;
         }
         const langMatch = source.match(/<script\s+setup\b[^>]*\blang=["']?([^"'\s>]+)["']?/i);

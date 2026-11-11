@@ -13,6 +13,7 @@ import type { ViewUserConfig } from "./View.js";
 import { ApplicationInterface } from "../contracts/ApplicationInterface.js";
 import { SectionContentRenderer, SectionContentType, SectionInterface, SectionItemType } from "../contracts/SectionInterface.js";
 import { InitMode } from "../contracts/common.js";
+import { FusedRow } from "../elements/FusedRow.js";
 import { ComponentInterface } from "../contracts/ComponentInterface.js";
 import { ForeachSlotCache } from "../elements/ForeachSlotCache.js";
 type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | SaoNodeInterface;
@@ -119,8 +120,22 @@ export declare class ViewController implements ViewControllerInterface {
     private _dataEpoch;
     /** Công tắc tắt việc bỏ qua dòng không đổi của @foreach (để khoanh lỗi). */
     static foreachMemo: boolean;
+    /** Công tắc tắt nhân bản khuôn dòng của @foreach (để khoanh lỗi). */
+    static rowCloning: boolean;
+    /** Khuôn của dòng đang dựng — Html gốc của dòng lấy bản sao từ đây. */
+    _rowProto: Node[] | null;
+    _rowProtoIndex: number;
+    /** Đang nhận lại node con từ một cây vừa nhân bản; con trỏ tới node kế tiếp. */
+    _adoptActive: boolean;
+    _adoptCursor: Node | null;
+    _adoptOk: boolean;
+    /** Đang dựng thử dòng đầu để làm khuôn; gặp thứ không nhân bản được thì dừng. */
+    _probing: boolean;
+    /** Có vòng lặp chạy bên trong phạm vi đang xét (số dòng con thay đổi → không có khuôn cố định). */
+    _structDirty: boolean;
     _foreachSkipRegistry: boolean;
-    private foreachRegistry;
+    foreachRegistry: Map<string, any> | null;
+    private htmlArgs;
     private inlineForeachCaches;
     /** Deferred child factories retain the row scope in which they were created. */
     private scopeFactory;
@@ -327,7 +342,7 @@ export declare class ViewController implements ViewControllerInterface {
      */
     private wrapEventModifiers;
     /** Chạy danh sách handler compiler khai báo cho MỘT event. */
-    private invokeEventHandlers;
+    invokeEventHandlers(handlers: SaoElementEventHandler, event: Event): void;
     addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler, modifiers?: EventModifier[]): void;
     removeEventListener(element: HTMLElement, event: string): void;
     /**
@@ -378,6 +393,13 @@ export declare class ViewController implements ViewControllerInterface {
     html(id: string | null | undefined, tagName: string, parentElement: HtmlInterface | null, config: any, childrenFactory?: SaoChildrenFactory): SaoNodeInterface;
     reactive(id: string | null, type: string, parentReactive: ReactiveInterface | null, parentElement: HtmlInterface | null, stateKeys: string[], childrenFactory: ReactiveChildrenFactory): ReactiveInterface;
     output(id: string | null, parent: HtmlInterface | null, isEscapeHTML?: boolean, stateKeys?: string[], contentFactory?: () => string): OutputInterface;
+    /**
+     * Dòng gộp của `@foreach` (compiler ≥ 3.8): MỘT element cho cả cây con của
+     * một phần tử gốc trong thân vòng lặp. `desc` là khuôn tĩnh compiler hoist,
+     * `suffix` là phần đuôi id theo vòng lặp, `get(i)` trả giá trị động thứ i
+     * của dòng này. Xem FusedRow.
+     */
+    __fused(desc: any, suffix: string, parentElement: HtmlInterface | null, get: (index: number) => any): FusedRow;
     /**
      * FIX(baseline#2): trả về TextElement (có saoType) thay vì raw Text node.
      * Raw Text node bị mountElementList/Reactive.render bỏ qua → text tĩnh biến mất.
@@ -470,6 +492,15 @@ export declare class ViewController implements ViewControllerInterface {
      */
     __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput;
     __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContextInterface, identity: number) => any, keyFn?: (item: T, index: number) => any, reconcile?: boolean, scopeId?: string, memo?: 0 | 1 | 2, memoDeps?: readonly string[]): any[];
+    /**
+     * Dựng thử dòng đầu tiên NGAY (chưa gắn vào trang) để lấy khuôn cho các
+     * dòng sau. Chỉ dòng gồm toàn Html / chữ tĩnh / `{{ }}` mới làm khuôn được:
+     * component, khối @if, vòng lặp lồng… có vòng đời riêng và số node thay đổi.
+     * Gặp thứ như vậy thì dừng dựng thử — phần chưa dựng sẽ đi đường thường.
+     */
+    private captureRowProto;
+    /** Dòng vừa nhân bản: nhận node con và ghi nội dung trước khi gắn vào trang. */
+    private prerenderClonedRow;
     __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, emptyCallback?: () => any): any[];
     __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any): any[];
     /**

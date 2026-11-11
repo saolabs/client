@@ -11,7 +11,7 @@ import { discarding, isDiscarded } from "./teardown.js";
  * ".6a3a..." trở thành selector không hợp lệ → querySelector ném SyntaxError.
  * Dùng CSS.escape khi có; fallback escape thủ công ký tự đầu là số + ký tự đặc biệt.
  */
-function cssEscape(value) {
+export function cssEscape(value) {
     const g = typeof globalThis !== 'undefined' ? globalThis : {};
     if (g.CSS && typeof g.CSS.escape === 'function') {
         return g.CSS.escape(value);
@@ -38,8 +38,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  * như parser HTML, `'clippath'` ra SVGElement trơ. Compiler đã trả về đúng
  * `clipPath` (xem Parser::SVG_TAG_ADJUST).
  */
-function createDomElement(tagName, parentElement) {
-    const parent = parentElement?.element;
+export function createDomElement(tagName, parent) {
     const isSvg = tagName === 'svg'
         || (parent?.namespaceURI === SVG_NS && parent.tagName !== 'foreignObject');
     return isSvg
@@ -53,6 +52,16 @@ function domTagName(el) {
 const VOID_TAGS = new Set(['input', 'img', 'br', 'hr', 'meta', 'link']);
 /** `dataCount` → `data-count`; kết quả nhớ lại vì mỗi tên được hỏi hàng nghìn lần. */
 const ATTR_NAME_CACHE = new Map();
+export function attrDomName(name) {
+    let normalized = ATTR_NAME_CACHE.get(name);
+    if (normalized === undefined) {
+        normalized = /^(?:data|aria)[A-Z]/.test(name)
+            ? name.slice(0, 4) + '-' + name[4].toLowerCase() + name.slice(5).replace(/[A-Z]/g, m => '-' + m.toLowerCase())
+            : name;
+        ATTR_NAME_CACHE.set(name, normalized);
+    }
+    return normalized;
+}
 /** Chỉ để thoả HtmlInterface — không ai ghi vào. */
 const NO_NODES = Object.freeze([]);
 const NO_CHILDREN = Object.freeze([]);
@@ -117,6 +126,16 @@ export class Html {
         this.registeredEventNames = null;
         this.initMode = InitModes.CREATE;
         this.adoptedSSR = false;
+        /** Registry của dòng @foreach nơi element này được tạo; factory con chạy trong phạm vi đó. */
+        this.scope = null;
+        /** Element lấy từ bản sao của khuôn dòng — con của nó cũng nằm sẵn trong đó. */
+        this.fromClone = false;
+        /** Chỉ bật trong constructor của element nhân bản: phần tĩnh đã có trên DOM. */
+        this.skipStatic = false;
+        /** Đã dựng xong trước khi gắn vào trang; lượt render() kế tiếp của vòng lặp bỏ qua. */
+        this.prerendered = false;
+        /** Lượt nhận node con từ bản sao đã chạy (chỉ một lần). */
+        this.cloneBuilt = false;
         this.contentRendered = false;
         this.bindingInitialized = false;
         this.composing = false;
@@ -188,7 +207,7 @@ export class Html {
             }
             else {
                 // Partial hydration fallback: element không có trong SSR output
-                this.element = createDomElement(tagName, parentElement);
+                this.element = createDomElement(tagName, parentElement?.element);
                 if (hydrateClass)
                     this.element.classList.add(hydrateClass);
             }
@@ -200,15 +219,44 @@ export class Html {
             // duy nhất từng là ~1/3 thời gian tạo một danh sách dài. Hệ quả:
             // DOM của CSR khác SSR đúng ở class `{viewId}-{id}` này.
             // Class tĩnh vẫn ghi MỘT lần trong initializeClasses().
-            this.element = createDomElement(this.tagName, parentElement);
-            this.pendingClass = Html.csrHydrateClass && hydrateClass ? hydrateClass : '';
+            // Nhân bản khuôn: gốc của dòng lấy một bản sao cả cây từ khuôn của
+            // vòng lặp; element con nhận lại node có sẵn trong cây đó (xem render()).
+            const vc = ctx;
+            let ready = null;
+            if (vc._rowProto) {
+                const proto = vc._rowProto[vc._rowProtoIndex++];
+                if (proto !== undefined && proto.localName === tagName)
+                    ready = proto.cloneNode(true);
+            }
+            else if (vc._adoptActive) {
+                const node = vc._adoptCursor;
+                if (node !== null && node.nodeType === 1 && node.localName === tagName) {
+                    ready = node;
+                    vc._adoptCursor = node.nextSibling;
+                }
+                else
+                    vc._adoptOk = false;
+            }
+            if (ready !== null) {
+                this.element = ready;
+                this.fromClone = true;
+                // Attr/class TĨNH đã có sẵn trên bản sao; chỉ class hydrate (bật
+                // riêng cho kiểm thử) là khác theo từng dòng.
+                this.pendingClass = Html.csrHydrateClass && hydrateClass ? hydrateClass : null;
+            }
+            else {
+                this.element = createDomElement(this.tagName, parentElement?.element);
+                this.pendingClass = Html.csrHydrateClass && hydrateClass ? hydrateClass : '';
+            }
         }
         const lowerTag = this.tagName.toLowerCase();
         this.isVoidTag = VOID_TAGS.has(lowerTag);
         this.isOptionTag = lowerTag === 'option';
         this.isTextareaTag = lowerTag === 'textarea';
         this.childrenFactory = childrenFactory;
+        this.skipStatic = this.fromClone;
         this.initialize();
+        this.skipStatic = false;
     }
     updateConfig(newConfig) {
         if (this.__destroyed__)
@@ -258,8 +306,14 @@ export class Html {
         this.removeStaleDomState(old, oldDynamic);
     }
     initialize() {
+        // Element vừa tạo: `class` ghi TRƯỚC attr — đúng thứ tự Blade phát
+        // (@class → @attr → @style), nếu không DOM của CSR lệch SSR ở thứ tự
+        // attribute. Riêng khi `class` đi qua attrs thì giữ thứ tự cũ (nối thêm).
+        const early = this.pendingClass !== null && !(this.config.attrs && 'class' in this.config.attrs);
+        if (early)
+            this.writePendingClass();
         this.initializeAttributes();
-        this.initializeClasses();
+        this.initializeClasses(early);
         this.initializeStyles();
         this.initializeEvents();
     }
@@ -316,7 +370,7 @@ export class Html {
         for (const propName in old.props) {
             if (now.props && propName in now.props)
                 continue;
-            defaults ?? (defaults = createDomElement(this.tagName, this.parent));
+            defaults ?? (defaults = createDomElement(this.tagName, this.parent?.element));
             try {
                 if (propName in defaults) {
                     target[propName] = defaults[propName];
@@ -346,14 +400,7 @@ export class Html {
      * @example normalizeAttrName('id') === 'id'  (không đổi)
      */
     normalizeAttrName(name) {
-        let normalized = ATTR_NAME_CACHE.get(name);
-        if (normalized === undefined) {
-            normalized = /^(?:data|aria)[A-Z]/.test(name)
-                ? name.slice(0, 4) + '-' + name[4].toLowerCase() + name.slice(5).replace(/[A-Z]/g, m => '-' + m.toLowerCase())
-                : name;
-            ATTR_NAME_CACHE.set(name, normalized);
-        }
-        return normalized;
+        return attrDomName(name);
     }
     /**
      * Thiết lập two-way data binding (v-model-like) theo compiler pattern:
@@ -514,6 +561,8 @@ export class Html {
         const normalizedName = this.normalizeAttrName(attrName);
         // FIX(baseline#1): contract chuẩn là 'static' (compiler emit); 'value' giữ làm legacy alias
         if (attrConfig.type === 'static' || attrConfig.type === 'value') {
+            if (this.skipStatic)
+                return;
             if (attrConfig.value !== undefined && attrConfig.value !== null && attrConfig.value !== false) {
                 if (this.element.getAttribute(normalizedName) !== String(attrConfig.value))
                     this.element.setAttribute(normalizedName, String(attrConfig.value));
@@ -550,24 +599,29 @@ export class Html {
             }
         }
     }
-    initializeClasses() {
-        const pending = this.pendingClass;
-        if (pending !== null) {
-            this.pendingClass = null;
-            let value = pending;
-            const list = this.config.classes;
-            if (Array.isArray(list)) {
-                for (const item of list)
-                    if (item && item.type === 'static' && item.value)
-                        value = value ? value + ' ' + item.value : item.value;
-            }
-            // `class` có thể đã được ghi qua attrs — khi đó nối thêm, không đè.
-            if (value) {
-                if (this.element.hasAttribute('class'))
-                    this.addClass(value);
-                else
-                    this.element.setAttribute('class', value);
-            }
+    /** Ghi một lần class hydrate (nếu bật) + mọi class tĩnh của element vừa tạo. */
+    writePendingClass() {
+        let value = this.pendingClass;
+        this.pendingClass = null;
+        const list = this.config.classes;
+        if (Array.isArray(list)) {
+            for (const item of list)
+                if (item && item.type === 'static' && item.value)
+                    value = value ? value + ' ' + item.value : item.value;
+        }
+        // `class` có thể đã được ghi qua attrs — khi đó nối thêm, không đè.
+        // Bản sao của khuôn mang class hydrate của dòng làm khuôn → ghi đè hẳn.
+        if (value) {
+            if (!this.fromClone && this.element.hasAttribute('class'))
+                this.addClass(value);
+            else
+                this.element.setAttribute('class', value);
+        }
+    }
+    initializeClasses(written = false) {
+        if (this.pendingClass !== null) {
+            this.writePendingClass();
+            written = true;
         }
         if (!this.config.classes)
             return;
@@ -611,7 +665,7 @@ export class Html {
                 const className = classConfig.value;
                 if (classConfig.type === 'static') {
                     // Vừa ghi cùng class hydrate ở trên → DOM đã có.
-                    if (pending === null)
+                    if (!written && !this.skipStatic)
                         this.addClass(className);
                     continue;
                 }
@@ -771,20 +825,95 @@ export class Html {
         return this.element;
     }
     renderChildren() {
-        const output = this.childrenFactory ? this.childrenFactory(this) : [];
+        let output;
+        const scope = this.scope;
+        if (!this.childrenFactory)
+            output = [];
+        else if (scope === null)
+            output = this.childrenFactory(this);
+        else {
+            // Factory của element trong một dòng @foreach: chạy trong registry của dòng đó.
+            const vc = this.ctx;
+            const previous = vc.foreachRegistry, skip = vc._foreachSkipRegistry;
+            vc.foreachRegistry = scope;
+            vc._foreachSkipRegistry = false;
+            try {
+                output = this.childrenFactory(this);
+            }
+            finally {
+                vc.foreachRegistry = previous;
+                vc._foreachSkipRegistry = skip;
+            }
+        }
         const children = [];
         for (let i = 0; i < output.length; i++) {
             const child = output[i];
             if (child === null || child === undefined)
                 continue;
             children.push(typeof child === 'string' || typeof child === 'number'
-                ? new TextElement({ ctx: this.ctx, parent: this.parent, text: String(child) })
+                ? this.primitiveText(child)
                 : child);
         }
         this.children = children;
         return this.children;
     }
+    /** Chuỗi/số trần trong danh sách con — dựng sau factory nên không theo được thứ tự nhận node của khuôn. */
+    primitiveText(child) {
+        this.ctx._adoptOk = false;
+        this.ctx._structDirty = true;
+        return new TextElement({ ctx: this.ctx, parent: this.parent, text: String(child) });
+    }
+    /** Dựng cây con NGAY, trước khi element được gắn vào trang (dòng nhân bản / dòng làm khuôn). */
+    prerender() {
+        const vc = this.ctx;
+        this.render();
+        if (!(vc._probing && vc._structDirty))
+            this.prerendered = true;
+    }
+    /**
+     * Cây con của element này có dùng làm khuôn nhân bản được không: chỉ Html,
+     * chữ tĩnh và `{{ }}` — những thứ mà mọi phần động đều được ghi lại (có so
+     * sánh) khi dựng trên bản sao. Loại: @bind và ô nhập (cloneNode chép cả
+     * giá trị đang gõ), class tính lúc chạy, transition, vùng tự quản DOM.
+     */
+    cloneable() {
+        const config = this.config;
+        if (config.bind || config.transition || config.element)
+            return false;
+        const tag = this.tagName.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'option')
+            return false;
+        if (this.element.hasAttribute('data-sao-preserve-children'))
+            return false;
+        if (Array.isArray(config.classes)) {
+            for (const item of config.classes)
+                if (item && item.type === 'dynamic')
+                    return false;
+        }
+        for (const child of this.children) {
+            if (child instanceof Html) {
+                if (!child.cloneable())
+                    return false;
+            }
+            else if (child instanceof TextElement) {
+                if (!child.isStatic)
+                    return false;
+            }
+            else if (child && child.saoType === 'Output') {
+                if (!child.isEscapeHTML)
+                    return false;
+            }
+            else
+                return false;
+        }
+        return true;
+    }
     render() {
+        if (this.prerendered) {
+            // Đã dựng trong __foreach; đây là lượt render của chính pass đó.
+            this.prerendered = false;
+            return this.element;
+        }
         const previous = this.children;
         if (this.isSingleElement()) {
             return this.element;
@@ -800,11 +929,66 @@ export class Html {
             this.renderTextContent();
             return this.element;
         }
+        // Element nhân bản, lượt dựng đầu: con của nó nằm sẵn trong bản sao.
+        // Mở "cửa sổ nhận node" quanh factory — Html/Output/chữ tĩnh tạo ra
+        // trong đó lấy node theo thứ tự thay vì tạo mới.
+        const vc = this.ctx;
+        const adopting = this.fromClone && previous.length === 0 && !this.cloneBuilt;
+        let adopted = false;
         let children = [];
-        if (this.childrenFactory) {
+        if (adopting) {
+            this.cloneBuilt = true;
+            const wasActive = vc._adoptActive, cursor = vc._adoptCursor, ok = vc._adoptOk;
+            vc._adoptActive = true;
+            vc._adoptCursor = this.element.firstChild;
+            vc._adoptOk = true;
+            try {
+                if (this.childrenFactory)
+                    children = this.renderChildren();
+                adopted = vc._adoptOk && vc._adoptCursor === null;
+            }
+            finally {
+                vc._adoptActive = wasActive;
+                vc._adoptCursor = cursor;
+                vc._adoptOk = ok;
+            }
+        }
+        else if (this.childrenFactory) {
             children = this.renderChildren();
         }
         children = this.children = reuseStaticText(previous, children);
+        if (vc._probing) {
+            // Dựng thử dòng làm khuôn: gặp con không nhân bản được (component,
+            // khối reactive, vòng lặp…) thì dừng TRƯỚC khi dựng nó — nó sẽ được
+            // dựng ở lượt render thường, sau khi dòng đã nằm trong trang.
+            let plain = !vc._structDirty;
+            for (let i = 0; plain && i < children.length; i++) {
+                const child = children[i];
+                plain = child instanceof Html || child instanceof TextElement || child.saoType === 'Output';
+            }
+            if (!plain) {
+                vc._structDirty = true;
+                this.children = NO_CHILDREN;
+                return this.element;
+            }
+        }
+        if (adopting) {
+            if (adopted) {
+                for (let i = 0; i < children.length; i++)
+                    children[i].render?.();
+            }
+            else {
+                // Cây con không khớp khuôn (hiếm): đường tổng quát tự xếp lại và dọn node thừa.
+                reconcileChildren(this.element, [], children);
+                removeUnmanagedNodes(this.element, this.element.firstChild, null, children);
+            }
+            this.applyOptionSelection();
+            if (this.isStarted)
+                for (const child of children)
+                    child.start?.();
+            this.maybeRunEnter();
+            return this.element;
+        }
         if (this.initMode === InitModes.HYDRATE) {
             // ── Hydrate mode: DOM đã có từ server ────────────────────────
             // renderChildren() đã tạo JS objects (Html claim DOM, Output claim markers).
@@ -832,8 +1016,11 @@ export class Html {
                     host.appendChild(child.closeTag);
                 }
             }
-            for (let i = 0; i < children.length; i++)
+            for (let i = 0; i < children.length; i++) {
                 children[i].render?.();
+                if (vc._probing && vc._structDirty)
+                    return this.element; // phần còn lại: lượt render thường
+            }
         }
         else {
             reconcileChildren(this.element, previous, children);

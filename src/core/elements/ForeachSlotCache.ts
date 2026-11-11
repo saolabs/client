@@ -62,6 +62,13 @@ export interface ForeachClaim {
 
 export class ForeachSlotCache {
     readonly refreshedElements = new Set<any>();
+    /**
+     * Khuôn DOM của một dòng (mỗi phần tử gốc của dòng một node) để các dòng
+     * sau `cloneNode` thay vì dựng từng element. `undefined` = chưa thử,
+     * `null` = dòng của vòng lặp này không nhân bản được.
+     * Xem ViewController.__foreach và Html (fromClone).
+     */
+    rowProto: Node[] | null | undefined = undefined;
     private nextIdentity = 0;
 
     /** Initial SSR indexes, then monotonically allocated identities for new rows. */
@@ -165,6 +172,7 @@ export class ForeachSlotCache {
      * KHÔNG tự gọi destroy() trên elements — caller phải làm trước.
      */
     clear(): void {
+        this.rowProto = undefined;
         this.nextIdentity = 0;
         this.refreshedElements.clear();
         this._map.clear();

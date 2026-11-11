@@ -137,9 +137,11 @@ describe('compiled-views: methods (F3 — gọi method component trong {{ }})', 
  */
 describe('compiled-views: marker parity SSR↔CSR (F4, qua pipeline thật)', () => {
     const jsIds = (src: string) =>
-        [...src.matchAll(/this\.output\(`([a-f0-9]+)/g)].map((m) => m[1]);
+        // Dòng gộp của @foreach khai id của {{ }} trong khuôn hoist (`o: "id"`), không
+        // theo thứ tự tài liệu → so theo tập đã sắp xếp.
+        [...src.matchAll(/this\.output\(`([a-f0-9]+)|\bo: "([a-f0-9]+)/g)].map((m) => m[1] ?? m[2]).sort();
     const bladeIds = (src: string) =>
-        [...src.matchAll(/startMarker\('output',\s*['"]([a-f0-9]+)/g)].map((m) => m[1]);
+        [...src.matchAll(/startMarker\('output',\s*['"]([a-f0-9]+)/g)].map((m) => m[1]).sort();
 
     it('mọi fixture: dãy id output khớp tuyệt đối giữa sao2js và sao2blade', () => {
         if (!existsSync(GENERATED_JS) || !existsSync(GENERATED_BLADE)) {

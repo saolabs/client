@@ -4,15 +4,16 @@ Faster list creation and teardown, and `@foreach` rows are kept far more often.
 
 - `__foreach` accepts the compiler's captured-state list (7th argument, `saola/compiler` 3.7.0) and compares only those states; output from older compilers keeps the previous "any other state" rule. `StateManager.revisionOf(keys)` is the new counter; quiet `updateRealState` writes now bump per-key versions too.
 - **Behaviour change:** elements created on the client no longer carry the hydrate class `{viewId}-{id}`. That class exists to claim server-rendered DOM; nothing claims client-created elements, and one unique class per element was about a third of list creation time. Server-rendered elements keep it. Tooling that identifies compiler-owned elements by that class in client-rendered DOM (the SSR↔CSR parity gate does) must set `window.__SAOLA_CSR_HYDRATE_CLASS__ = true` before the app boots (`Html.csrHydrateClass`).
+- `@foreach` row template cloning: the first new row of a loop is built normally and becomes a template; later rows `cloneNode` the whole subtree and their `Html` / `Output` / static text objects adopt the existing nodes, built before the row is attached. Only rows made of plain elements, static text and escaped `{{ }}` qualify (no components, `@if` blocks, nested loops, `@bind` or form controls, transitions, computed class names); anything else takes the normal path. `ViewController.rowCloning = false` turns it off. `Html` child factories run in their row scope without a wrapping closure.
 - Element registry keys live on the element instead of two `WeakMap`s; `Html` no longer allocates tracking `Set`s per element (stale attrs / classes / styles / props are derived from the previous config on update); static text allocates no closure or key array.
 - Event listeners are no longer bound to an `AbortSignal`; a view removes its listeners explicitly on destroy. `elementEventHandlers` values are now `EventInvoker` records.
 - `bench/profile.mjs` prints self time per function; `BENCH_ONLY=saola` runs one side of `bench/run.mjs`.
 
-Benchmark (1,000-row table, Chrome, script ms, before → after; React 18.3 / Vue 3.5 for reference): create 18.8 → 9.9 (4.8 / 3.3), swap two rows after a selection 9.1 → 1.3 (4.8 / 1.1), replace 2,000 rows 69.5 → 36.0 (22.1 / 11.1), clear 2,000 rows 13.9 → 9.4 (7.6 / 3.7).
+Benchmark (1,000-row table, Chrome, script ms, before → after; React 18.3 / Vue 3.5 for reference): create 18.8 → 9.2 (4.2 / 3.2), swap two rows after a selection 9.1 → 1.3 (4.8 / 1.1), replace 2,000 rows 69.5 → 36.0 (22.1 / 11.1), clear 2,000 rows 13.9 → 9.4 (7.6 / 3.7).
 
 Pairs with `saola/compiler` 3.7.0. Built `dist` is included in this release.
 
-Validation: 682 client tests (100 test files), TypeScript build; gehihi-app browser pass over 46 web and admin pages (direct load and SPA navigation) identical to 1.8.0.
+Validation: 689 client tests (101 test files; one compiled-fixture test needs the starter on builder ≥ 1.6 when its compiler is 3.7), TypeScript build; gehihi-app browser pass over 46 web and admin pages (direct load and SPA navigation) identical to 1.8.0.
 
 # Saola Client v1.8.0
 

@@ -28,8 +28,8 @@ export class Output implements OutputInterface {
     saoType: SaoObjectType = 'Output';
     ctx: ViewControllerInterface;
     parent: HtmlInterface | null;
-    openTag: Comment;
-    closeTag: Comment;
+    openTag!: Comment;
+    closeTag!: Comment;
     stateKeys: string[];
     contentFactory: () => string;
     isEscapeHTML: boolean;
@@ -82,9 +82,29 @@ export class Output implements OutputInterface {
                 this.closeTag = markerRegistry.createMarkerEnd('output', this.id);
             }
         } else {
-            // ── CSR: tạo markers mới ─────────────────────────────────────────
-            this.openTag = markerRegistry.createMarkerStart('output', this.id);
-            this.closeTag = markerRegistry.createMarkerEnd('output', this.id);
+            // ── CSR ──────────────────────────────────────────────────────────
+            // Trong cây vừa nhân bản từ khuôn dòng: marker và text node đã nằm
+            // sẵn đúng chỗ, chỉ cần đổi nội dung marker sang id của dòng này.
+            const vc = ctx as any;
+            let open: Node | null = null;
+            if (vc._adoptActive) {
+                const first: Node | null = vc._adoptCursor;
+                const text = first !== null && first.nodeType === 8 ? first.nextSibling : null;
+                const close = text !== null && text.nodeType === 3 ? text.nextSibling : null;
+                if (isEscapeHTML && close !== null && close.nodeType === 8) {
+                    open = first;
+                    (open as Comment).data = markerRegistry.openComment('output', this.id);
+                    (close as Comment).data = markerRegistry.closeComment('output', this.id);
+                    this.openTag = open as Comment;
+                    this.closeTag = close as Comment;
+                    this.textNode = text as Text;
+                    vc._adoptCursor = close.nextSibling;
+                } else vc._adoptOk = false;
+            }
+            if (open === null) {
+                this.openTag = markerRegistry.createMarkerStart('output', this.id);
+                this.closeTag = markerRegistry.createMarkerEnd('output', this.id);
+            }
         }
     }
 

@@ -3,6 +3,31 @@ import type { HtmlInterface, SaoChildrenFactory, SaoElementChildren, SaoElementC
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
+/**
+ * Escape một chuỗi để dùng làm CSS class/id selector. Class hydrate dạng
+ * "{viewId}-{id}" có viewId là hex (uniqid) CÓ THỂ bắt đầu bằng chữ số, làm
+ * ".6a3a..." trở thành selector không hợp lệ → querySelector ném SyntaxError.
+ * Dùng CSS.escape khi có; fallback escape thủ công ký tự đầu là số + ký tự đặc biệt.
+ */
+export declare function cssEscape(value: string): string;
+/**
+ * `document.createElement('svg')` ra HTMLUnknownElement — SVG dựng bằng CSR
+ * không vẽ gì. Phải dùng createElementNS.
+ *
+ * Chỉ cần nhận ra `<svg>`: mọi thứ bên trong kế thừa namespace từ cha, kể cả
+ * tag không liệt kê được hết (`filter`, cả họ `fe*`, `textPath`…). Danh sách
+ * tag SVG là thừa và luôn thiếu.
+ *
+ * `foreignObject` CẮT chuỗi kế thừa: con của nó là HTML thật (đó là toàn bộ lý
+ * do nó tồn tại), parser của trình duyệt cũng làm đúng như vậy khi đọc markup
+ * SSR — không cắt ở đây thì SSR và CSR ra hai cây khác nhau.
+ *
+ * Tên tag phải giữ đúng hoa/thường: createElementNS KHÔNG có bảng điều chỉnh
+ * như parser HTML, `'clippath'` ra SVGElement trơ. Compiler đã trả về đúng
+ * `clipPath` (xem Parser::SVG_TAG_ADJUST).
+ */
+export declare function createDomElement(tagName: string, parent?: Element | null): HTMLElement;
+export declare function attrDomName(name: string): string;
 export declare class Html implements HtmlInterface {
     /**
      * CHỈ cho kiểm thử: bật thì element tạo ở client cũng mang class hydrate
@@ -48,6 +73,16 @@ export declare class Html implements HtmlInterface {
     private registeredEventNames;
     initMode: InitMode;
     private adoptedSSR;
+    /** Registry của dòng @foreach nơi element này được tạo; factory con chạy trong phạm vi đó. */
+    scope: Map<string, any> | null;
+    /** Element lấy từ bản sao của khuôn dòng — con của nó cũng nằm sẵn trong đó. */
+    fromClone: boolean;
+    /** Chỉ bật trong constructor của element nhân bản: phần tĩnh đã có trên DOM. */
+    private skipStatic;
+    /** Đã dựng xong trước khi gắn vào trang; lượt render() kế tiếp của vòng lặp bỏ qua. */
+    private prerendered;
+    /** Lượt nhận node con từ bản sao đã chạy (chỉ một lần). */
+    private cloneBuilt;
     constructor({ ctx, id, parentElement, tagName, element, config, childrenFactory, initMode, }: {
         ctx: ViewControllerInterface | ViewManagerInterface;
         id?: string | null;
@@ -95,6 +130,8 @@ export declare class Html implements HtmlInterface {
      *   - Xử lý reactive binding
      */
     private _applyAttr;
+    /** Ghi một lần class hydrate (nếu bật) + mọi class tĩnh của element vừa tạo. */
+    private writePendingClass;
     private initializeClasses;
     private addClass;
     private removeClass;
@@ -111,10 +148,21 @@ export declare class Html implements HtmlInterface {
     isSingleElement(): boolean;
     getElement(): HTMLElement;
     renderChildren(): SaoElementChildren;
+    /** Chuỗi/số trần trong danh sách con — dựng sau factory nên không theo được thứ tự nhận node của khuôn. */
+    private primitiveText;
     private contentRendered;
     private bindingInitialized;
     private composing;
     private isStarted;
+    /** Dựng cây con NGAY, trước khi element được gắn vào trang (dòng nhân bản / dòng làm khuôn). */
+    prerender(): void;
+    /**
+     * Cây con của element này có dùng làm khuôn nhân bản được không: chỉ Html,
+     * chữ tĩnh và `{{ }}` — những thứ mà mọi phần động đều được ghi lại (có so
+     * sánh) khi dựng trên bản sao. Loại: @bind và ô nhập (cloneNode chép cả
+     * giá trị đang gõ), class tính lúc chạy, transition, vùng tự quản DOM.
+     */
+    cloneable(): boolean;
     render(): HTMLElement;
     private applyOptionSelection;
     private renderTextContent;
