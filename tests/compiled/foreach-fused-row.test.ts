@@ -225,3 +225,11 @@ it('hydrate lệch cấu trúc: dòng đó dựng lại từ khuôn, không vỡ
     expect(container.querySelector('article[data-id="2"] h3')!.textContent).toContain('b');
     StoreService.instance('ViewManager').clear();
 });
+
+it('setter của state gọi SAU khi view đã huỷ (mounted async chạy tiếp khi đã rời trang) không ném lỗi', async () => {
+    h = mount(await load('fused-rows')); flush();
+    const view = h.view as any;
+    h.destroy();
+    expect(() => { view.select(2); view.replace(rows(3)); }).not.toThrow();
+    h = null;
+});
