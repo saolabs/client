@@ -1,3 +1,4 @@
+import { isDiscarded } from "./teardown.js";
 /**
  * TextElement — wraps a DOM Text node.
  *
@@ -8,6 +9,7 @@
 export class TextElement {
     constructor({ ctx, parent = null, stateKeys = [], generateText = () => '', isEscapeHTML = true }) {
         this.saoType = 'TextElement';
+        this._element = null;
         this.statekeys = [];
         this.unsubscribe = null;
         this.generateText = () => this._text;
@@ -26,7 +28,17 @@ export class TextElement {
         // FIX(baseline#3): KHÔNG escapeHTML khi ghi vào Text node — text node tự an toàn,
         // escape thủ công gây double-escape. shouldEscapeHTML chỉ dùng cho SSR string path.
         this._text = this.generateText();
-        this.element = document.createTextNode(this._text);
+    }
+    /**
+     * Text node tạo LƯỜI. Mỗi lượt re-render compiler gọi lại `this.text(...)`
+     * cho mọi đoạn chữ tĩnh, rồi `reuseStaticText` bỏ ngay bản mới để giữ node
+     * cũ — tạo sẵn DOM node ở constructor là tạo ra để vứt.
+     */
+    get element() {
+        return this._element ?? (this._element = document.createTextNode(this._text));
+    }
+    set element(node) {
+        this._element = node;
     }
     /** Start reactive text updates */
     start() {
@@ -55,7 +67,8 @@ export class TextElement {
     update(newText) {
         if (this._text !== newText) {
             this._text = newText;
-            this.element.textContent = newText;
+            if (this._element)
+                this._element.data = newText;
         }
     }
     render() {
@@ -68,7 +81,7 @@ export class TextElement {
         this.update(text);
     }
     remove() {
-        this.element.remove();
+        this._element?.remove();
     }
     destroy() {
         this.__destroyed__ = true;
@@ -76,7 +89,8 @@ export class TextElement {
             this.unsubscribe();
             this.unsubscribe = null;
         }
-        this.element.remove();
+        if (this._element && !isDiscarded(this._element))
+            this._element.remove();
         this.parent = null;
     }
     get text() {

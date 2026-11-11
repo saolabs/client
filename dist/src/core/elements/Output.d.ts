@@ -2,15 +2,6 @@ import { InitMode } from "../contracts/common.js";
 import type { HtmlInterface, OutputInterface } from "../contracts/ElementInterface.js";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
-/**
- * Output — reactive text output between comment markers.
- *
- * Compiled từ: {{ $expression }}   → output({ctx, parentElement, stateKeys, isEscapeHTML: true}, () => expression)
- * Compiled từ: {!! $expression !!} → output({ctx, parentElement, stateKeys, isEscapeHTML: false}, () => expression)
- *
- * Render: Tạo Text node giữa <!--o:id-s--> và <!--o:id-e-->
- * Update: Khi stateKeys thay đổi → re-evaluate contentFactory → update textContent
- */
 export declare class Output implements OutputInterface {
     saoType: SaoObjectType;
     ctx: ViewControllerInterface;

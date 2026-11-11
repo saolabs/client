@@ -1,3 +1,19 @@
+# Saola Client v1.8.0
+
+`__foreach` honours the compiler's memo mode (`1` / `2`): a row whose item is
+the same reference is kept when no other state, in-place mutation or parent data
+changed since (`ViewController.foreachMemo = false` turns it off). Uses a single
+root listener per `(element, event)` reading the current handler list so
+re-renders no longer remove and re-add listeners; `@click.once` now fires once
+for the life of the element. Reordering moves only out-of-place nodes, removing
+a subtree detaches its root first, and hoisted static config objects (`__scN`)
+are skipped when identical.
+
+Pairs with `saola/compiler` 3.6.0. Built `dist` is included in this release.
+
+Validation: 680 client tests (100 test files), TypeScript build and packed
+native ESM/CJS/NodeNext export checks.
+
 # Saola Client v1.7.1
 
 Fixes a page restored from PageCache leaving the shared layout with the

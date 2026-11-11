@@ -1,6 +1,7 @@
 import { InitModes } from "../contracts/common.js";
 import { generateUUID } from "../helpers/utils.js";
 import markerRegistry from "../services/MarkerRegistry.js";
+import { isDiscarded } from "./teardown.js";
 /**
  * Output — reactive text output between comment markers.
  *
@@ -10,6 +11,16 @@ import markerRegistry from "../services/MarkerRegistry.js";
  * Render: Tạo Text node giữa <!--o:id-s--> và <!--o:id-e-->
  * Update: Khi stateKeys thay đổi → re-evaluate contentFactory → update textContent
  */
+function sameKeys(a, b) {
+    if (a === b)
+        return true;
+    if (a.length !== b.length)
+        return false;
+    for (let i = 0; i < a.length; i++)
+        if (a[i] !== b[i])
+            return false;
+    return true;
+}
 export class Output {
     constructor({ ctx, id = null, parent = null, stateKeys = [], contentFactory = () => '', isEscapeHTML = true, initMode = InitModes.CREATE }) {
         this.saoType = 'Output';
@@ -82,7 +93,12 @@ export class Output {
         this.contentFactory = factory;
     }
     setStateKeys(stateKeys) {
+        // Mỗi lượt re-render compiler truyền lại một mảng MỚI cùng nội dung;
+        // đăng ký lại khi key không đổi là việc thừa trên từng output.
+        const unchanged = sameKeys(this.stateKeys, stateKeys);
         this.stateKeys = stateKeys;
+        if (unchanged)
+            return;
         // If already started, we need to resubscribe with new keys
         if (this._isStarted) {
             this.stop();
@@ -189,9 +205,8 @@ export class Output {
             return;
         const rawText = String(this.contentFactory() ?? '');
         if (this.isEscapeHTML && this.textNode) {
-            if (this.textNode.textContent !== rawText) {
-                this.textNode.textContent = rawText;
-            }
+            if (this.textNode.data !== rawText)
+                this.textNode.data = rawText;
             return;
         }
         // Raw mode hoặc textNode chưa tồn tại → render lại nội dung giữa markers
@@ -217,18 +232,21 @@ export class Output {
         this._isDestroyed = true;
         this.ctx.releaseElement?.(this);
         this.stop();
-        // Remove mọi nội dung giữa markers (text node hoặc raw nodes)
-        let current = this.openTag.nextSibling;
-        while (current && current !== this.closeTag) {
-            const next = current.nextSibling;
-            current.remove();
-            current = next;
+        // Cả nhánh chứa output đang bị vứt bỏ → markers và nội dung đi theo gốc.
+        if (!isDiscarded(this.openTag)) {
+            // Remove mọi nội dung giữa markers (text node hoặc raw nodes)
+            let current = this.openTag.nextSibling;
+            while (current && current !== this.closeTag) {
+                const next = current.nextSibling;
+                current.remove();
+                current = next;
+            }
+            // Remove markers
+            this.openTag.remove();
+            this.closeTag.remove();
         }
         this.textNode = null;
         this.rawNodes = [];
-        // Remove markers
-        this.openTag.remove();
-        this.closeTag.remove();
         this.parent = null;
     }
     // ─── OneElement markers ─────────────────────────────

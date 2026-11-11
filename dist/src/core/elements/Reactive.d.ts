@@ -64,6 +64,12 @@ export declare class Reactive implements ReactiveInterface {
     private claimSSRMarkers;
     setParentElement(parent: HtmlInterface | null): void;
     setChildrenFactory(factory: ReactiveChildrenFactory): void;
+    /**
+     * Factory vừa được thay = vùng CHA vừa render lại, mọi thứ thân vòng lặp
+     * đóng gói từ scope ngoài (item của vòng cha, biến cục bộ) có thể đã khác.
+     * Lượt render kế tiếp vì vậy không được bỏ qua dòng nào.
+     */
+    private _factoryFresh;
     setStateKeys(stateKeys: string[]): void;
     /** Registry guard — element đã destroy không được reuse */
     __destroyed__: boolean;

@@ -23,6 +23,17 @@ export declare class StateManager implements StateManagerInterface {
     private subscriptions;
     private pendingChanges;
     private versions;
+    /** Tổng mọi lần `versions` tăng — "có state nào của view vừa đổi không". */
+    private revisionCount;
+    /**
+     * Tăng mỗi khi dữ liệu bị sửa TẠI CHỖ ở bên dưới một state (thuộc tính
+     * của item, mảng lồng) hoặc khi dev set lại đúng reference cũ. `@foreach`
+     * dựa vào đây để biết một item cùng reference có còn nguyên nội dung không.
+     * Toàn cục vì cùng một object có thể nằm trong state của nhiều view.
+     */
+    static mutationEpoch: number;
+    /** Số lần state của view này đổi, trừ phần đóng góp của `exclude`. */
+    revisionExcluding(exclude: readonly string[]): number;
     private stateIndex;
     private flushRAF;
     private hasPendingFlush;
@@ -180,6 +191,8 @@ export declare class StateManager implements StateManagerInterface {
      * dựa vào đây để chụp lại mà KHÔNG cảnh báo. Xoá sau mỗi lần quét.
      */
     private hookHandledKeys;
+    /** `value` đang được ít nhất một state quan sát — mọi lần sửa tại chỗ đều tăng mutationEpoch. */
+    static isTracked(value: any): boolean;
     /** Chỉ quan sát object THUẦN và mảng — tránh phá Date/Map/Set/instance class. */
     private static isObservable;
     /**

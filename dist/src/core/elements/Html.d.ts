@@ -13,7 +13,18 @@ export declare class Html implements HtmlInterface {
     private children;
     domChildren: Node[];
     private childrenFactory;
+    /**
+     * Chỉ `@bind` cần signal. Tạo sẵn cho MỌI element (và tạo lại ở mỗi
+     * updateConfig) từng chiếm ~30% thời gian một lượt cập nhật danh sách.
+     */
     private abortController;
+    /** Config NGUYÊN BẢN compiler truyền vào — so identity để bỏ qua cập nhật thừa. */
+    private sourceConfig;
+    private isVoidTag;
+    /** Class hydrate chờ ghi cùng class tĩnh (chỉ element vừa tạo). */
+    private pendingClass;
+    private isOptionTag;
+    private isTextareaTag;
     /** All state subscriptions for reactive bindings — cleanup on destroy */
     private bindingUnsubscribes;
     /** Invalidates deferred/stale binding callbacks after a config reconciliation. */
@@ -42,7 +53,8 @@ export declare class Html implements HtmlInterface {
     private initialize;
     private isBindingCurrent;
     private cleanupBindingResources;
-    private clearManagedDomState;
+    /** Gỡ khỏi DOM những gì config CŨ quản lý mà config mới không còn nhắc tới. */
+    private removeStaleDomState;
     /**
      * Chuẩn hóa tên attr từ camelCase → kebab-case cho data-* và aria-* attrs.
      *
@@ -82,7 +94,8 @@ export declare class Html implements HtmlInterface {
     private initializeStyles;
     private initializeEvents;
     addEventListeners(): void;
-    removeEventListeners(): void;
+    /** Gỡ listener; truyền `keep` thì giữ lại các event còn trong config mới. */
+    removeEventListeners(keep?: Record<string, unknown> | null): void;
     setParentElement(parent: HtmlInterface | null): void;
     setParent(parent: HtmlInterface | null): void;
     setChildrenFactory(factory: SaoChildrenFactory): void;

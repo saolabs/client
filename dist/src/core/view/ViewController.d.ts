@@ -112,6 +112,14 @@ export declare class ViewController implements ViewControllerInterface {
      * Reset về null ngay sau khi childrenFactory trả về.
      */
     _currentForeachCache: ForeachSlotCache | null;
+    /** State key của vùng @foreach đang render (Reactive đặt quanh factory). */
+    _foreachMemoKeys: readonly string[] | null;
+    /** Lượt render này có được giữ nguyên dòng không đổi không. */
+    _foreachMemoSkip: boolean;
+    /** Tăng mỗi lần cha đẩy data mới xuống — biến data không có version riêng. */
+    private _dataEpoch;
+    /** Công tắc tắt việc bỏ qua dòng không đổi của @foreach (để khoanh lỗi). */
+    static foreachMemo: boolean;
     _foreachSkipRegistry: boolean;
     private foreachRegistry;
     private elementRegistries;
@@ -322,6 +330,10 @@ export declare class ViewController implements ViewControllerInterface {
      * `once` KHÔNG xử lý ở đây — nó là option của addEventListener.
      */
     private wrapEventModifiers;
+    /** Trạng thái sống của một listener gốc — xem addEventListener. */
+    private eventInvokers;
+    /** Chạy danh sách handler compiler khai báo cho MỘT event. */
+    private invokeEventHandlers;
     addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler, modifiers?: EventModifier[]): void;
     removeEventListener(element: HTMLElement, event: string): void;
     /**
@@ -463,7 +475,7 @@ export declare class ViewController implements ViewControllerInterface {
      *   - string — SSR data hoặc default '' → render text tĩnh (rỗng → []).
      */
     __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput;
-    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContextInterface, identity: number) => any, keyFn?: (item: T, index: number) => any, reconcile?: boolean, scopeId?: string): any[];
+    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContextInterface, identity: number) => any, keyFn?: (item: T, index: number) => any, reconcile?: boolean, scopeId?: string, memo?: 0 | 1 | 2): any[];
     __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, emptyCallback?: () => any): any[];
     __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any): any[];
     /**

@@ -85,21 +85,7 @@ export class LoopContext {
      * MUTABLE vì codegen của chúng cần `setCurrentTimes`/`next`).
      */
     snapshot() {
-        return Object.freeze({
-            index: this.index,
-            iteration: this.iteration,
-            count: this.count,
-            remaining: this.remaining,
-            first: this.first,
-            last: this.last,
-            odd: this.odd,
-            even: this.even,
-            depth: this.depth,
-            parent: this.parent ? this.parent.snapshot() : null,
-            next() {
-                console.warn('[LoopContext] `loop` trong @foreach là bản chụp chỉ đọc — next() không có tác dụng.');
-            },
-        });
+        return Object.freeze(new LoopSnapshot(this));
     }
     reset() {
         this.iteration = 0;
@@ -131,6 +117,27 @@ export class LoopContext {
         this.last = this.count > 0 ? this.index === this.count - 1 : false;
         this.odd = this.iteration % 2 === 1;
         this.even = !this.odd;
+    }
+}
+/**
+ * Bản chụp chỉ đọc của một lượt lặp. Là class (không phải object literal kèm
+ * closure `next`) vì `@foreach` tạo một bản cho MỖI phần tử ở MỖI lượt render.
+ */
+class LoopSnapshot {
+    constructor(source) {
+        this.index = source.index;
+        this.iteration = source.iteration;
+        this.count = source.count;
+        this.remaining = source.remaining;
+        this.first = source.first;
+        this.last = source.last;
+        this.odd = source.odd;
+        this.even = source.even;
+        this.depth = source.depth;
+        this.parent = source.parent ? source.parent.snapshot() : null;
+    }
+    next() {
+        console.warn('[LoopContext] `loop` trong @foreach là bản chụp chỉ đọc — next() không có tác dụng.');
     }
 }
 //# sourceMappingURL=LoopContext.js.map

@@ -1,9 +1,10 @@
-import { reconcileChildren, reuseStaticText } from './reconcileChildren.js';
+import { reconcileChildren, reuseStaticText, removeUnmanagedNodes } from './reconcileChildren.js';
 import { InitModes } from "../contracts/common.js";
 import { hydrateElementList } from "../helpers/view.js";
 import { TextElement } from "./TextElement.js";
 import SectionManager from "../services/SectionManager.js";
 import { runEnter, runLeave } from "../helpers/transition.js";
+import { discarding, isDiscarded } from "./teardown.js";
 /**
  * Escape một chuỗi để dùng làm CSS class/id selector. Class hydrate dạng
  * "{viewId}-{id}" có viewId là hex (uniqid) CÓ THỂ bắt đầu bằng chữ số, làm
@@ -49,25 +50,45 @@ function createDomElement(tagName, parentElement) {
 function domTagName(el) {
     return el.namespaceURI === SVG_NS ? el.tagName : el.tagName.toLowerCase();
 }
+const VOID_TAGS = new Set(['input', 'img', 'br', 'hr', 'meta', 'link']);
+/** `dataCount` → `data-count`; kết quả nhớ lại vì mỗi tên được hỏi hàng nghìn lần. */
+const ATTR_NAME_CACHE = new Map();
+function hasOwnKeys(value) {
+    if (value)
+        for (const _ in value)
+            return true;
+    return false;
+}
 export class Html {
     constructor({ ctx, id = null, parentElement = null, tagName = 'div', element = null, config = {}, childrenFactory = null, initMode = InitModes.CREATE, }) {
         this.saoType = 'Html';
         this.children = [];
         this.domChildren = []; // For compatibility with HtmlInterface; Html itself doesn't have a single root element
         this.childrenFactory = null;
-        this.abortController = new AbortController();
+        /**
+         * Chỉ `@bind` cần signal. Tạo sẵn cho MỌI element (và tạo lại ở mỗi
+         * updateConfig) từng chiếm ~30% thời gian một lượt cập nhật danh sách.
+         */
+        this.abortController = null;
+        /** Config NGUYÊN BẢN compiler truyền vào — so identity để bỏ qua cập nhật thừa. */
+        this.sourceConfig = null;
+        this.isVoidTag = false;
+        /** Class hydrate chờ ghi cùng class tĩnh (chỉ element vừa tạo). */
+        this.pendingClass = null;
+        this.isOptionTag = false;
+        this.isTextareaTag = false;
         /** All state subscriptions for reactive bindings — cleanup on destroy */
         this.bindingUnsubscribes = [];
         /** Invalidates deferred/stale binding callbacks after a config reconciliation. */
         this.bindingGeneration = 0;
         this.contentUnsubscribe = null;
         /** DOM state owned by this Html config, used for exact cleanup before reuse. */
-        this.managedAttributeNames = new Set();
-        this.managedClassNames = new Set();
-        this.managedStyleNames = new Set();
-        this.managedPropertyNames = new Set();
+        this.managedAttributeNames = null;
+        this.managedClassNames = null;
+        this.managedStyleNames = null;
+        this.managedPropertyNames = null;
         /** Events actually registered through ViewController, independent of current config. */
-        this.registeredEventNames = new Set();
+        this.registeredEventNames = null;
         this.initMode = InitModes.CREATE;
         this.adoptedSSR = false;
         this.contentRendered = false;
@@ -81,6 +102,7 @@ export class Html {
         this.ctx = ctx;
         this.parent = parentElement;
         this.config = config;
+        this.sourceConfig = config;
         this.tagName = tagName;
         this.initMode = initMode;
         // ── Ưu tiên element trực tiếp (ViewManager rootElement / test) ─────────
@@ -147,35 +169,65 @@ export class Html {
         }
         else {
             // ── CSR (create mode): tạo element mới ───────────────────────────────
+            // Class hydrate được ghi chung MỘT lần với class tĩnh trong
+            // initializeClasses() thay vì mỗi tên một lệnh classList.add.
             this.element = createDomElement(this.tagName, parentElement);
-            if (hydrateClass)
-                this.element.classList.add(hydrateClass);
+            this.pendingClass = hydrateClass;
         }
+        const lowerTag = this.tagName.toLowerCase();
+        this.isVoidTag = VOID_TAGS.has(lowerTag);
+        this.isOptionTag = lowerTag === 'option';
+        this.isTextareaTag = lowerTag === 'textarea';
         this.childrenFactory = childrenFactory;
         this.initialize();
     }
     updateConfig(newConfig) {
         if (this.__destroyed__)
             return;
+        // Compiler hoist config TĨNH (không factory/event) thành hằng dùng chung
+        // cho mọi lượt render, nên cùng một object nghĩa là không có gì để làm.
+        // Config rỗng `{}` cũng vậy dù mỗi lần là một object mới.
+        const previousSource = this.sourceConfig;
+        if (newConfig === previousSource)
+            return;
+        this.sourceConfig = newConfig;
+        if (!hasOwnKeys(newConfig) && !hasOwnKeys(previousSource))
+            return;
         // Reuse must behave like a fresh initialization without replacing the DOM
         // node: remove every resource owned by the previous config first, then make
         // the new managed sections authoritative. This prevents stale attrs,
         // duplicate events, and state subscriptions retaining old closures.
-        this.removeEventListeners();
+        //
+        // Event giữ nguyên listener gốc: ViewController thay danh sách handler
+        // tại chỗ, nên chỉ gỡ những event KHÔNG còn trong config mới.
+        this.removeEventListeners(newConfig.events);
         this.cleanupBindingResources();
-        this.clearManagedDomState(newConfig);
-        this.config = {
-            ...this.config,
-            ...newConfig,
-            attrs: newConfig.attrs,
-            props: newConfig.props,
-            events: newConfig.events,
-            classes: newConfig.classes,
-            styles: newConfig.styles,
-            bind: newConfig.bind,
-            content: newConfig.content,
-        };
+        // Bảy mục dưới đây luôn do config mới quyết định; các khoá khác
+        // (transition, eventModifiers, element) giữ giá trị cũ nếu config mới
+        // không nhắc tới. Config cũ không có khoá nào loại đó thì dùng thẳng
+        // config mới, khỏi cấp phát bản gộp cho mỗi element ở mỗi lượt render.
+        const old = this.config;
+        this.config = old.transition === undefined && old.eventModifiers === undefined && old.element === undefined
+            ? newConfig
+            : {
+                ...old,
+                ...newConfig,
+                attrs: newConfig.attrs,
+                props: newConfig.props,
+                events: newConfig.events,
+                classes: newConfig.classes,
+                styles: newConfig.styles,
+                bind: newConfig.bind,
+                content: newConfig.content,
+            };
+        // initialize() ghi lại chính xác những gì config mới quản lý; phần còn
+        // sót trong tập cũ là thứ phải gỡ. Làm theo thứ tự này thì không cần
+        // dựng riêng một bộ Set "config mới có gì" chỉ để so.
+        const attrs = this.managedAttributeNames, classes = this.managedClassNames;
+        const styles = this.managedStyleNames, props = this.managedPropertyNames;
+        this.managedAttributeNames = this.managedClassNames = this.managedStyleNames = this.managedPropertyNames = null;
         this.initialize();
+        this.removeStaleDomState(attrs, classes, styles, props);
     }
     initialize() {
         this.initializeAttributes();
@@ -186,14 +238,16 @@ export class Html {
     isBindingCurrent(generation) {
         return !this.__destroyed__ && generation === this.bindingGeneration;
     }
-    cleanupBindingResources(renewAbortController = true) {
+    cleanupBindingResources() {
         this.bindingGeneration++;
         this.contentUnsubscribe?.();
         this.contentUnsubscribe = null;
-        this.abortController.abort();
-        if (renewAbortController) {
-            this.abortController = new AbortController();
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
         }
+        if (this.bindingUnsubscribes.length === 0)
+            return;
         for (const unsubscribe of this.bindingUnsubscribes) {
             try {
                 unsubscribe();
@@ -204,39 +258,31 @@ export class Html {
         }
         this.bindingUnsubscribes = [];
     }
-    clearManagedDomState(next = {}) {
-        const attrs = new Set(Object.keys(next.attrs ?? {}).map(name => this.normalizeAttrName(name)));
-        const classes = new Set();
-        if (Array.isArray(next.classes)) {
-            for (const item of next.classes)
-                if (item && item.type !== 'dynamic' && item.value)
-                    classes.add(String(item.value));
-        }
-        else {
-            for (const [name, item] of Object.entries(next.classes ?? {})) {
-                if (item.type === 'binding' || item.value)
-                    classes.add(name);
+    /** Gỡ khỏi DOM những gì config CŨ quản lý mà config mới không còn nhắc tới. */
+    removeStaleDomState(attrs, classes, styles, props) {
+        if (attrs)
+            for (const name of attrs) {
+                if (!this.managedAttributeNames?.has(name))
+                    this.element.removeAttribute(name);
             }
-        }
-        for (const attrName of this.managedAttributeNames) {
-            if (!attrs.has(attrName))
-                this.element.removeAttribute(attrName);
-        }
-        this.managedAttributeNames.clear();
-        for (const className of this.managedClassNames) {
-            if (!classes.has(className))
-                this.removeClass(className);
-        }
-        this.managedClassNames.clear();
-        for (const prop of this.managedStyleNames) {
-            if (!(prop in (next.styles ?? {})))
-                this.element.style.removeProperty(prop);
-        }
-        this.managedStyleNames.clear();
-        const removedProps = [...this.managedPropertyNames].filter(name => !(name in (next.props ?? {})));
-        const defaults = removedProps.length ? createDomElement(this.tagName, this.parent) : {};
+        if (classes)
+            for (const name of classes) {
+                if (!this.managedClassNames?.has(name))
+                    this.removeClass(name);
+            }
+        if (styles)
+            for (const name of styles) {
+                if (!this.managedStyleNames?.has(name))
+                    this.element.style.removeProperty(name);
+            }
+        if (!props)
+            return;
+        let defaults = null;
         const target = this.element;
-        for (const propName of removedProps) {
+        for (const propName of props) {
+            if (this.managedPropertyNames?.has(propName))
+                continue;
+            defaults ?? (defaults = createDomElement(this.tagName, this.parent));
             try {
                 if (propName in defaults) {
                     target[propName] = defaults[propName];
@@ -254,7 +300,6 @@ export class Html {
                 catch { /* no-op */ }
             }
         }
-        this.managedPropertyNames.clear();
     }
     /**
      * Chuẩn hóa tên attr từ camelCase → kebab-case cho data-* và aria-* attrs.
@@ -267,13 +312,14 @@ export class Html {
      * @example normalizeAttrName('id') === 'id'  (không đổi)
      */
     normalizeAttrName(name) {
-        if (/^data[A-Z]/.test(name)) {
-            return 'data-' + name[4].toLowerCase() + name.slice(5).replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+        let normalized = ATTR_NAME_CACHE.get(name);
+        if (normalized === undefined) {
+            normalized = /^(?:data|aria)[A-Z]/.test(name)
+                ? name.slice(0, 4) + '-' + name[4].toLowerCase() + name.slice(5).replace(/[A-Z]/g, m => '-' + m.toLowerCase())
+                : name;
+            ATTR_NAME_CACHE.set(name, normalized);
         }
-        if (/^aria[A-Z]/.test(name)) {
-            return 'aria-' + name[4].toLowerCase() + name.slice(5).replace(/[A-Z]/g, m => '-' + m.toLowerCase());
-        }
-        return name;
+        return normalized;
     }
     /**
      * Thiết lập two-way data binding (v-model-like) theo compiler pattern:
@@ -355,7 +401,7 @@ export class Html {
             else
                 applyState(initial);
         }
-        const signal = this.abortController.signal;
+        const signal = (this.abortController ?? (this.abortController = new AbortController())).signal;
         const inputHandler = (event) => {
             if (this.composing || event.isComposing)
                 return;
@@ -375,9 +421,8 @@ export class Html {
     initializeAttributes() {
         const attrs = this.config.attrs;
         if (attrs) {
-            for (const [attrName, attrConfig] of Object.entries(attrs)) {
-                this._applyAttr(attrName, attrConfig);
-            }
+            for (const attrName in attrs)
+                this._applyAttr(attrName, attrs[attrName]);
         }
         // @bind/@val — own top-level config bucket (sibling of attrs/props/events,
         // same shape/spirit as events — see ElementInterface.ts). Applied AFTER
@@ -389,7 +434,7 @@ export class Html {
         // props độc lập với attrs/bind — element chỉ có props vẫn phải chạy
         if (this.config.props) {
             for (const [propName, propConfig] of Object.entries(this.config.props)) {
-                this.managedPropertyNames.add(propName);
+                (this.managedPropertyNames ?? (this.managedPropertyNames = new Set())).add(propName);
                 if (propConfig.type === 'static' || propConfig.type === 'value') {
                     if (this.element[propName] !== propConfig.value)
                         this.element[propName] = propConfig.value;
@@ -434,7 +479,7 @@ export class Html {
     _applyAttr(attrName, attrConfig) {
         // FIX(Phase4): chuẩn hóa tên — dataCount → data-count
         const normalizedName = this.normalizeAttrName(attrName);
-        this.managedAttributeNames.add(normalizedName);
+        (this.managedAttributeNames ?? (this.managedAttributeNames = new Set())).add(normalizedName);
         // FIX(baseline#1): contract chuẩn là 'static' (compiler emit); 'value' giữ làm legacy alias
         if (attrConfig.type === 'static' || attrConfig.type === 'value') {
             if (attrConfig.value !== undefined && attrConfig.value !== null && attrConfig.value !== false) {
@@ -474,6 +519,22 @@ export class Html {
         }
     }
     initializeClasses() {
+        const pending = this.pendingClass;
+        if (pending !== null) {
+            this.pendingClass = null;
+            let value = pending;
+            const list = this.config.classes;
+            if (Array.isArray(list)) {
+                for (const item of list)
+                    if (item && item.type === 'static' && item.value)
+                        value += ' ' + item.value;
+            }
+            // `class` có thể đã được ghi qua attrs — khi đó nối thêm, không đè.
+            if (this.element.hasAttribute('class'))
+                this.addClass(value);
+            else
+                this.element.setAttribute('class', value);
+        }
         if (!this.config.classes)
             return;
         // New simplified format: classes: [{ type, value, factory?, stateKeys? }]
@@ -494,12 +555,12 @@ export class Html {
                         for (const prev of applied) {
                             if (next.indexOf(prev) === -1) {
                                 this.removeClass(prev);
-                                this.managedClassNames.delete(prev);
+                                this.managedClassNames?.delete(prev);
                             }
                         }
                         for (const name of next) {
                             this.addClass(name);
-                            this.managedClassNames.add(name);
+                            (this.managedClassNames ?? (this.managedClassNames = new Set())).add(name);
                         }
                         applied = next;
                     };
@@ -514,9 +575,11 @@ export class Html {
                 if (!classConfig.value)
                     continue;
                 const className = classConfig.value;
-                this.managedClassNames.add(className);
+                (this.managedClassNames ?? (this.managedClassNames = new Set())).add(className);
                 if (classConfig.type === 'static') {
-                    this.addClass(className);
+                    // Vừa ghi cùng class hydrate ở trên → DOM đã có.
+                    if (pending === null)
+                        this.addClass(className);
                     continue;
                 }
                 if (classConfig.type === 'binding') {
@@ -537,7 +600,7 @@ export class Html {
             return;
         }
         for (const [className, classConfig] of Object.entries(this.config.classes)) {
-            this.managedClassNames.add(className);
+            (this.managedClassNames ?? (this.managedClassNames = new Set())).add(className);
             if (classConfig.type === 'static') {
                 if (classConfig.value) {
                     this.addClass(className);
@@ -568,13 +631,11 @@ export class Html {
             const tokens = className.trim().split(/\s+/);
             for (let i = 0; i < tokens.length; i++) {
                 if (tokens[i])
-                    if (!this.element.classList.contains(tokens[i]))
-                        this.element.classList.add(tokens[i]);
+                    this.element.classList.add(tokens[i]);
             }
             return;
         }
-        if (!this.element.classList.contains(className))
-            this.element.classList.add(className);
+        this.element.classList.add(className);
     }
     removeClass(className) {
         if (!className)
@@ -583,13 +644,11 @@ export class Html {
             const tokens = className.trim().split(/\s+/);
             for (let i = 0; i < tokens.length; i++) {
                 if (tokens[i])
-                    if (this.element.classList.contains(tokens[i]))
-                        this.element.classList.remove(tokens[i]);
+                    this.element.classList.remove(tokens[i]);
             }
             return;
         }
-        if (this.element.classList.contains(className))
-            this.element.classList.remove(className);
+        this.element.classList.remove(className);
     }
     toggleClass(className, force) {
         if (!className)
@@ -615,7 +674,7 @@ export class Html {
         if (!this.config.styles)
             return;
         for (const [prop, styleConfig] of Object.entries(this.config.styles)) {
-            this.managedStyleNames.add(prop);
+            (this.managedStyleNames ?? (this.managedStyleNames = new Set())).add(prop);
             if (styleConfig.type === 'static' || styleConfig.type === 'value') {
                 this.applyStyle(prop, styleConfig.value ?? '');
             }
@@ -641,23 +700,29 @@ export class Html {
         this.addEventListeners();
     }
     addEventListeners() {
-        if (this.config.events) {
-            for (const [eventName, handlers] of Object.entries(this.config.events)) {
-                this.ctx.addEventListener(this.element, eventName, handlers, this.config.eventModifiers?.[eventName]);
-                this.registeredEventNames.add(eventName);
-            }
+        const events = this.config.events;
+        if (!events)
+            return;
+        for (const eventName in events) {
+            this.ctx.addEventListener(this.element, eventName, events[eventName], this.config.eventModifiers?.[eventName]);
+            (this.registeredEventNames ?? (this.registeredEventNames = new Set())).add(eventName);
         }
     }
-    removeEventListeners() {
+    /** Gỡ listener; truyền `keep` thì giữ lại các event còn trong config mới. */
+    removeEventListeners(keep) {
+        if (!this.registeredEventNames)
+            return;
         for (const eventName of this.registeredEventNames) {
+            if (keep && eventName in keep)
+                continue;
             try {
                 this.ctx.removeEventListener(this.element, eventName);
             }
             catch (error) {
                 console.error(`[Html] Failed to remove "${eventName}" listener:`, error);
             }
+            this.registeredEventNames.delete(eventName);
         }
-        this.registeredEventNames.clear();
     }
     setParentElement(parent) {
         this.parent = parent;
@@ -669,22 +734,23 @@ export class Html {
         this.childrenFactory = factory;
     }
     isSingleElement() {
-        return ['input', 'img', 'br', 'hr', 'meta', 'link'].includes(this.tagName.toLowerCase());
+        return this.isVoidTag;
     }
     getElement() {
         return this.element;
     }
     renderChildren() {
-        const children = this.childrenFactory ? this.childrenFactory(this) : [];
-        this.children = [];
-        this.children = children
-            .filter((child) => child !== null && child !== undefined)
-            .map((child) => {
-            if (typeof child === 'string' || typeof child === 'number') {
-                return new TextElement({ ctx: this.ctx, parent: this.parent, stateKeys: [], generateText: () => String(child) });
-            }
-            return child;
-        });
+        const output = this.childrenFactory ? this.childrenFactory(this) : [];
+        const children = [];
+        for (let i = 0; i < output.length; i++) {
+            const child = output[i];
+            if (child === null || child === undefined)
+                continue;
+            children.push(typeof child === 'string' || typeof child === 'number'
+                ? new TextElement({ ctx: this.ctx, parent: this.parent, stateKeys: [], generateText: () => String(child) })
+                : child);
+        }
+        this.children = children;
         return this.children;
     }
     render() {
@@ -720,23 +786,28 @@ export class Html {
             this.initMode = InitModes.CREATE;
             return this.element;
         }
-        reconcileChildren(this.element, previous, children);
-        // Drop unmanaged nodes left by previous renders, retaining marker ranges.
-        const keep = new Set();
-        for (const child of children) {
-            const first = child.element ?? child.openTag;
-            const last = child.element ?? child.closeTag;
-            let current = first;
-            while (current) {
-                keep.add(current);
-                if (current === last)
-                    break;
-                current = current.nextSibling ?? undefined;
+        if (previous.length === 0 && this.element.firstChild === null) {
+            // ── Lần dựng đầu của element vừa tạo: không có gì để đối chiếu ──
+            // Nối thẳng theo thứ tự; bỏ qua toàn bộ phần diff, lưu/khôi phục
+            // focus và dọn node lạ của reconcileChildren.
+            const host = this.element;
+            for (let i = 0; i < children.length; i++) {
+                const child = children[i];
+                const single = child.element;
+                if (single)
+                    host.appendChild(single);
+                else if (child.openTag && child.closeTag) {
+                    host.appendChild(child.openTag);
+                    host.appendChild(child.closeTag);
+                }
             }
+            for (let i = 0; i < children.length; i++)
+                children[i].render?.();
         }
-        for (const node of Array.from(this.element.childNodes))
-            if (!keep.has(node))
-                node.remove();
+        else {
+            reconcileChildren(this.element, previous, children);
+            removeUnmanagedNodes(this.element, this.element.firstChild, null, children);
+        }
         this.applyOptionSelection();
         if (this.isStarted)
             for (const child of children)
@@ -745,8 +816,10 @@ export class Html {
         return this.element;
     }
     applyOptionSelection() {
+        if (!this.isOptionTag)
+            return;
         const selected = this.config.props?.selected;
-        if (this.tagName.toLowerCase() !== 'option' || !selected)
+        if (!selected)
             return;
         // Insertion into a select may choose an option automatically. Apply the
         // declared selection again after its DOM and text children are mounted.
@@ -757,7 +830,7 @@ export class Html {
         this.contentUnsubscribe?.();
         this.contentUnsubscribe = null;
         const content = this.config.content;
-        const isTextarea = this.tagName.toLowerCase() === 'textarea';
+        const isTextarea = this.isTextareaTag;
         const generation = this.bindingGeneration;
         const apply = () => {
             if (!this.isBindingCurrent(generation))
@@ -820,6 +893,11 @@ export class Html {
     }
     /** Start reactive bindings + children (Phase 2 lifecycle) */
     start() {
+        // Đã chạy thì mọi child hiện có cũng đã chạy: child sinh sau do chính
+        // lượt render tạo ra nó start (xem cuối render()). Thiếu chốt này mỗi
+        // lượt render lại duyệt start() xuống TOÀN BỘ cây con.
+        if (this.isStarted)
+            return;
         this.isStarted = true;
         for (const child of this.children) {
             if ('start' in child && typeof child.start === 'function') {
@@ -849,7 +927,7 @@ export class Html {
         this.ctx.releaseElement?.(this);
         this.removeEventListeners();
         // Abort @bind listeners and unsubscribe every reactive attr/prop/class/style.
-        this.cleanupBindingResources(false);
+        this.cleanupBindingResources();
         const transitionName = this.config.transition?.name;
         if (transitionName && this.element.isConnected) {
             // HOÃN teardown cây con: destroy() của child Html gỡ luôn DOM của nó,
@@ -868,9 +946,15 @@ export class Html {
             void runLeave(this.element, transitionName).then(() => this.teardownSubtree());
             return;
         }
-        this.teardownSubtree();
-        // Gỡ element khỏi DOM — destroy là vĩnh viễn
+        // Gỡ element khỏi DOM TRƯỚC — destroy là vĩnh viễn. Cây con sau đó tự
+        // dọn trên một nhánh đã rời tài liệu, thay vì mỗi node con gây một lượt
+        // vô hiệu hoá style/layout trên cây đang sống.
+        if (isDiscarded(this.element)) {
+            this.teardownSubtree();
+            return;
+        }
         this.element.remove();
+        discarding(this.element, () => this.teardownSubtree());
     }
     /**
      * Nhả id của element này và toàn bộ cây con khỏi `ctx.elements`, KHÔNG
@@ -892,13 +976,11 @@ export class Html {
     }
     /** Destroy children + dọn nội dung. Tách riêng để leave hoãn được. */
     teardownSubtree() {
-        this.children.forEach(child => {
-            if ('destroy' in child && typeof child.destroy === 'function') {
-                child.destroy();
-            }
-        });
+        const children = this.children;
         this.children = [];
-        if (this.element.children.length > 0) {
+        for (let i = 0; i < children.length; i++)
+            children[i].destroy?.();
+        if (this.element.firstElementChild && !isDiscarded(this.element)) {
             this.element.innerHTML = '';
         }
     }

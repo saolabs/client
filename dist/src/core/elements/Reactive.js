@@ -1,4 +1,4 @@
-import { reconcileChildren } from './reconcileChildren.js';
+import { reconcileChildren, removeUnmanagedNodes } from './reconcileChildren.js';
 import { InitModes } from "../contracts/common.js";
 import { generateUUID } from "../helpers/utils.js";
 import { mountChildrenBeforeAnchor } from "../helpers/view.js";
@@ -39,6 +39,12 @@ export class Reactive {
          * khi item object reference không thay đổi.
          */
         this._foreachCache = null;
+        /**
+         * Factory vừa được thay = vùng CHA vừa render lại, mọi thứ thân vòng lặp
+         * đóng gói từ scope ngoài (item của vòng cha, biến cục bộ) có thể đã khác.
+         * Lượt render kế tiếp vì vậy không được bỏ qua dòng nào.
+         */
+        this._factoryFresh = true;
         /** Registry guard — element đã destroy không được reuse */
         this.__destroyed__ = false;
         this.ctx = ctx;
@@ -90,9 +96,13 @@ export class Reactive {
     }
     setChildrenFactory(factory) {
         this.childrenFactory = factory;
+        this._factoryFresh = true;
     }
     setStateKeys(stateKeys) {
+        const previous = this.stateKeys;
         this.stateKeys = stateKeys;
+        if (previous.length === stateKeys.length && previous.every((key, i) => key === stateKeys[i]))
+            return;
         // If already started, we need to resubscribe with new keys
         if (this._isStarted) {
             this.stop();
@@ -239,11 +249,16 @@ export class Reactive {
         }
         this._foreachCache.beginPass();
         this.ctx._currentForeachCache = this._foreachCache;
+        this.ctx._foreachMemoKeys = this.stateKeys;
+        this.ctx._foreachMemoSkip = !this._factoryFresh;
+        this._factoryFresh = false;
         try {
             return this.childrenFactory(this, this.parentElement);
         }
         finally {
             this.ctx._currentForeachCache = null;
+            this.ctx._foreachMemoKeys = null;
+            this.ctx._foreachMemoSkip = false;
         }
     }
     /**
@@ -339,33 +354,11 @@ export class Reactive {
      * và remove nodes không nằm trong tập đó.
      */
     _cleanOrphanNodes(newChildren) {
-        // Thu thập tất cả DOM nodes hợp lệ (thuộc new children)
-        const validNodes = new Set();
-        for (const child of newChildren) {
-            if ('element' in child && child.element) {
-                validNodes.add(child.element);
-            }
-            else if ('openTag' in child) {
-                // Marker-based: collect tất cả nodes trong block
-                let node = child.openTag;
-                while (node && node !== child.closeTag) {
-                    validNodes.add(node);
-                    node = node.nextSibling;
-                }
-                if (node)
-                    validNodes.add(node); // closeTag
-            }
-        }
-        // Scan từ openTag → closeTag, remove nodes không hợp lệ.
-        // Node đang chạy leave PHẢI nằm lại tới khi animation xong — nó tự gỡ.
-        let current = this.openTag.nextSibling;
-        while (current && current !== this.closeTag) {
-            const next = current.nextSibling;
-            if (!validNodes.has(current) && !isLeaving(current)) {
-                current.remove();
-            }
-            current = next;
-        }
+        // newChildren đã đúng thứ tự trong DOM (vừa reconcile) → một lượt đi
+        // song song. Node đang chạy leave PHẢI nằm lại tới khi animation xong.
+        const parent = this.closeTag.parentNode;
+        if (parent)
+            removeUnmanagedNodes(parent, this.openTag.nextSibling, this.closeTag, newChildren, isLeaving);
     }
     /** Schedule a re-render through the ViewController */
     update() {

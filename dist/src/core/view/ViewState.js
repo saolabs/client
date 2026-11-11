@@ -21,11 +21,20 @@ import { app } from '../helpers/app.js';
  * setCount(1); // → triggers listener → Reactive re-renders its region only
  */
 export class StateManager {
+    /** Số lần state của view này đổi, trừ phần đóng góp của `exclude`. */
+    revisionExcluding(exclude) {
+        let total = this.revisionCount;
+        for (let i = 0; i < exclude.length; i++)
+            total -= this.versions.get(exclude[i]) ?? 0;
+        return total;
+    }
     constructor(stateInstance, controller) {
         this.states = {};
         this.subscriptions = new Map();
         this.pendingChanges = new Set();
         this.versions = new Map();
+        /** Tổng mọi lần `versions` tăng — "có state nào của view vừa đổi không". */
+        this.revisionCount = 0;
         this.stateIndex = 0;
         this.flushRAF = null;
         this.hasPendingFlush = false;
@@ -102,6 +111,7 @@ export class StateManager {
         for (const key in stateMap) {
             if (stateMap.hasOwnProperty(key) && this.states[key] && !this.computedNodes.has(key)) {
                 this.states[key].value = stateMap[key];
+                this.revisionCount++;
                 this.trackArray(key, stateMap[key]);
                 this.invalidateComputed(key, false);
             }
@@ -193,6 +203,7 @@ export class StateManager {
                 seen.add(dependent);
                 this.computedNodes.get(dependent)?.dirty();
                 this.versions.set(dependent, (this.versions.get(dependent) ?? 0) + 1);
+                this.revisionCount++;
                 if (notify)
                     (this._isPaused ? this.dirtyKeys : this.pendingChanges).add(dependent);
                 pending.push(dependent);
@@ -489,6 +500,10 @@ export class StateManager {
                 && typeof newValue === 'object' && !Object.isFrozen(newValue)) {
                 // An explicit same-reference setter declares a mutation. No copy
                 // is needed in production, including for new keys/array indexes.
+                // Hook đã xếp hàng key này rồi thì lần set chỉ là thừa; chưa thì
+                // đây là mutation KHÔNG qua hook (key mới, gán theo index).
+                if (!this.pendingChanges.has(key) && !this.dirtyKeys.has(key))
+                    StateManager.mutationEpoch++;
                 this.enqueueChange(key);
                 return;
             }
@@ -506,6 +521,8 @@ export class StateManager {
             // y hệt như dev tự viết `state.x = [...state.x]`, chỉ khác là không
             // bắt họ phải nhớ.
             if (fromSetter && this.mutatedInPlace(key, newValue)) {
+                if (!this.pendingChanges.has(key) && !this.dirtyKeys.has(key))
+                    StateManager.mutationEpoch++;
                 this.enqueueChange(key);
                 return;
             }
@@ -578,6 +595,7 @@ export class StateManager {
         if (this._isDestroyed)
             return;
         this.versions.set(String(key), (this.versions.get(String(key)) ?? 0) + 1);
+        this.revisionCount++;
         this.invalidateComputed(key);
         // Paused → ghi sổ, không notify (giá trị đã được set vào states)
         if (this._isPaused) {
@@ -626,6 +644,11 @@ export class StateManager {
         // nguyên làm đường dự phòng cho update phát sinh NGOÀI chu kỳ flush
         // state; gặp hàng đợi rỗng (đã flush ở đây) thì chỉ là no-op.
         this.controller?.flushReactiveUpdatesNow?.();
+    }
+    /** `value` đang được ít nhất một state quan sát — mọi lần sửa tại chỗ đều tăng mutationEpoch. */
+    static isTracked(value) {
+        const hooks = value[StateManager.HOOKS];
+        return hooks !== undefined && hooks.size > 0;
     }
     /** Chỉ quan sát object THUẦN và mảng — tránh phá Date/Map/Set/instance class. */
     static isObservable(v) {
@@ -758,8 +781,16 @@ export class StateManager {
             const set = node[StateManager.HOOKS];
             if (!set)
                 return;
-            for (const ch of set)
+            // Sửa chính GỐC của một state (rows.push) không đổi nội dung item
+            // nào; sửa bất cứ thứ gì nằm dưới gốc thì có.
+            let nested = set.size === 0;
+            for (const ch of set) {
+                if (ch.root !== node)
+                    nested = true;
                 ch.notify?.();
+            }
+            if (nested)
+                StateManager.mutationEpoch++;
         };
         /** Giá trị MỚI gán vào cũng phải được quan sát — chỉ khi nó đáng quan sát. */
         const observeIncoming = (next) => {
@@ -1092,6 +1123,13 @@ export class StateManager {
         return data;
     }
 }
+/**
+ * Tăng mỗi khi dữ liệu bị sửa TẠI CHỖ ở bên dưới một state (thuộc tính
+ * của item, mảng lồng) hoặc khi dev set lại đúng reference cũ. `@foreach`
+ * dựa vào đây để biết một item cùng reference có còn nguyên nội dung không.
+ * Toàn cục vì cùng một object có thể nằm trong state của nhiều view.
+ */
+StateManager.mutationEpoch = 0;
 /** Key đã cảnh báo rồi — mỗi key tối đa 1 dòng cho cả vòng đời app. */
 StateManager.warnedKeys = new Set();
 /** Trần số vòng flush nối tiếp trong 1 frame — chặn computed phụ thuộc vòng. */

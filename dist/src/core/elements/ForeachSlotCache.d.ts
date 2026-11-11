@@ -46,6 +46,11 @@ export interface ForeachSlot {
     /** Compiler opt-in: closures are refreshed within this occurrence's scope. */
     registry?: Map<string, any>;
     identity?: number;
+    /** Dấu vết của lượt chạy callback gần nhất — xem ViewController.__foreach (memo). */
+    memoEpoch?: number;
+    memoIndex?: number;
+    memoCount?: number;
+    memoShape?: number;
 }
 /** Kết quả claim: slot khi reuse được, occ để store khi phải tạo mới. */
 export interface ForeachClaim {

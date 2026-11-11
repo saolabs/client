@@ -10,7 +10,7 @@ import { SaoObjectType } from "../types/utils.js";
  */
 export declare class TextElement implements TextInterface {
     saoType: SaoObjectType;
-    element: Text;
+    private _element;
     parent: HtmlInterface | null;
     private ctx;
     private statekeys;
@@ -28,6 +28,13 @@ export declare class TextElement implements TextInterface {
         generateText?: () => string;
         isEscapeHTML?: boolean;
     });
+    /**
+     * Text node tạo LƯỜI. Mỗi lượt re-render compiler gọi lại `this.text(...)`
+     * cho mọi đoạn chữ tĩnh, rồi `reuseStaticText` bỏ ngay bản mới để giữ node
+     * cũ — tạo sẵn DOM node ở constructor là tạo ra để vứt.
+     */
+    get element(): Text;
+    set element(node: Text);
     /** Start reactive text updates */
     start(): void;
     stop(): void;
