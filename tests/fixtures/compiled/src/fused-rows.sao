@@ -1,0 +1,28 @@
+<template>
+<div>
+    @foreach(rows as row)
+    @key(row['id'])
+    <article class="card" data-id="{{ row['id'] }}" title="hàng &amp; &quot;nháy&quot;" @class({'on': selected === row['id'], 'odd': row['id'] % 2 === 1}) @style({'opacity': '0.9', 'width': row['id'] * 10 + 'px', 'color': 'red'})>
+        <h3 @class({'hot': selected === row['id']}) @style({'margin': '0'})>{{ row['label'] }} — <small>#{{ row['id'] }}/{{ tick }}</small></h3>
+        <a href="/r/{{ row['id'] }}" class="go" @click.prevent(pick(row['id'], selected))>mở<br>{{ row['label'] }}</a>
+        <button type="button" @click(remove(row['id'])) @mouseenter(hover(row['id']))><span aria-hidden="true" hidden>×</span></button>
+        <i @attr({'data-note': row['note']})></i>
+    </article>
+    <hr class="sep">
+    @endforeach
+</div>
+</template>
+<script setup>
+@state(rows = [{id: 1, label: 'a', note: 'n1'}, {id: 2, label: 'b', note: null}, {id: 3, label: '', note: 'n3'}], selected = 0, tick = 0, picked = [], hovered = 0)
+export default {
+    replace(next) { setRows(next); },
+    current() { return rows; },
+    select(id) { setSelected(id); },
+    bump() { setTick(tick + 1); },
+    pick(id, was) { setPicked([id, was]); },
+    lastPick() { return picked; },
+    hover(id) { setHovered(id); },
+    lastHover() { return hovered; },
+    remove(id) { setRows(rows.filter(r => r['id'] !== id)); }
+}
+</script>

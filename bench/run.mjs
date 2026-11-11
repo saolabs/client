@@ -5,6 +5,7 @@
  *   node bench/run.mjs            # bảng tổng (script + layout), median
  *   node bench/run.mjs --split    # tách riêng script và layout
  *   BENCH_VIEW=/đường/dẫn/view.sao node bench/run.mjs   # đo một biến thể của view
+ *   BENCH_ONLY=saola node bench/run.mjs                 # chỉ đo một bên (lặp nhanh)
  *
  * Cùng một thao tác, cùng dữ liệu, cùng cấu trúc DOM ở cả ba bên (xem table.sao,
  * react.js, vue.js). Số đo là từ lúc gọi tới khi layout xong (`offsetHeight`),
@@ -34,6 +35,8 @@ mkdirSync(CACHE, { recursive: true });
 const compiled = JSON.parse(execFileSync('php', [
     path.resolve(ROOT, '../compiler/bin/saoc'), 'compile', process.env.BENCH_VIEW || path.join(HERE, 'table.sao'),
     '--view-path=bench.table', '--fn=BenchTable', '--factory=BenchTable', '--json',
+    // Dòng gộp của @foreach (builder tự bật khi client ≥ 1.10). BENCH_FUSE=0 để đo đường thường.
+    ...(process.env.BENCH_FUSE === '0' ? [] : ['--fuse-rows']),
 ], { encoding: 'utf8' }));
 writeFileSync(path.join(CACHE, 'table.view.js'), compiled.js);
 esbuild.buildSync({
@@ -57,7 +60,7 @@ const targets = [
     { label: 'saola', files: [path.join(CACHE, 'saola.js')] },
     { label: 'react 18.3', files: [path.join(CACHE, 'react.production.min.js'), path.join(CACHE, 'react-dom.production.min.js'), path.join(HERE, 'react.js')] },
     { label: 'vue 3.5', files: [path.join(CACHE, 'vue.global.prod.js'), path.join(HERE, 'vue.js')] },
-];
+].filter(target => !process.env.BENCH_ONLY || target.label.startsWith(process.env.BENCH_ONLY));
 
 // 3. Đo.
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -104,6 +107,6 @@ await browser.close();
 
 const pad = (value, width) => String(value).padEnd(width);
 console.log(pad(SPLIT ? 'ms (script + layout)' : 'ms (median)', 24) + targets.map(target => pad(target.label, 16)).join(''));
-for (const name of Object.keys(results.saola)) {
+for (const name of Object.keys(results[targets[0].label])) {
     console.log(pad(name, 24) + targets.map(target => pad(results[target.label][name], 16)).join(''));
 }

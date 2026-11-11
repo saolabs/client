@@ -6,7 +6,7 @@ import type {
 } from "../contracts/ElementInterface.js";
 import type { LoopContextInterface } from "../contracts/LoopContextInterface.js";
 import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface.js";
-import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ViewConfigThis, ErrorInfo, ErrorBoundaryHandler } from "../contracts/ViewControllerInterface.js";
+import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ViewConfigThis, ErrorInfo, ErrorBoundaryHandler, EventInvoker } from "../contracts/ViewControllerInterface.js";
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface.js";
 import type { ViewStateInterface } from "../contracts/ViewStateInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
@@ -27,6 +27,7 @@ import { SectionConstruvtorArgs, SectionContentRenderer, SectionContentType, Sec
 import { Section } from "./Section.js";
 import { InitMode } from "../contracts/common.js";
 import { Block, BlockOutlet, Fragment, Html, TextElement } from "../elements/index.js";
+import { FusedRow } from "../elements/FusedRow.js";
 import { Wrapper } from "../elements/Wrapper.js";
 import { YieldElement } from "../elements/Yield.js";
 import { app } from "../helpers/app.js";
@@ -54,6 +55,9 @@ function itemShape(item: any): number {
     for (const _ in item) count++;
     return count;
 }
+
+/** Mảng stateKeys rỗng dùng chung cho đoạn chữ tĩnh — không cấp phát mỗi lần gọi. */
+const NO_KEYS: string[] = [];
 
 /**
  * ViewController — the brain behind a View.
@@ -160,9 +164,8 @@ export class ViewController implements ViewControllerInterface {
     private pendingReactiveUpdates: Set<ReactiveInterface> = new Set();
     private hasScheduledUpdate = false;
     /** Centralized AbortController for all event listeners */
-    private eventAbortController: AbortController = new AbortController();
     /** Exact listener references for cleanup when an individual Html node dies. */
-    public elementEventHandlers: Map<HTMLElement, Map<string, EventListener[]>> = new Map();
+    public elementEventHandlers: Map<HTMLElement, Map<string, EventInvoker>> = new Map();
 
     // ─── Loop ───────────────────────────────────────────────────
     /** Current loop context stack (@foreach, @for, @while) */
@@ -182,9 +185,24 @@ export class ViewController implements ViewControllerInterface {
     private _dataEpoch = 0;
     /** Công tắc tắt việc bỏ qua dòng không đổi của @foreach (để khoanh lỗi). */
     static foreachMemo = true;
+    /** Công tắc tắt nhân bản khuôn dòng của @foreach (để khoanh lỗi). */
+    static rowCloning = true;
+
+    // ── Nhân bản khuôn dòng (xem __foreach, Html.fromClone) ──────────────
+    /** Khuôn của dòng đang dựng — Html gốc của dòng lấy bản sao từ đây. */
+    public _rowProto: Node[] | null = null;
+    public _rowProtoIndex = 0;
+    /** Đang nhận lại node con từ một cây vừa nhân bản; con trỏ tới node kế tiếp. */
+    public _adoptActive = false;
+    public _adoptCursor: Node | null = null;
+    public _adoptOk = true;
+    /** Đang dựng thử dòng đầu để làm khuôn; gặp thứ không nhân bản được thì dừng. */
+    public _probing = false;
+    /** Có vòng lặp chạy bên trong phạm vi đang xét (số dòng con thay đổi → không có khuôn cố định). */
+    public _structDirty = false;
     public _foreachSkipRegistry: boolean = false;
-    private foreachRegistry: Map<string, any> | null = null;
-    private elementRegistries = new WeakMap<object, Map<string, any>>();
+    public foreachRegistry: Map<string, any> | null = null;
+    private htmlArgs: any = { ctx: this, id: null, parentElement: null, tagName: 'div', config: null, childrenFactory: null, initMode: 'create' };
     private inlineForeachCaches = new WeakMap<Map<string, any>, Map<string, ForeachSlotCache>>();
 
     /** Deferred child factories retain the row scope in which they were created. */
@@ -219,8 +237,6 @@ export class ViewController implements ViewControllerInterface {
     public blocks: Map<string, BlockInterface> = new Map();
 
     public elements: Map<string, ElementChild> = new Map();
-    /** element → key của nó trong `elements` (xem registerElement/releaseElement) */
-    private elementKeys: WeakMap<object, string> = new WeakMap();
 
     public preloadElement: WrapperInterface | null = null; // For pre-rendering elements before the main render
     public mainElement: WrapperInterface | null = null; // The main rendered element tree
@@ -776,7 +792,9 @@ export class ViewController implements ViewControllerInterface {
         this.hasScheduledUpdate = false;
 
         // Abort all event listeners
-        this.eventAbortController.abort();
+        for (const [element, events] of this.elementEventHandlers) {
+            for (const [event, live] of events) element.removeEventListener(event, live.fn);
+        }
         this.elementEventHandlers.clear();
 
         // Sắp gỡ DOM khỏi real DOM
@@ -1010,11 +1028,9 @@ export class ViewController implements ViewControllerInterface {
         } as EventListener;
     }
 
-    /** Trạng thái sống của một listener gốc — xem addEventListener. */
-    private eventInvokers = new WeakMap<EventListener, { handlers: SaoElementEventHandler; modKey: string }>();
 
     /** Chạy danh sách handler compiler khai báo cho MỘT event. */
-    private invokeEventHandlers(handlers: SaoElementEventHandler, event: Event): void {
+    invokeEventHandlers(handlers: SaoElementEventHandler, event: Event): void {
         let failure: unknown;
         let failed = false;
         for (const h of handlers) {
@@ -1048,43 +1064,43 @@ export class ViewController implements ViewControllerInterface {
         element: HTMLElement,
         event: string,
         handlers: SaoElementEventHandler,
-        modifiers: EventModifier[] = [],
+        modifiers?: EventModifier[],
     ): void {
         // MỘT listener gốc cho mỗi (element, event); nó đọc danh sách handler
         // hiện hành lúc event xảy ra. Re-render vì vậy chỉ thay danh sách —
         // không removeEventListener/addEventListener lại trên từng element
         // (đo được: đó là phần lớn chi phí của một lượt cập nhật @foreach).
-        const modKey = modifiers.join(',');
-        const current = this.elementEventHandlers.get(element)?.get(event)?.[0];
-        const live = current ? this.eventInvokers.get(current) : undefined;
-        if (live && live.modKey === modKey) {
-            live.handlers = handlers;
-            return;
-        }
-        this.removeEventListener(element, event);
-
-        const state = { handlers, modKey };
-        let fn: EventListener = (e: Event) => this.invokeEventHandlers(state.handlers, e);
-        if (modifiers.length) fn = this.wrapEventModifiers(fn, modifiers);
-        element.addEventListener(event, fn, { signal: this.eventAbortController.signal, once: modifiers.includes('once') });
-        this.eventInvokers.set(fn, state);
-
+        const modKey = modifiers && modifiers.length ? modifiers.join(',') : '';
         let events = this.elementEventHandlers.get(element);
-        if (!events) {
-            events = new Map();
-            this.elementEventHandlers.set(element, events);
+        const live = events?.get(event);
+        if (live) {
+            if (live.modKey === modKey) {
+                live.handlers = handlers;
+                return;
+            }
+            element.removeEventListener(event, live.fn);
         }
-        events.set(event, [fn]);
+
+        const state: EventInvoker = { handlers, modKey, fn: null as any };
+        let fn: EventListener = (e: Event) => this.invokeEventHandlers(state.handlers, e);
+        if (modKey) fn = this.wrapEventModifiers(fn, modifiers!);
+        state.fn = fn;
+        // Không gắn AbortSignal: mỗi listener kèm signal đắt hơn hẳn khi tạo
+        // hàng nghìn dòng. destroy() gỡ tường minh qua elementEventHandlers.
+        if (modKey && modifiers!.includes('once')) element.addEventListener(event, fn, { once: true });
+        else element.addEventListener(event, fn);
+
+        if (!events) this.elementEventHandlers.set(element, events = new Map());
+        events.set(event, state);
     }
 
     removeEventListener(element: HTMLElement, event: string): void {
         const events = this.elementEventHandlers.get(element);
-        const listeners = events?.get(event) ?? [];
-        for (const listener of listeners) {
-            element.removeEventListener(event, listener);
-        }
-        events?.delete(event);
-        if (events?.size === 0) this.elementEventHandlers.delete(element);
+        const live = events?.get(event);
+        if (!live) return;
+        element.removeEventListener(event, live.fn);
+        events!.delete(event);
+        if (events!.size === 0) this.elementEventHandlers.delete(element);
     }
 
     // ─── Reactive Scheduling ────────────────────────────────────
@@ -1292,19 +1308,28 @@ export class ViewController implements ViewControllerInterface {
      */
 
     html(id: string | null = null, tagName: string, parentElement: HtmlInterface | null, config: any, childrenFactory?: SaoChildrenFactory): SaoNodeInterface {
-        if (childrenFactory) childrenFactory = this.scopeFactory(childrenFactory);
         if (!id) {
             id = `el-${tagName}-${generateUUID(5)}`;
         }
+        // Factory con chạy lại trong đúng phạm vi dòng nơi nó được tạo. Html tự
+        // mở phạm vi đó quanh lời gọi factory (xem Html.renderChildren) — khỏi
+        // bọc mỗi factory trong một closure như các loại element khác.
+        const scope = this.foreachRegistry;
         const existing = this.aliveFromRegistry(id, Html);
         if (existing) {
             existing.updateConfig(config);
             if (childrenFactory) {
                 existing.setChildrenFactory(childrenFactory);
+                existing.scope = scope;
             }
             return existing;
         }
-        const element = new Html({ ctx: this, tagName, id, parentElement, initMode: this.initMode, config, childrenFactory });
+        // Một object tham số dùng lại: constructor đọc xong là thôi, không giữ.
+        const args = this.htmlArgs;
+        args.tagName = tagName; args.id = id; args.parentElement = parentElement;
+        args.initMode = this.initMode; args.config = config; args.childrenFactory = childrenFactory ?? null;
+        const element = new Html(args);
+        element.scope = scope;
         this.registerElement(id, element);
         return element;
     }
@@ -1364,11 +1389,37 @@ export class ViewController implements ViewControllerInterface {
     }
 
     /**
+     * Dòng gộp của `@foreach` (compiler ≥ 3.8): MỘT element cho cả cây con của
+     * một phần tử gốc trong thân vòng lặp. `desc` là khuôn tĩnh compiler hoist,
+     * `suffix` là phần đuôi id theo vòng lặp, `get(i)` trả giá trị động thứ i
+     * của dòng này. Xem FusedRow.
+     */
+    __fused(desc: any, suffix: string, parentElement: HtmlInterface | null, get: (index: number) => any): FusedRow {
+        const id = desc.i + '-' + suffix;
+        const existing = this.aliveFromRegistry(id, FusedRow);
+        if (existing) {
+            existing.update(get);
+            return existing;
+        }
+        return this.registerElement(id, new FusedRow(this, desc, id, suffix, parentElement, get));
+    }
+
+    /**
      * FIX(baseline#2): trả về TextElement (có saoType) thay vì raw Text node.
      * Raw Text node bị mountElementList/Reactive.render bỏ qua → text tĩnh biến mất.
      */
     text(text: string): TextInterface {
-        return new TextElement({ ctx: this, stateKeys: [], generateText: () => text });
+        const el = new TextElement({ ctx: this, stateKeys: NO_KEYS, text });
+        if (this._adoptActive) {
+            // Cây vừa nhân bản đã có sẵn text node ở đúng vị trí này.
+            const node = this._adoptCursor;
+            if (node !== null && node.nodeType === 3) {
+                if ((node as Text).data !== text) (node as Text).data = text;
+                el.element = node as Text;
+                this._adoptCursor = node.nextSibling;
+            } else this._adoptOk = false;
+        }
+        return el;
     }
 
     /**
@@ -1379,10 +1430,12 @@ export class ViewController implements ViewControllerInterface {
      */
     private registerElement<T extends object>(id: string, el: T): T {
         this.elements.set(id, el as any);
-        this.elementKeys.set(el, id);
+        // Khoá + registry dòng ghi thẳng lên element: hai WeakMap ở đây từng
+        // là ~5% thời gian tạo/xoá một danh sách dài.
+        (el as any).__regKey = id;
         if (this.foreachRegistry) {
             this.foreachRegistry.set(id, el);
-            this.elementRegistries.set(el, this.foreachRegistry);
+            (el as any).__regScope = this.foreachRegistry;
         }
         return el;
     }
@@ -1397,12 +1450,14 @@ export class ViewController implements ViewControllerInterface {
      * khi prunePass destroy element cũ — xoá vô điều kiện sẽ gỡ nhầm bản mới.
      */
     releaseElement(el: object): void {
-        const id = this.elementKeys.get(el);
+        const id: string | undefined = (el as any).__regKey;
         if (id === undefined) return;
-        this.elementKeys.delete(el);
-        const registry = this.elementRegistries.get(el);
-        if (registry?.get(id) === el) registry.delete(id);
-        this.elementRegistries.delete(el);
+        (el as any).__regKey = undefined;
+        const registry: Map<string, any> | undefined = (el as any).__regScope;
+        if (registry) {
+            if (registry.get(id) === el) registry.delete(id);
+            (el as any).__regScope = undefined;
+        }
         if (this.elements.get(id) === el) this.elements.delete(id);
     }
 
@@ -1623,7 +1678,11 @@ export class ViewController implements ViewControllerInterface {
         reconcile = false,
         scopeId?: string,
         memo: 0 | 1 | 2 = 0,
+        memoDeps?: readonly string[],
     ): any[] {
+        // Vòng lặp chạy trong một dòng/cây đang xét làm khuôn → số node con
+        // không cố định, phạm vi bên ngoài không nhân bản được.
+        this._structDirty = true;
         if (!list || typeof list !== 'object') return [];
         let cache = Array.isArray(list) || reconcile ? this._currentForeachCache : null;
         // ── Bỏ qua dòng không đổi ────────────────────────────────────────
@@ -1631,14 +1690,17 @@ export class ViewController implements ViewControllerInterface {
         // theo dõi được (biến/hàm ngoài) → luôn chạy lại; 1 = chỉ phụ thuộc
         // item + state; 2 = thêm vị trí trong vòng lặp (index/count).
         // Một dòng được giữ nguyên khi item CÙNG reference và từ lần chạy
-        // trước không có: state nào khác của view đổi, data mới từ cha, sửa
+        // trước không có: state mà thân vòng lặp đọc (`memoDeps`) đổi, data mới từ cha, sửa
         // tại chỗ bên dưới state, hay vùng cha render lại (memoKeys = null).
         const memoKeys = cache && cache === this._currentForeachCache ? this._foreachMemoKeys : null;
         const memoSkip = this._foreachMemoSkip;
         this._foreachMemoKeys = null;
         this._foreachMemoSkip = false;
         const memoEpoch = memo !== 0 && reconcile && memoKeys && ViewController.foreachMemo
-            ? (this.states.__ as StateManager).revisionExcluding(memoKeys) + StateManager.mutationEpoch + this._dataEpoch
+            // Compiler ≥ 3.7 liệt kê đúng những state thân vòng lặp chụp lại;
+            // bản cũ không có danh sách thì mọi state khác của view đều tính.
+            ? (memoDeps ? (this.states.__ as StateManager).revisionOf(memoDeps) : (this.states.__ as StateManager).revisionExcluding(memoKeys))
+                + StateManager.mutationEpoch + this._dataEpoch
             : -1;
         let ownsPass = false;
         if (!cache && reconcile && scopeId && this.foreachRegistry) {
@@ -1681,6 +1743,14 @@ export class ViewController implements ViewControllerInterface {
                 const previousCache = this._currentForeachCache;
                 const previousSkip = this._foreachSkipRegistry;
                 const previousRegistry = this.foreachRegistry;
+                // Dòng MỚI của vòng lặp reconcile: thử dựng bằng cách nhân bản khuôn.
+                const cloning = !slot && reconcile && cache !== null && cache.rowProto !== null
+                    && this.initMode === 'create' && ViewController.rowCloning;
+                const previousProto = this._rowProto;
+                const previousProtoIndex = this._rowProtoIndex;
+                this._rowProto = cloning ? cache!.rowProto ?? null : null;
+                this._rowProtoIndex = 0;
+                this._structDirty = false;
                 this._currentForeachCache = null; // nested inline loops own no outer slots
                 if (registry) {
                     // = inForeachScope(registry, …), viết thẳng để khỏi cấp phát
@@ -1690,13 +1760,20 @@ export class ViewController implements ViewControllerInterface {
                 } else if (cache && !reconcile) this._foreachSkipRegistry = true;
                 let output: any;
                 try {
-                    output = callback(item, key, loopIndex, loopCtx.snapshot(), identity);
+                    output = callback(item, key, loopIndex, memo === 1 ? loopCtx : loopCtx.snapshot(), identity);
                 } finally {
                     this._currentForeachCache = previousCache;
                     this._foreachSkipRegistry = previousSkip;
                     this.foreachRegistry = previousRegistry;
+                    this._rowProto = previousProto;
+                    this._rowProtoIndex = previousProtoIndex;
                 }
                 let elements = output == null ? [] : Array.isArray(output) ? output : [output];
+                if (cloning) {
+                    if (this._structDirty) cache!.rowProto = null;
+                    else if (cache!.rowProto === undefined) cache!.rowProto = this.captureRowProto(elements);
+                    else this.prerenderClonedRow(elements);
+                }
                 if (slot && reconcile) elements = reuseStaticText(slot.elements, elements);
                 for (let i = 0; i < elements.length; i++) result.push(elements[i]);
                 if (cache && claim) {
@@ -1723,8 +1800,60 @@ export class ViewController implements ViewControllerInterface {
             });
         } finally {
             this.__resetLoopContext();
+            this._structDirty = true;   // với phạm vi bên ngoài: vừa có một vòng lặp chạy ở đây
         }
         return result;
+    }
+
+    /**
+     * Dựng thử dòng đầu tiên NGAY (chưa gắn vào trang) để lấy khuôn cho các
+     * dòng sau. Chỉ dòng gồm toàn Html / chữ tĩnh / `{{ }}` mới làm khuôn được:
+     * component, khối @if, vòng lặp lồng… có vòng đời riêng và số node thay đổi.
+     * Gặp thứ như vậy thì dừng dựng thử — phần chưa dựng sẽ đi đường thường.
+     */
+    private captureRowProto(elements: any[]): Node[] | null {
+        const roots: Html[] = [];
+        for (let i = 0; i < elements.length; i++) {
+            const el = elements[i];
+            if (el instanceof TextElement) continue;
+            if (!(el instanceof Html)) return null;
+            roots.push(el);
+        }
+        if (roots.length === 0) return null;
+        const previousCache = this._currentForeachCache;
+        const wasProbing = this._probing;
+        this._currentForeachCache = null;
+        this._probing = true;
+        this._structDirty = false;
+        try {
+            for (let i = 0; i < roots.length; i++) {
+                roots[i].prerender();
+                if (this._structDirty) return null;
+            }
+        } finally {
+            this._probing = wasProbing;
+            this._currentForeachCache = previousCache;
+        }
+        const proto: Node[] = [];
+        for (let i = 0; i < roots.length; i++) {
+            if (!roots[i].cloneable()) return null;
+            proto.push(roots[i].element.cloneNode(true));
+        }
+        return proto;
+    }
+
+    /** Dòng vừa nhân bản: nhận node con và ghi nội dung trước khi gắn vào trang. */
+    private prerenderClonedRow(elements: any[]): void {
+        const previousCache = this._currentForeachCache;
+        this._currentForeachCache = null;
+        try {
+            for (let i = 0; i < elements.length; i++) {
+                const el = elements[i];
+                if (el instanceof Html && el.fromClone) el.prerender();
+            }
+        } finally {
+            this._currentForeachCache = previousCache;
+        }
     }
 
     __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, emptyCallback: () => any = () => []): any[] {
@@ -1747,6 +1876,7 @@ export class ViewController implements ViewControllerInterface {
         end: number = 0,
         execute: (loop: LoopContext) => any = () => []
     ): any {
+        this._structDirty = true;
         const loopCtx = this.__setLoopContext(end);
         loopCtx.setType(loopType);
         let result: any;
@@ -1765,6 +1895,7 @@ export class ViewController implements ViewControllerInterface {
      * @while directive
      */
     __while(execute: (loop: LoopContext) => any, maxIterations: number = 10000): any {
+        this._structDirty = true;
         const loopCtx = this.__setLoopContext(-1);
         loopCtx.setType('increment');
         let result: any;

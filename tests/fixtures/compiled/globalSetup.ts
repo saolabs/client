@@ -66,14 +66,22 @@ export default async function setup() {
         const saoPath = path.join(SRC_DIR, file);
 
         const source = readFileSync(saoPath, 'utf-8');
-        if (['db-language-page', 'auth-reactivity', 'use-auth', 'middleware', 'memo-rows'].includes(name)) {
+        if (['db-language-page', 'auth-reactivity', 'use-auth', 'middleware', 'memo-rows', 'memo-captured', 'fused-rows', 'fused-nested'].includes(name)) {
             // Pin this contract fixture to the compiler under change, rather than an older
             // Composer installation in the starter. Both use the public compile API.
             const compilerRoot = path.resolve(HERE, '../../../../compiler');
-            const script = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: $argv[3], functionName: $argv[4], factoryName: $argv[4])); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
+            const script = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: $argv[3], functionName: $argv[4], factoryName: $argv[4], fuseRows: true)); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
             const result = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, compilerRoot, saoPath, viewPath, fnName], { encoding: 'utf8' }));
             writeFileSync(path.join(OUT_JS_DIR, `${name}.js`), result.js, 'utf8');
             writeFileSync(path.join(OUT_BLADE_DIR, `${name}.blade.php`), result.blade, 'utf8');
+            // Cùng nguồn, KHÔNG bật fuseRows (mặc định của compiler): để so hai đường dựng dòng
+            // (foreach-fused-row.test) và giữ vùng phủ cho nhân bản khuôn phía client.
+            const plain = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script.replace(', fuseRows: true', ''), compilerRoot, saoPath, viewPath, fnName],
+                { encoding: 'utf8' }));
+            if (plain.js.includes('__fused')) throw new Error(`fuseRows phải mặc định tắt: ${name}`);
+            if (plain.blade !== result.blade) throw new Error(`Dòng gộp không được đổi Blade: ${name}`);
+            mkdirSync(path.join(GEN_DIR, 'js-nofuse'), { recursive: true });
+            writeFileSync(path.join(GEN_DIR, 'js-nofuse', `${name}.js`), plain.js, 'utf8');
             continue;
         }
         const langMatch = source.match(/<script\s+setup\b[^>]*\blang=["']?([^"'\s>]+)["']?/i);
@@ -112,13 +120,13 @@ export default async function setup() {
     const demo = demoSources.map(source => path.resolve(SAOLA_APP_ROOT, starterConfig.paths.saoView, source, demoRelative))
         .find(source => existsSync(source));
     if (!demo) throw new Error('Starter view mappings must contain the language demo source.');
-    const script = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: "web.modules.home.language-demo", functionName: "LanguageDemo", factoryName: "LanguageDemo")); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
+    const script = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: "web.modules.home.language-demo", functionName: "LanguageDemo", factoryName: "LanguageDemo", fuseRows: true)); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
     const demoResult = JSON.parse(execFileSync(process.env.SAOLA_PHP_BINARY || 'php', ['-r', script, compilerRoot, demo], {encoding: 'utf8'}));
     writeFileSync(path.join(OUT_JS_DIR, 'language-demo.ts'), demoResult.js);
     writeFileSync(path.join(OUT_BLADE_DIR, 'language-demo.blade.php'), demoResult.blade);
 
     const adminRoot = path.resolve(HERE, '../../../../admin');
-    const adminScript = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: $argv[3], functionName: $argv[4], factoryName: $argv[4], lang: \\Saola\\Compiler\\Lang::Ts)); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
+    const adminScript = 'require $argv[1]."/vendor/autoload.php"; $result = (new \\Saola\\Compiler\\SaolaCompiler())->compile(file_get_contents($argv[2]), new \\Saola\\Compiler\\CompileOptions(viewPath: $argv[3], functionName: $argv[4], factoryName: $argv[4], fuseRows: true, lang: \\Saola\\Compiler\\Lang::Ts)); echo json_encode(["js" => $result->js, "blade" => $result->blade], JSON_THROW_ON_ERROR);';
     for (const theme of ['classic', 'material']) {
     for (const [name, file, fn] of [
         ['admin-page', 'pages/resource', 'AdminPage'],

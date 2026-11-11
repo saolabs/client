@@ -34,6 +34,8 @@ export declare class StateManager implements StateManagerInterface {
     static mutationEpoch: number;
     /** Số lần state của view này đổi, trừ phần đóng góp của `exclude`. */
     revisionExcluding(exclude: readonly string[]): number;
+    /** Tổng số lần các state trong `keys` đổi (kể cả computed). */
+    revisionOf(keys: readonly string[]): number;
     private stateIndex;
     private flushRAF;
     private hasPendingFlush;

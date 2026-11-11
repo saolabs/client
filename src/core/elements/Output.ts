@@ -22,16 +22,18 @@ function sameKeys(a: readonly string[], b: readonly string[]): boolean {
     return true;
 }
 
+const NO_NODES = Object.freeze([]) as unknown as Node[];
+
 export class Output implements OutputInterface {
     saoType: SaoObjectType = 'Output';
     ctx: ViewControllerInterface;
     parent: HtmlInterface | null;
-    openTag: Comment;
-    closeTag: Comment;
+    openTag!: Comment;
+    closeTag!: Comment;
     stateKeys: string[];
     contentFactory: () => string;
     isEscapeHTML: boolean;
-    domChildren: Node[] = []; // For compatibility with HtmlInterface; Output itself doesn't have a single root element
+    domChildren: Node[] = NO_NODES; // For compatibility with HtmlInterface; Output itself doesn't have a single root element
     private textNode: Text | null = null;
     private unsubscribe: (() => void) | null = null;
     private _isStarted = false;
@@ -80,9 +82,29 @@ export class Output implements OutputInterface {
                 this.closeTag = markerRegistry.createMarkerEnd('output', this.id);
             }
         } else {
-            // ── CSR: tạo markers mới ─────────────────────────────────────────
-            this.openTag = markerRegistry.createMarkerStart('output', this.id);
-            this.closeTag = markerRegistry.createMarkerEnd('output', this.id);
+            // ── CSR ──────────────────────────────────────────────────────────
+            // Trong cây vừa nhân bản từ khuôn dòng: marker và text node đã nằm
+            // sẵn đúng chỗ, chỉ cần đổi nội dung marker sang id của dòng này.
+            const vc = ctx as any;
+            let open: Node | null = null;
+            if (vc._adoptActive) {
+                const first: Node | null = vc._adoptCursor;
+                const text = first !== null && first.nodeType === 8 ? first.nextSibling : null;
+                const close = text !== null && text.nodeType === 3 ? text.nextSibling : null;
+                if (isEscapeHTML && close !== null && close.nodeType === 8) {
+                    open = first;
+                    (open as Comment).data = markerRegistry.openComment('output', this.id);
+                    (close as Comment).data = markerRegistry.closeComment('output', this.id);
+                    this.openTag = open as Comment;
+                    this.closeTag = close as Comment;
+                    this.textNode = text as Text;
+                    vc._adoptCursor = close.nextSibling;
+                } else vc._adoptOk = false;
+            }
+            if (open === null) {
+                this.openTag = markerRegistry.createMarkerStart('output', this.id);
+                this.closeTag = markerRegistry.createMarkerEnd('output', this.id);
+            }
         }
     }
 
@@ -132,7 +154,7 @@ export class Output implements OutputInterface {
     }
 
     /** Nodes của raw HTML mode ({!! !!}) — track để clear khi update */
-    private rawNodes: Node[] = [];
+    private rawNodes: Node[] = NO_NODES;
 
     /**
      * Render — idempotent + position-aware (RUNTIME_CONTRACT.md §2):
@@ -186,7 +208,7 @@ export class Output implements OutputInterface {
             current = next;
         }
         this.textNode = null;
-        this.rawNodes = [];
+        this.rawNodes = NO_NODES;
     }
 
     private insertBeforeClose(node: Node): void {
@@ -286,7 +308,7 @@ export class Output implements OutputInterface {
             this.closeTag.remove();
         }
         this.textNode = null;
-        this.rawNodes = [];
+        this.rawNodes = NO_NODES;
 
         this.parent = null;
     }

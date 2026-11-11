@@ -1,0 +1,32 @@
+<template>
+<div>
+    @foreach(groups as g)
+    @key(g['id'])
+    <section data-g="{{ g['id'] }}">
+        <h4>{{ g['name'] }}</h4>
+        <ul>
+            @foreach(tags as t)
+            @key(t['id'])
+            <li data-t="{{ t['id'] }}" @class({'on': selected === t['id']}) @click(pick('li', t['id']))>{{ t['label'] }}</li>
+            @endforeach
+        </ul>
+    </section>
+    @endforeach
+    <svg viewBox="0 0 100 10" width="100" height="10">
+        @foreach(tags as t)
+        @key(t['id'])
+        <g @class({'hot': selected === t['id']})><circle r="2" cy="5" cx="{{ t['id'] * 10 }}" @click(pick('dot', t['id']))></circle></g>
+        @endforeach
+    </svg>
+</div>
+</template>
+<script setup>
+@state(groups = [{id: 'a', name: 'A'}, {id: 'b', name: 'B'}], tags = [{id: 1, label: 'x'}, {id: 2, label: 'y'}], selected = 0, picked = [])
+export default {
+    setGroups(next) { setGroups(next); },
+    setTags(next) { setTags(next); },
+    select(key) { setSelected(key); },
+    pick(g, t) { setPicked([g, t]); setSelected(t); },
+    lastPick() { return picked; }
+}
+</script>

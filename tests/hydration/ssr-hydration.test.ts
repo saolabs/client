@@ -263,9 +263,9 @@ describe('Html constructor — SSR hydration', () => {
         });
 
         expect(html.element.tagName.toLowerCase()).toBe('div');
-        // CSR gắn ĐÚNG class hydrate như Blade emit ($__VIEW_ID__ . '-' . $id),
-        // để DOM do server và do client sinh ra giống hệt nhau.
-        expect(html.element.classList.contains('v-csr01-fresh-div')).toBe(true);
+        // Class hydrate (`{viewId}-{id}`) chỉ để claim DOM của server; element
+        // tạo ở client không ai claim nên KHÔNG mang class đó (11/2026).
+        expect(html.element.hasAttribute('class')).toBe(false);
     });
 });
 

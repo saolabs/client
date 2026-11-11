@@ -58,6 +58,12 @@ export class StateManager implements StateManagerInterface {
         for (let i = 0; i < exclude.length; i++) total -= this.versions.get(exclude[i]) ?? 0;
         return total;
     }
+    /** Tổng số lần các state trong `keys` đổi (kể cả computed). */
+    revisionOf(keys: readonly string[]): number {
+        let total = 0;
+        for (let i = 0; i < keys.length; i++) total += this.versions.get(keys[i]) ?? 0;
+        return total;
+    }
     private stateIndex = 0;
     private flushRAF: number | null = null;
     private hasPendingFlush = false;
@@ -119,6 +125,7 @@ export class StateManager implements StateManagerInterface {
         for (const key in stateMap) {
             if (stateMap.hasOwnProperty(key) && this.states[key] && !this.computedNodes.has(key)) {
                 this.states[key].value = stateMap[key];
+                this.versions.set(String(key), (this.versions.get(String(key)) ?? 0) + 1);
                 this.revisionCount++;
                 this.trackArray(key, stateMap[key]);
                 this.invalidateComputed(key, false);
@@ -151,8 +158,13 @@ export class StateManager implements StateManagerInterface {
         }
 
         const setValue = (newValue: any) => {
-            const oldValue = this.states[stateKey].value;
-            this.states[stateKey].value = newValue;
+            // View đã huỷ (destroy() xoá `states`) mà setter còn được gọi — điển hình
+            // là hook `mounted` async chạy tiếp sau khi người dùng rời trang. Không
+            // còn gì để cập nhật; ném lỗi ở đây chỉ làm bẩn console.
+            const slot = this.states[stateKey];
+            if (!slot) return;
+            const oldValue = slot.value;
+            slot.value = newValue;
             this.trackArray(stateKey, newValue);
             // fromSetter: đây là đường DEV tự set (`state.x = v` / `set$x(v)`).
             // Đường props plumbing (updateStateByKey) re-pass cùng ref là bình

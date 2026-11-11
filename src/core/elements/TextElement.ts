@@ -10,14 +10,19 @@ import { isDiscarded } from "./teardown.js";
  * When `update(newText)` is called, only the textContent changes — 
  * no DOM removal/insertion needed.
  */
+const NO_KEYS: string[] = [];
+/** Chỉ để thoả HtmlInterface — không ai ghi vào. */
+const NO_NODES = Object.freeze([]) as unknown as Node[];
+
 export class TextElement implements TextInterface {
     saoType: SaoObjectType = 'TextElement';
     private _element: Text | null = null;
     public parent: HtmlInterface | null;
     private ctx: ViewControllerInterface;
-    private statekeys: string[] = [];
+    private statekeys: string[];
     private unsubscribe: (() => void) | null = null;
-    protected generateText: () => string = () => this._text;
+    /** null = chữ tĩnh, giá trị nằm sẵn trong `_text`. */
+    protected generateText: (() => string) | null = null;
     public _text: string = '';
     public shouldEscapeHTML: boolean = true; // Whether to escape HTML in text content
 
@@ -25,8 +30,8 @@ export class TextElement implements TextInterface {
     readonly isStatic: boolean;
 
 
-    domChildren: Node[] = []; // For compatibility with HtmlInterface; Text itself doesn't have a single root element
-    constructor({ ctx, parent = null, stateKeys = [], generateText = () => '', isEscapeHTML = true }: { ctx: ViewControllerInterface, parent?: HtmlInterface | null, stateKeys?: string[], generateText?: () => string, isEscapeHTML?: boolean }) {
+    domChildren: Node[] = NO_NODES; // For compatibility with HtmlInterface; Text itself doesn't have a single root element
+    constructor({ ctx, parent = null, stateKeys = NO_KEYS, generateText = null, text = '', isEscapeHTML = true }: { ctx: ViewControllerInterface, parent?: HtmlInterface | null, stateKeys?: string[], generateText?: (() => string) | null, text?: string, isEscapeHTML?: boolean }) {
         this.ctx = ctx;
         this.generateText = generateText;
         this.parent = parent;
@@ -35,7 +40,7 @@ export class TextElement implements TextInterface {
         this.shouldEscapeHTML = isEscapeHTML;
         // FIX(baseline#3): KHÔNG escapeHTML khi ghi vào Text node — text node tự an toàn,
         // escape thủ công gây double-escape. shouldEscapeHTML chỉ dùng cho SSR string path.
-        this._text = this.generateText();
+        this._text = generateText ? generateText() : text;
     }
 
     /**
@@ -56,7 +61,7 @@ export class TextElement implements TextInterface {
         this.isStarted = true;
         if (this.statekeys.length > 0) {
             this.unsubscribe = this.ctx.states.__.subscribe(this.statekeys, (newText: string) => {
-                this.update(this.generateText());
+                this.update(this.generateText ? this.generateText() : this._text);
             });
         }
     }
@@ -81,13 +86,12 @@ export class TextElement implements TextInterface {
     }
 
     render(): HTMLElement | Text | Comment {
-        const text = this.generateText();
-        this.update(text);
+        if (this.generateText) this.update(this.generateText());
         return this.element;
     }
 
     replaceStaticText(text: string): void {
-        this.generateText = () => text;
+        this.generateText = null;
         this.update(text);
     }
 

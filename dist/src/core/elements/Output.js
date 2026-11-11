@@ -21,17 +21,18 @@ function sameKeys(a, b) {
             return false;
     return true;
 }
+const NO_NODES = Object.freeze([]);
 export class Output {
     constructor({ ctx, id = null, parent = null, stateKeys = [], contentFactory = () => '', isEscapeHTML = true, initMode = InitModes.CREATE }) {
         this.saoType = 'Output';
-        this.domChildren = []; // For compatibility with HtmlInterface; Output itself doesn't have a single root element
+        this.domChildren = NO_NODES; // For compatibility with HtmlInterface; Output itself doesn't have a single root element
         this.textNode = null;
         this.unsubscribe = null;
         this._isStarted = false;
         this._isDestroyed = false;
         this.initMode = InitModes.CREATE;
         /** Nodes của raw HTML mode ({!! !!}) — track để clear khi update */
-        this.rawNodes = [];
+        this.rawNodes = NO_NODES;
         this.ctx = ctx;
         this.parent = parent;
         this.stateKeys = stateKeys;
@@ -56,9 +57,31 @@ export class Output {
             }
         }
         else {
-            // ── CSR: tạo markers mới ─────────────────────────────────────────
-            this.openTag = markerRegistry.createMarkerStart('output', this.id);
-            this.closeTag = markerRegistry.createMarkerEnd('output', this.id);
+            // ── CSR ──────────────────────────────────────────────────────────
+            // Trong cây vừa nhân bản từ khuôn dòng: marker và text node đã nằm
+            // sẵn đúng chỗ, chỉ cần đổi nội dung marker sang id của dòng này.
+            const vc = ctx;
+            let open = null;
+            if (vc._adoptActive) {
+                const first = vc._adoptCursor;
+                const text = first !== null && first.nodeType === 8 ? first.nextSibling : null;
+                const close = text !== null && text.nodeType === 3 ? text.nextSibling : null;
+                if (isEscapeHTML && close !== null && close.nodeType === 8) {
+                    open = first;
+                    open.data = markerRegistry.openComment('output', this.id);
+                    close.data = markerRegistry.closeComment('output', this.id);
+                    this.openTag = open;
+                    this.closeTag = close;
+                    this.textNode = text;
+                    vc._adoptCursor = close.nextSibling;
+                }
+                else
+                    vc._adoptOk = false;
+            }
+            if (open === null) {
+                this.openTag = markerRegistry.createMarkerStart('output', this.id);
+                this.closeTag = markerRegistry.createMarkerEnd('output', this.id);
+            }
         }
     }
     /**
@@ -155,7 +178,7 @@ export class Output {
             current = next;
         }
         this.textNode = null;
-        this.rawNodes = [];
+        this.rawNodes = NO_NODES;
     }
     insertBeforeClose(node) {
         this.closeTag.parentNode?.insertBefore(node, this.closeTag);
@@ -246,7 +269,7 @@ export class Output {
             this.closeTag.remove();
         }
         this.textNode = null;
-        this.rawNodes = [];
+        this.rawNodes = NO_NODES;
         this.parent = null;
     }
     // ─── OneElement markers ─────────────────────────────

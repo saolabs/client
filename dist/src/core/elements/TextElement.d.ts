@@ -1,13 +1,6 @@
 import type { HtmlInterface, TextInterface } from "../contracts/ElementInterface.js";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import { SaoObjectType } from "../types/utils.js";
-/**
- * TextElement — wraps a DOM Text node.
- *
- * Supports reactive text updates without re-creating the node.
- * When `update(newText)` is called, only the textContent changes —
- * no DOM removal/insertion needed.
- */
 export declare class TextElement implements TextInterface {
     saoType: SaoObjectType;
     private _element;
@@ -15,17 +8,19 @@ export declare class TextElement implements TextInterface {
     private ctx;
     private statekeys;
     private unsubscribe;
-    protected generateText: () => string;
+    /** null = chữ tĩnh, giá trị nằm sẵn trong `_text`. */
+    protected generateText: (() => string) | null;
     _text: string;
     shouldEscapeHTML: boolean;
     isStarted: boolean;
     readonly isStatic: boolean;
     domChildren: Node[];
-    constructor({ ctx, parent, stateKeys, generateText, isEscapeHTML }: {
+    constructor({ ctx, parent, stateKeys, generateText, text, isEscapeHTML }: {
         ctx: ViewControllerInterface;
         parent?: HtmlInterface | null;
         stateKeys?: string[];
-        generateText?: () => string;
+        generateText?: (() => string) | null;
+        text?: string;
         isEscapeHTML?: boolean;
     });
     /**

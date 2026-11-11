@@ -1,0 +1,19 @@
+<template>
+<ul>
+    @foreach(rows as row)
+    @key(row['id'])
+    <li data-id="{{ row['id'] }}" @click(pick(row['id'], selected))>{{ row['label'] }}</li>
+    @endforeach
+</ul>
+</template>
+<script setup>
+@state(rows = [{id: 1, label: 'a'}, {id: 2, label: 'b'}], selected = 0, other = 0, picked = [])
+export default {
+    replace(next) { setRows(next); },
+    current() { return rows; },
+    select(id) { setSelected(id); },
+    touch() { setOther(other + 1); },
+    pick(id, was) { setPicked([id, was]); },
+    lastPick() { return picked; }
+}
+</script>

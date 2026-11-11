@@ -6,17 +6,20 @@ import { isDiscarded } from "./teardown.js";
  * When `update(newText)` is called, only the textContent changes —
  * no DOM removal/insertion needed.
  */
+const NO_KEYS = [];
+/** Chỉ để thoả HtmlInterface — không ai ghi vào. */
+const NO_NODES = Object.freeze([]);
 export class TextElement {
-    constructor({ ctx, parent = null, stateKeys = [], generateText = () => '', isEscapeHTML = true }) {
+    constructor({ ctx, parent = null, stateKeys = NO_KEYS, generateText = null, text = '', isEscapeHTML = true }) {
         this.saoType = 'TextElement';
         this._element = null;
-        this.statekeys = [];
         this.unsubscribe = null;
-        this.generateText = () => this._text;
+        /** null = chữ tĩnh, giá trị nằm sẵn trong `_text`. */
+        this.generateText = null;
         this._text = '';
         this.shouldEscapeHTML = true; // Whether to escape HTML in text content
         this.isStarted = false;
-        this.domChildren = []; // For compatibility with HtmlInterface; Text itself doesn't have a single root element
+        this.domChildren = NO_NODES; // For compatibility with HtmlInterface; Text itself doesn't have a single root element
         /** Registry guard — element đã destroy không được reuse */
         this.__destroyed__ = false;
         this.ctx = ctx;
@@ -27,7 +30,7 @@ export class TextElement {
         this.shouldEscapeHTML = isEscapeHTML;
         // FIX(baseline#3): KHÔNG escapeHTML khi ghi vào Text node — text node tự an toàn,
         // escape thủ công gây double-escape. shouldEscapeHTML chỉ dùng cho SSR string path.
-        this._text = this.generateText();
+        this._text = generateText ? generateText() : text;
     }
     /**
      * Text node tạo LƯỜI. Mỗi lượt re-render compiler gọi lại `this.text(...)`
@@ -47,7 +50,7 @@ export class TextElement {
         this.isStarted = true;
         if (this.statekeys.length > 0) {
             this.unsubscribe = this.ctx.states.__.subscribe(this.statekeys, (newText) => {
-                this.update(this.generateText());
+                this.update(this.generateText ? this.generateText() : this._text);
             });
         }
     }
@@ -72,12 +75,12 @@ export class TextElement {
         }
     }
     render() {
-        const text = this.generateText();
-        this.update(text);
+        if (this.generateText)
+            this.update(this.generateText());
         return this.element;
     }
     replaceStaticText(text) {
-        this.generateText = () => text;
+        this.generateText = null;
         this.update(text);
     }
     remove() {
