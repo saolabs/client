@@ -35,6 +35,8 @@ mkdirSync(CACHE, { recursive: true });
 const compiled = JSON.parse(execFileSync('php', [
     path.resolve(ROOT, '../compiler/bin/saoc'), 'compile', process.env.BENCH_VIEW || path.join(HERE, 'table.sao'),
     '--view-path=bench.table', '--fn=BenchTable', '--factory=BenchTable', '--json',
+    // Dòng gộp của @foreach (builder tự bật khi client ≥ 1.10). BENCH_FUSE=0 để đo đường thường.
+    ...(process.env.BENCH_FUSE === '0' ? [] : ['--fuse-rows']),
 ], { encoding: 'utf8' }));
 writeFileSync(path.join(CACHE, 'table.view.js'), compiled.js);
 esbuild.buildSync({

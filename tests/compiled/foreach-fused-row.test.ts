@@ -13,7 +13,7 @@ import { StoreService } from '../../src/core/services/StoreService';
  * Dòng gộp của `@foreach` (FusedRow, 11/2026) — output compiler THẬT.
  *
  * Cùng một `.sao` được biên dịch hai lần (globalSetup): `.generated/js` có dòng
- * gộp, `.generated/js-nofuse` (SAOC_NO_FUSE=1) đi đường thường Html/Output.
+ * gộp, `.generated/js-nofuse` (không bật `fuseRows`) đi đường thường Html/Output.
  * Bất biến: hai đường cho ra DOM GIỐNG HỆT từng byte — thứ tự attribute, marker
  * `s:o:…`, class hydrate — ở mọi bước; và hydrate nhận lại DOM server thay vì
  * dựng lại.
@@ -60,6 +60,51 @@ it.each([
     const plain = await scenario(name, false, hydrateClass);
     expect(fused[0]).toContain(name === 'fused-rows' ? '<article' : '<li');
     expect(fused).toEqual(plain);
+});
+
+async function nested(fused: boolean, hydrateClass: boolean): Promise<string[]> {
+    Html.csrHydrateClass = hydrateClass;
+    h = mount(await load('fused-nested', fused)); flush();
+    const view = h.view as any, shots: string[] = [snapshot()];
+    const step = (act: () => void) => { act(); flush(); shots.push(snapshot()); };
+    step(() => view.select(2));
+    step(() => view.setTags([{ id: 2, label: 'y!' }, { id: 3, label: 'z' }, { id: 1, label: 'x' }]));
+    step(() => view.setGroups([{ id: 'b', name: 'B2' }, { id: 'c', name: 'C' }]));
+    step(() => view.select(3));
+    step(() => (h!.container.querySelector('section[data-g="c"] li[data-t="3"]') as HTMLElement).click());
+    step(() => h!.container.querySelector('svg g:nth-of-type(2) circle')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    step(() => view.setTags([]));
+    shots.push(JSON.stringify(view.lastPick()));
+    shots.push([...h.container.querySelectorAll('svg *')].map(el => el.namespaceURI).join());
+    h.destroy(); h = null;
+    return shots;
+}
+
+it.each([false, true])('vòng lặp trong vòng lặp (không gộp) cạnh vòng gộp có gốc dòng là SVG (class hydrate: %s): giống đường thường', async (hydrateClass) => {
+    const fused = await nested(true, hydrateClass);
+    expect(fused).toEqual(await nested(false, hydrateClass));
+    expect(fused[0]).toContain('<circle');
+    expect(fused.at(-2)).toBe('["dot",3]');
+});
+
+it('gốc dòng trong <svg> được dựng đúng namespace', async () => {
+    h = mount(await load('fused-nested')); flush();
+    const nodes = [...h.container.querySelectorAll('svg g, svg circle')];
+    expect(nodes).toHaveLength(4);
+    expect(nodes.every(el => el.namespaceURI === 'http://www.w3.org/2000/svg')).toBe(true);
+    // Vòng <li> nằm TRONG vòng ngoài: id của nó chứa biến vòng ngoài nên memo = 0 và
+    // compiler không gộp (đi đường thường) — chỉ vòng <g> ở cấp ngoài được gộp.
+    const fusedTags = [...(h.ctrl as any).elements.values()].filter(el => el instanceof FusedRow).map((el: any) => el.element.localName);
+    expect(fusedTags).toEqual(['g', 'g']);
+    expect(h.container.querySelectorAll('li')).toHaveLength(4);
+});
+
+it('tham số event là giá trị HIỆN HÀNH kể cả khi state vừa đổi mà chưa flush', async () => {
+    h = mount(await load('fused-rows')); flush();
+    const view = h.view as any;
+    view.select(3);                                                   // chưa flush
+    (h.container.querySelector('article[data-id="1"] a') as HTMLElement).click(); flush();
+    expect(view.lastPick()).toEqual([1, 3]);
 });
 
 it('fixture thật sự đi đường gộp: mỗi phần tử gốc của dòng là MỘT FusedRow, không Html/Output nào', async () => {

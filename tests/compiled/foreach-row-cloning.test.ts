@@ -6,7 +6,7 @@ import { Html } from '../../src/core/elements/Html';
 
 /**
  * Nhân bản khuôn dòng của `@foreach` (11/2026) — output compiler THẬT, biên dịch
- * với `SAOC_NO_FUSE=1`: thân đủ điều kiện gộp thì đi FusedRow, không qua đường này.
+ * KHÔNG bật `fuseRows`: thân đủ điều kiện gộp thì đi FusedRow, không qua đường này.
  *
  * Dòng đầu dựng bình thường và thành khuôn; dòng sau `cloneNode` cả cây rồi các
  * element nhận lại node có sẵn. Bất biến duy nhất đáng gác: DOM và hành vi phải

@@ -1,10 +1,24 @@
+# Saola Client v1.10.0
+
+`@foreach` list creation is now on par with React 18 on the 1,000-row benchmark.
+
+- **Fused rows** (`FusedRow`, `ViewController.__fused`): for loop bodies that `saola/compiler` 3.8.0 fuses, each root element of a row is one object instead of one `Html` / `Output` / text object per node. The row is cloned from a template built once from the compiler's descriptor, dynamic holes are written by child-index path, one listener object serves every event of the row (modifiers supported), one state subscription serves all its bindings, and a row that re-runs with a new item is patched in place. Hydration claims the server DOM by walking template and DOM in parallel; a structural mismatch rebuilds only that row. The DOM is byte-identical to the regular path.
+- `@foreach` row template cloning: the first new row of a loop is built normally and becomes a template; later rows `cloneNode` the whole subtree and their `Html` / `Output` / static text objects adopt the existing nodes, built before the row is attached. Only rows made of plain elements, static text and escaped `{{ }}` qualify (no components, `@if` blocks, nested loops, `@bind` or form controls, transitions, computed class names); anything else takes the normal path. `ViewController.rowCloning = false` turns it off. `Html` child factories run in their row scope without a wrapping closure.
+- **Behaviour change:** client-created elements write `class` before other attributes, the order Blade emits. 1.9.0 wrote it after, so client-rendered DOM differed from server-rendered DOM in attribute order.
+- `bench/run.mjs` compiles with fused rows; `BENCH_FUSE=0` measures the regular path.
+
+Benchmark (1,000-row table, Chrome, script ms, 1.9.0 → 1.10.0; React 18.3 / Vue 3.5 for reference): create 10.8 → 4.3 (4.3 / 3.2), append 1,000 12.1 → 6.4 (5.4 / 4.6), replace 2,000 39.3 → 14.8 (21.1 / 11.1), clear 2,000 10.4 → 5.0 (7.2 / 3.7), create 10,000 130 → 49 (130 / 34). No operation got slower.
+
+Fused output needs this client: views compiled with `fuseRows` call `this.__fused`, which older clients do not have. `@saolabs/builder` 1.7.0 turns the option on only when the project's installed client is ≥ 1.10. Output from older compilers runs unchanged. Built `dist` is included in this release.
+
+Validation: 705 client tests (102 test files; the known `label()` compiled-fixture test still needs the starter on a newer builder), including fused-vs-regular DOM equality on real compiler output, events, teardown, hydration and SVG rows; admin views compile fused under strict TypeScript; TypeScript build. Starter browser gate 70/70 (SSR↔CSR parity, hydration, grid, emit, styles) run twice with local client 1.10.0 + builder 1.7.0 + compiler 3.8.0. Not yet run against gehihi-app.
+
 # Saola Client v1.9.0
 
 Faster list creation and teardown, and `@foreach` rows are kept far more often.
 
 - `__foreach` accepts the compiler's captured-state list (7th argument, `saola/compiler` 3.7.0) and compares only those states; output from older compilers keeps the previous "any other state" rule. `StateManager.revisionOf(keys)` is the new counter; quiet `updateRealState` writes now bump per-key versions too.
 - **Behaviour change:** elements created on the client no longer carry the hydrate class `{viewId}-{id}`. That class exists to claim server-rendered DOM; nothing claims client-created elements, and one unique class per element was about a third of list creation time. Server-rendered elements keep it. Tooling that identifies compiler-owned elements by that class in client-rendered DOM (the SSR↔CSR parity gate does) must set `window.__SAOLA_CSR_HYDRATE_CLASS__ = true` before the app boots (`Html.csrHydrateClass`).
-- `@foreach` row template cloning: the first new row of a loop is built normally and becomes a template; later rows `cloneNode` the whole subtree and their `Html` / `Output` / static text objects adopt the existing nodes, built before the row is attached. Only rows made of plain elements, static text and escaped `{{ }}` qualify (no components, `@if` blocks, nested loops, `@bind` or form controls, transitions, computed class names); anything else takes the normal path. `ViewController.rowCloning = false` turns it off. `Html` child factories run in their row scope without a wrapping closure.
 - Element registry keys live on the element instead of two `WeakMap`s; `Html` no longer allocates tracking `Set`s per element (stale attrs / classes / styles / props are derived from the previous config on update); static text allocates no closure or key array.
 - Event listeners are no longer bound to an `AbortSignal`; a view removes its listeners explicitly on destroy. `elementEventHandlers` values are now `EventInvoker` records.
 - `bench/profile.mjs` prints self time per function; `BENCH_ONLY=saola` runs one side of `bench/run.mjs`.
