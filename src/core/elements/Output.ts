@@ -3,6 +3,7 @@ import type { HtmlInterface, OutputInterface } from "../contracts/ElementInterfa
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import { generateUUID } from "../helpers/utils.js";
 import markerRegistry from "../services/MarkerRegistry.js";
+import { isDiscarded } from "./teardown.js";
 import type { SaoObjectType } from "../types/utils.js";
 
 /**
@@ -14,6 +15,13 @@ import type { SaoObjectType } from "../types/utils.js";
  * Render: Tạo Text node giữa <!--o:id-s--> và <!--o:id-e-->
  * Update: Khi stateKeys thay đổi → re-evaluate contentFactory → update textContent
  */
+function sameKeys(a: readonly string[], b: readonly string[]): boolean {
+    if (a === b) return true;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+}
+
 export class Output implements OutputInterface {
     saoType: SaoObjectType = 'Output';
     ctx: ViewControllerInterface;
@@ -111,7 +119,11 @@ export class Output implements OutputInterface {
         this.contentFactory = factory;
     }
     setStateKeys(stateKeys: string[]): void {
+        // Mỗi lượt re-render compiler truyền lại một mảng MỚI cùng nội dung;
+        // đăng ký lại khi key không đổi là việc thừa trên từng output.
+        const unchanged = sameKeys(this.stateKeys, stateKeys);
         this.stateKeys = stateKeys;
+        if (unchanged) return;
         // If already started, we need to resubscribe with new keys
         if (this._isStarted) {
             this.stop();
@@ -232,9 +244,7 @@ export class Output implements OutputInterface {
         const rawText = String(this.contentFactory() ?? '');
 
         if (this.isEscapeHTML && this.textNode) {
-            if (this.textNode.textContent !== rawText) {
-                this.textNode.textContent = rawText;
-            }
+            if (this.textNode.data !== rawText) this.textNode.data = rawText;
             return;
         }
 
@@ -262,19 +272,21 @@ export class Output implements OutputInterface {
         this.ctx.releaseElement?.(this);
         this.stop();
 
-        // Remove mọi nội dung giữa markers (text node hoặc raw nodes)
-        let current: Node | null = this.openTag.nextSibling;
-        while (current && current !== this.closeTag) {
-            const next: Node | null = current.nextSibling;
-            (current as ChildNode).remove();
-            current = next;
+        // Cả nhánh chứa output đang bị vứt bỏ → markers và nội dung đi theo gốc.
+        if (!isDiscarded(this.openTag)) {
+            // Remove mọi nội dung giữa markers (text node hoặc raw nodes)
+            let current: Node | null = this.openTag.nextSibling;
+            while (current && current !== this.closeTag) {
+                const next: Node | null = current.nextSibling;
+                (current as ChildNode).remove();
+                current = next;
+            }
+            // Remove markers
+            this.openTag.remove();
+            this.closeTag.remove();
         }
         this.textNode = null;
         this.rawNodes = [];
-
-        // Remove markers
-        this.openTag.remove();
-        this.closeTag.remove();
 
         this.parent = null;
     }

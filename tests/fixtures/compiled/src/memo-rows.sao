@@ -1,0 +1,16 @@
+<template>
+<ul>
+    @foreach(rows as row)
+    @key(row['id'])
+    <li data-id="{{ row['id'] }}" @class({'on': selected === row['id']})>{{ row['label'] }}</li>
+    @endforeach
+</ul>
+</template>
+<script setup>
+@state(rows = [{id: 1, label: 'a'}, {id: 2, label: 'b'}, {id: 3, label: 'c'}], selected = 0)
+export default {
+    replace(next) { setRows(next); },
+    current() { return rows; },
+    select(id) { setSelected(id); }
+}
+</script>

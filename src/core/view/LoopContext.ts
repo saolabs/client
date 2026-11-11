@@ -93,21 +93,7 @@ export class LoopContext implements LoopContextInterface {
      * MUTABLE vì codegen của chúng cần `setCurrentTimes`/`next`).
      */
     snapshot(): LoopContextInterface {
-        return Object.freeze({
-            index: this.index,
-            iteration: this.iteration,
-            count: this.count,
-            remaining: this.remaining,
-            first: this.first,
-            last: this.last,
-            odd: this.odd,
-            even: this.even,
-            depth: this.depth,
-            parent: this.parent ? this.parent.snapshot() : null,
-            next(): void {
-                console.warn('[LoopContext] `loop` trong @foreach là bản chụp chỉ đọc — next() không có tác dụng.');
-            },
-        }) as LoopContextInterface;
+        return Object.freeze(new LoopSnapshot(this)) as unknown as LoopContextInterface;
     }
 
     reset(): void {
@@ -142,5 +128,39 @@ export class LoopContext implements LoopContextInterface {
         this.last = this.count > 0 ? this.index === this.count - 1 : false;
         this.odd = this.iteration % 2 === 1;
         this.even = !this.odd;
+    }
+}
+
+/**
+ * Bản chụp chỉ đọc của một lượt lặp. Là class (không phải object literal kèm
+ * closure `next`) vì `@foreach` tạo một bản cho MỖI phần tử ở MỖI lượt render.
+ */
+class LoopSnapshot {
+    readonly index: number;
+    readonly iteration: number;
+    readonly count: number;
+    readonly remaining: number;
+    readonly first: boolean;
+    readonly last: boolean;
+    readonly odd: boolean;
+    readonly even: boolean;
+    readonly depth: number;
+    readonly parent: LoopContextInterface | null;
+
+    constructor(source: LoopContext) {
+        this.index = source.index;
+        this.iteration = source.iteration;
+        this.count = source.count;
+        this.remaining = source.remaining;
+        this.first = source.first;
+        this.last = source.last;
+        this.odd = source.odd;
+        this.even = source.even;
+        this.depth = source.depth;
+        this.parent = source.parent ? source.parent.snapshot() : null;
+    }
+
+    next(): void {
+        console.warn('[LoopContext] `loop` trong @foreach là bản chụp chỉ đọc — next() không có tác dụng.');
     }
 }

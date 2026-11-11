@@ -4,3 +4,6 @@ node_modules
 
 # Output của test runner cũ (đã thay bằng vitest)
 .test-build
+
+# Bundle và thư viện tải về của bench/run.mjs
+bench/.cache

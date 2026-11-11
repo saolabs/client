@@ -43,6 +43,9 @@ export interface ViewControllerInterface {
      * null = không có cache active (render bình thường).
      */
     _currentForeachCache: ForeachSlotCache | null;
+    /** State key của vùng @foreach đang render; null = lượt này không được bỏ qua dòng. */
+    _foreachMemoKeys: readonly string[] | null;
+    _foreachMemoSkip: boolean;
     /** Element gọi trong destroy() để tự gỡ khỏi registry (no-op nếu key đã trỏ bản mới) */
     releaseElement(el: object): void;
     /** Compiler helper for raw interpolation inside HTML RCDATA. */

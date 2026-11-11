@@ -1,0 +1,23 @@
+<template>
+<div class="container">
+<table class="table"><tbody>
+@foreach(rows as row)
+@key(row['id'])
+<tr @class({'danger': selected === row['id']})>
+<td class="col-md-1">{{ row['id'] }}</td>
+<td class="col-md-4"><a class="lbl" @click(select(row['id']))>{{ row['label'] }}</a></td>
+<td class="col-md-1"><a class="rm" @click(remove(row['id']))><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></a></td>
+<td class="col-md-6"></td>
+</tr>
+@endforeach
+</tbody></table>
+</div>
+</template>
+<script setup>
+@state(rows = [], selected = 0)
+export default {
+    set(next) { setRows(next); },
+    select(id) { setSelected(id); },
+    remove(id) { setRows(rows.filter(r => r['id'] !== id)); }
+}
+</script>

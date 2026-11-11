@@ -1,6 +1,7 @@
 import type { HtmlInterface, TextInterface } from "../contracts/ElementInterface.js";
 import type { ViewControllerInterface } from "../contracts/ViewControllerInterface.js";
 import { SaoObjectType } from "../types/utils.js";
+import { isDiscarded } from "./teardown.js";
 
 /**
  * TextElement — wraps a DOM Text node.
@@ -11,7 +12,7 @@ import { SaoObjectType } from "../types/utils.js";
  */
 export class TextElement implements TextInterface {
     saoType: SaoObjectType = 'TextElement';
-    public element: Text;
+    private _element: Text | null = null;
     public parent: HtmlInterface | null;
     private ctx: ViewControllerInterface;
     private statekeys: string[] = [];
@@ -35,7 +36,18 @@ export class TextElement implements TextInterface {
         // FIX(baseline#3): KHÔNG escapeHTML khi ghi vào Text node — text node tự an toàn,
         // escape thủ công gây double-escape. shouldEscapeHTML chỉ dùng cho SSR string path.
         this._text = this.generateText();
-        this.element = document.createTextNode(this._text);
+    }
+
+    /**
+     * Text node tạo LƯỜI. Mỗi lượt re-render compiler gọi lại `this.text(...)`
+     * cho mọi đoạn chữ tĩnh, rồi `reuseStaticText` bỏ ngay bản mới để giữ node
+     * cũ — tạo sẵn DOM node ở constructor là tạo ra để vứt.
+     */
+    get element(): Text {
+        return this._element ??= document.createTextNode(this._text);
+    }
+    set element(node: Text) {
+        this._element = node;
     }
 
     /** Start reactive text updates */
@@ -64,7 +76,7 @@ export class TextElement implements TextInterface {
     update(newText: string): void {
         if (this._text !== newText) {
             this._text = newText;
-            this.element.textContent = newText;
+            if (this._element) this._element.data = newText;
         }
     }
 
@@ -80,7 +92,7 @@ export class TextElement implements TextInterface {
     }
 
     remove(): void {
-        this.element.remove();
+        this._element?.remove();
     }
 
     /** Registry guard — element đã destroy không được reuse */
@@ -92,7 +104,7 @@ export class TextElement implements TextInterface {
             this.unsubscribe();
             this.unsubscribe = null;
         }
-        this.element.remove();
+        if (this._element && !isDiscarded(this._element)) this._element.remove();
         this.parent = null;
     }
 

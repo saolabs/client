@@ -10,7 +10,7 @@ import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, 
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface.js";
 import type { ViewStateInterface } from "../contracts/ViewStateInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
-import { ViewState } from "./ViewState.js";
+import { StateManager, ViewState } from "./ViewState.js";
 import { ResourceScope } from './ResourceScope.js';
 import { LoopContext } from "./LoopContext.js";
 import { Reactive } from "../elements/Reactive.js";
@@ -31,11 +31,29 @@ import { Wrapper } from "../elements/Wrapper.js";
 import { YieldElement } from "../elements/Yield.js";
 import { app } from "../helpers/app.js";
 import { ComponentInterface } from "../contracts/ComponentInterface.js";
-import { ForeachSlotCache } from "../elements/ForeachSlotCache.js";
+import { ForeachSlotCache, type ForeachSlot } from "../elements/ForeachSlotCache.js";
 import { reuseStaticText } from '../elements/reconcileChildren.js';
 import AssetManager, { StyleSpec, ScriptSpec } from "../services/AssetManager.js";
 
 type ElementChild = ReactiveInterface | ComponentInterface | HtmlInterface | TextInterface | FragmentInterface | OutputInterface | BlockOutletInterface | YieldInterface | SaoNodeInterface;
+
+
+/**
+ * "Hình dạng" cấp 1 của một item `@foreach`, hoặc -1 nếu KHÔNG thể tin rằng
+ * item cùng reference thì cùng nội dung.
+ *
+ * Giá trị nguyên thuỷ luôn tin được. Object/mảng chỉ tin được khi đang được
+ * một state quan sát (mọi lần sửa thuộc tính ĐÃ CÓ đều tăng mutationEpoch);
+ * số khoá bắt nốt ca hook không thấy: thêm khoá mới ở cấp 1.
+ */
+function itemShape(item: any): number {
+    if (item === null || typeof item !== 'object') return 0;
+    if (!StateManager.isTracked(item)) return NaN;   // NaN !== NaN → không bao giờ khớp dấu đã lưu
+    if (Array.isArray(item)) return item.length;
+    let count = 0;
+    for (const _ in item) count++;
+    return count;
+}
 
 /**
  * ViewController — the brain behind a View.
@@ -156,6 +174,14 @@ export class ViewController implements ViewControllerInterface {
      * Reset về null ngay sau khi childrenFactory trả về.
      */
     public _currentForeachCache: ForeachSlotCache | null = null;
+    /** State key của vùng @foreach đang render (Reactive đặt quanh factory). */
+    public _foreachMemoKeys: readonly string[] | null = null;
+    /** Lượt render này có được giữ nguyên dòng không đổi không. */
+    public _foreachMemoSkip = false;
+    /** Tăng mỗi lần cha đẩy data mới xuống — biến data không có version riêng. */
+    private _dataEpoch = 0;
+    /** Công tắc tắt việc bỏ qua dòng không đổi của @foreach (để khoanh lỗi). */
+    static foreachMemo = true;
     public _foreachSkipRegistry: boolean = false;
     private foreachRegistry: Map<string, any> | null = null;
     private elementRegistries = new WeakMap<object, Map<string, any>>();
@@ -165,7 +191,16 @@ export class ViewController implements ViewControllerInterface {
     private scopeFactory<F extends (...args: any[]) => any>(factory: F): F {
         const registry = this.foreachRegistry;
         if (!registry) return factory;
-        return ((...args: any[]) => this.inForeachScope(registry, () => factory(...args))) as F;
+        // = inForeachScope(registry, …) viết thẳng: factory con chỉ nhận tối đa
+        // hai tham số, không cần rest-args và closure lồng cho mỗi lần gọi.
+        return ((a: any, b: any) => {
+            const previous = this.foreachRegistry;
+            const skip = this._foreachSkipRegistry;
+            this.foreachRegistry = registry;
+            this._foreachSkipRegistry = false;
+            try { return factory(a, b); }
+            finally { this.foreachRegistry = previous; this._foreachSkipRegistry = skip; }
+        }) as F;
     }
 
     private inForeachScope<T>(registry: Map<string, any>, run: () => T): T {
@@ -864,6 +899,7 @@ export class ViewController implements ViewControllerInterface {
      * Khi paused: buffer lại, apply lúc resume (ROUTE_RENDER_FLOW §8.2).
      */
     updateData(newData: Record<string, any>): void {
+        this._dataEpoch++;
         if (this._isDestroyed) return;
         if (this._lifecycleState === 'paused') {
             this._bufferedData = { ...(this._bufferedData ?? {}), ...newData };
@@ -923,6 +959,7 @@ export class ViewController implements ViewControllerInterface {
      * Update single data item — cùng contract với updateData (xem trên).
      */
     updateDataItem(key: string, value: any): void {
+        this._dataEpoch++;
         this.data[key] = value;
         if (!this._isDataCommitted) {
             // Constructor phase: trait-only, không đụng lock (như updateData)
@@ -973,72 +1010,71 @@ export class ViewController implements ViewControllerInterface {
         } as EventListener;
     }
 
+    /** Trạng thái sống của một listener gốc — xem addEventListener. */
+    private eventInvokers = new WeakMap<EventListener, { handlers: SaoElementEventHandler; modKey: string }>();
+
+    /** Chạy danh sách handler compiler khai báo cho MỘT event. */
+    private invokeEventHandlers(handlers: SaoElementEventHandler, event: Event): void {
+        let failure: unknown;
+        let failed = false;
+        for (const h of handlers) {
+            try {
+                if (typeof h === 'function') {
+                    (h as Function).call(event.currentTarget, event);
+                    continue;
+                }
+                if (typeof h !== 'object' || h === null) continue;
+                const def = h as { handler: string | ((event: Event) => any); params?: any[] };
+                const view = this.view as any;
+                const target = typeof def.handler === 'string' ? view[def.handler] : def.handler;
+                if (typeof target !== 'function') continue;
+                if (!def.params) {
+                    if (typeof def.handler === 'string') view[def.handler](event);
+                    else target.call(event.currentTarget, event);
+                    continue;
+                }
+                const params = def.params.map((p: any) => typeof p === 'function' ? p(event) : p === '@EVENT' ? event : p);
+                target.apply(view, params);
+            } catch (error) {
+                // Mỗi handler từng là một listener riêng: cái này ném không
+                // được chặn cái sau. Ném lại lỗi đầu tiên khi đã chạy hết.
+                if (!failed) { failed = true; failure = error; }
+            }
+        }
+        if (failed) throw failure;
+    }
+
     addEventListener(
         element: HTMLElement,
         event: string,
         handlers: SaoElementEventHandler,
         modifiers: EventModifier[] = [],
     ): void {
-        // Compiled Html supplies the complete handler list for one event. Replacing
-        // the previous set makes render/hydrate initialization idempotent.
+        // MỘT listener gốc cho mỗi (element, event); nó đọc danh sách handler
+        // hiện hành lúc event xảy ra. Re-render vì vậy chỉ thay danh sách —
+        // không removeEventListener/addEventListener lại trên từng element
+        // (đo được: đó là phần lớn chi phí của một lượt cập nhật @foreach).
+        const modKey = modifiers.join(',');
+        const current = this.elementEventHandlers.get(element)?.get(event)?.[0];
+        const live = current ? this.eventInvokers.get(current) : undefined;
+        if (live && live.modKey === modKey) {
+            live.handlers = handlers;
+            return;
+        }
         this.removeEventListener(element, event);
-        const registered: EventListener[] = [];
-        const once = modifiers.includes('once');
-        for (const h of handlers) {
-            let fn: EventListener;
 
-            if (typeof h === 'function') {
-                fn = h as EventListener;
-            } else if (typeof h === 'object' && h !== null) {
-                const handlerDef = h as { handler: string | ((event: Event) => any); params?: any[] };
-                if (typeof handlerDef.handler === 'string') {
-                    // Method name on view
-                    const methodName = handlerDef.handler;
-                    const view = this.view;
-                    fn = ((event: Event) => {
-                        if (typeof (view as any)[methodName] === 'function') {
-                            const params = handlerDef.params
-                                ? handlerDef.params.map(p => {
-                                    if (typeof p === 'function') return p(event);
-                                    return p === '@EVENT' ? event : p;
-                                })
-                                : [event];
-                            (view as any)[methodName](...params);
-                        }
-                    }) as EventListener;
-                } else if (typeof handlerDef.handler === 'function') {
-                    const originalHandler = handlerDef.handler;
-                    if (handlerDef.params) {
-                        fn = ((event: Event) => {
-                            const params = handlerDef.params!.map((p: any) => {
-                                if (typeof p === 'function') return p(event);
-                                return p === '@EVENT' ? event : p;
-                            });
-                            (originalHandler as Function).apply(this.view, params);
-                        }) as EventListener;
-                    } else {
-                        fn = originalHandler as EventListener;
-                    }
-                } else {
-                    continue;
-                }
-            } else {
-                continue;
-            }
+        const state = { handlers, modKey };
+        let fn: EventListener = (e: Event) => this.invokeEventHandlers(state.handlers, e);
+        if (modifiers.length) fn = this.wrapEventModifiers(fn, modifiers);
+        element.addEventListener(event, fn, { signal: this.eventAbortController.signal, once: modifiers.includes('once') });
+        this.eventInvokers.set(fn, state);
 
-            if (modifiers.length) fn = this.wrapEventModifiers(fn, modifiers);
-            element.addEventListener(event, fn, { signal: this.eventAbortController.signal, once });
-            registered.push(fn);
+        let events = this.elementEventHandlers.get(element);
+        if (!events) {
+            events = new Map();
+            this.elementEventHandlers.set(element, events);
         }
-
-        if (registered.length > 0) {
-            let events = this.elementEventHandlers.get(element);
-            if (!events) {
-                events = new Map();
-                this.elementEventHandlers.set(element, events);
-            }
-            events.set(event, registered);
-        }
+        events.set(event, [fn]);
     }
 
     removeEventListener(element: HTMLElement, event: string): void {
@@ -1586,9 +1622,24 @@ export class ViewController implements ViewControllerInterface {
         keyFn?: (item: T, index: number) => any,
         reconcile = false,
         scopeId?: string,
+        memo: 0 | 1 | 2 = 0,
     ): any[] {
         if (!list || typeof list !== 'object') return [];
         let cache = Array.isArray(list) || reconcile ? this._currentForeachCache : null;
+        // ── Bỏ qua dòng không đổi ────────────────────────────────────────
+        // `memo` do compiler quyết: 0 = thân vòng lặp dùng thứ runtime không
+        // theo dõi được (biến/hàm ngoài) → luôn chạy lại; 1 = chỉ phụ thuộc
+        // item + state; 2 = thêm vị trí trong vòng lặp (index/count).
+        // Một dòng được giữ nguyên khi item CÙNG reference và từ lần chạy
+        // trước không có: state nào khác của view đổi, data mới từ cha, sửa
+        // tại chỗ bên dưới state, hay vùng cha render lại (memoKeys = null).
+        const memoKeys = cache && cache === this._currentForeachCache ? this._foreachMemoKeys : null;
+        const memoSkip = this._foreachMemoSkip;
+        this._foreachMemoKeys = null;
+        this._foreachMemoSkip = false;
+        const memoEpoch = memo !== 0 && reconcile && memoKeys && ViewController.foreachMemo
+            ? (this.states.__ as StateManager).revisionExcluding(memoKeys) + StateManager.mutationEpoch + this._dataEpoch
+            : -1;
         let ownsPass = false;
         if (!cache && reconcile && scopeId && this.foreachRegistry) {
             let caches = this.inlineForeachCaches.get(this.foreachRegistry);
@@ -1599,50 +1650,74 @@ export class ViewController implements ViewControllerInterface {
             ownsPass = true;
         }
         const result: any[] = [];
-        const keys = Array.isArray(list)
-            ? Object.keys(list).filter(key => String(Number(key)) === key && Number(key) >= 0 && Number(key) < list.length)
-            : Object.keys(list);
-        const loopCtx = this.__setLoopContext(Array.isArray(list) ? list.length : keys.length);
+        const isArray = Array.isArray(list);
+        const keys = isArray ? null : Object.keys(list);
+        const length = isArray ? (list as T[]).length : keys!.length;
+        const loopCtx = this.__setLoopContext(length);
         loopCtx.setType('increment');
         try {
-            keys.forEach((key, index) => {
+            for (let position = 0; position < length; position++) {
                 // Sparse arrays retain their actual index and loop count.
-                const loopIndex = Array.isArray(list) ? Number(key) : index;
+                if (isArray && !(position in list)) continue;
+                const key = isArray ? String(position) : keys![position];
+                const loopIndex = position;
                 const item = (list as any)[key] as T;
                 loopCtx.setCurrentTimes(loopIndex);
                 const cacheKey = keyFn ? keyFn(item, loopIndex) : item;
-                const claim = cache?.claim(cacheKey, item, reconcile);
+                const claim = cache ? cache.claim(cacheKey, item, reconcile) : undefined;
                 const slot = claim?.slot;
                 if (slot && !reconcile) {
-                    result.push(...slot.elements);
-                    return;
+                    for (let i = 0; i < slot.elements.length; i++) result.push(slot.elements[i]);
+                    continue;
+                }
+                if (slot && memoSkip && memoEpoch !== -1 && slot.memoEpoch === memoEpoch && slot.item === item
+                    && (memo === 1 || (slot.memoIndex === loopIndex && slot.memoCount === length))
+                    && slot.memoShape === itemShape(item)) {
+                    for (let i = 0; i < slot.elements.length; i++) result.push(slot.elements[i]);
+                    continue;
                 }
                 const registry = reconcile ? slot?.registry ?? new Map<string, any>() : null;
                 const identity = slot?.identity ?? (cache && reconcile ? cache.allocateIdentity(loopIndex) : loopIndex);
                 const previousCache = this._currentForeachCache;
                 const previousSkip = this._foreachSkipRegistry;
+                const previousRegistry = this.foreachRegistry;
                 this._currentForeachCache = null; // nested inline loops own no outer slots
-                if (cache && !reconcile) this._foreachSkipRegistry = true;
+                if (registry) {
+                    // = inForeachScope(registry, …), viết thẳng để khỏi cấp phát
+                    // hai closure cho mỗi phần tử.
+                    this.foreachRegistry = registry;
+                    this._foreachSkipRegistry = false;
+                } else if (cache && !reconcile) this._foreachSkipRegistry = true;
                 let output: any;
                 try {
-                    const run = () => callback(item, key, loopIndex, loopCtx.snapshot(), identity);
-                    output = registry ? this.inForeachScope(registry, run) : run();
+                    output = callback(item, key, loopIndex, loopCtx.snapshot(), identity);
                 } finally {
                     this._currentForeachCache = previousCache;
                     this._foreachSkipRegistry = previousSkip;
+                    this.foreachRegistry = previousRegistry;
                 }
                 let elements = output == null ? [] : Array.isArray(output) ? output : [output];
                 if (slot && reconcile) elements = reuseStaticText(slot.elements, elements);
-                result.push(...elements);
+                for (let i = 0; i < elements.length; i++) result.push(elements[i]);
                 if (cache && claim) {
+                    let stored: ForeachSlot;
                     if (slot && reconcile) {
+                        stored = slot;
                         slot.item = item;
-                        slot.identity = identity;
                         slot.elements = elements;
-                        for (const el of elements) cache.refreshedElements.add(el);
-                    } else cache.store(cacheKey, claim.occ, item, elements, registry ?? undefined).identity = identity;
+                        for (let i = 0; i < elements.length; i++) cache.refreshedElements.add(elements[i]);
+                    } else stored = cache.store(cacheKey, claim.occ, item, elements, registry ?? undefined);
+                    stored.identity = identity;
+                    if (memoEpoch !== -1) {
+                        // Dấu lấy từ TRƯỚC khi chạy callback: callback tự đổi
+                        // state thì lượt sau lệch dấu và chạy lại — an toàn.
+                        stored.memoEpoch = memoEpoch;
+                        stored.memoIndex = loopIndex;
+                        stored.memoCount = length;
+                        stored.memoShape = itemShape(item);
+                    }
                 }
-            });
+            }
             if (ownsPass) cache!.prunePass(slot => {
                 for (const el of slot.elements) el.destroy?.();
             });
