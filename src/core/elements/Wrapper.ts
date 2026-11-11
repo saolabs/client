@@ -100,7 +100,7 @@ export class Wrapper implements WrapperInterface {
             .filter((child): child is NonNullable<typeof child> => child !== null && child !== undefined)
             .map((child) => {
                 if (typeof child === 'string' || typeof child === 'number') {
-                    return new TextElement({ ctx: this.ctx, parent: this.parent, stateKeys: [], generateText: () => String(child) });
+                    return new TextElement({ ctx: this.ctx, parent: this.parent, text: String(child) });
                 }
                 return child;
             });

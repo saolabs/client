@@ -59,12 +59,21 @@ describe('Html.updateConfig', () => {
         expect(html.element.classList.contains('cell')).toBe(false);
     });
 
-    it('ghi class hydrate và class tĩnh trong một lần, không mất class nào', () => {
+    it('element tạo ở client: class tĩnh ghi một lần, không kèm class hydrate', () => {
         const controller = makeController();
         const html = new Html({ ctx: controller, id: 'row', tagName: 'tr', config: {
             classes: [{ type: 'static', value: 'a' }, { type: 'static', value: 'b c' }],
         } });
-        expect([...html.element.classList]).toEqual([`${controller.viewId}-row`, 'a', 'b', 'c']);
+        expect(html.element.getAttribute('class')).toBe('a b c');
+    });
+
+    it('công tắc kiểm thử Html.csrHydrateClass gắn lại class hydrate cho cổng parity', () => {
+        Html.csrHydrateClass = true;
+        try {
+            const controller = makeController();
+            const html = new Html({ ctx: controller, id: 'row', tagName: 'tr', config: { classes: [{ type: 'static', value: 'a' }] } });
+            expect(html.element.getAttribute('class')).toBe(`${controller.viewId}-row a`);
+        } finally { Html.csrHydrateClass = false; }
     });
 });
 

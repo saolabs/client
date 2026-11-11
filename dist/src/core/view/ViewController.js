@@ -36,6 +36,8 @@ function itemShape(item) {
         count++;
     return count;
 }
+/** Mảng stateKeys rỗng dùng chung cho đoạn chữ tĩnh — không cấp phát mỗi lần gọi. */
+const NO_KEYS = [];
 /**
  * ViewController — the brain behind a View.
  *
@@ -153,7 +155,6 @@ export class ViewController {
         this.pendingReactiveUpdates = new Set();
         this.hasScheduledUpdate = false;
         /** Centralized AbortController for all event listeners */
-        this.eventAbortController = new AbortController();
         /** Exact listener references for cleanup when an individual Html node dies. */
         this.elementEventHandlers = new Map();
         // ─── Loop ───────────────────────────────────────────────────
@@ -173,7 +174,6 @@ export class ViewController {
         this._dataEpoch = 0;
         this._foreachSkipRegistry = false;
         this.foreachRegistry = null;
-        this.elementRegistries = new WeakMap();
         this.inlineForeachCaches = new WeakMap();
         // ─── Layout (Sections & Blocks) ─────────────────────────────
         /** Section management across views */
@@ -181,8 +181,6 @@ export class ViewController {
         /** Block slots in layout views */
         this.blocks = new Map();
         this.elements = new Map();
-        /** element → key của nó trong `elements` (xem registerElement/releaseElement) */
-        this.elementKeys = new WeakMap();
         this.preloadElement = null; // For pre-rendering elements before the main render
         this.mainElement = null; // The main rendered element tree
         /** Wrapper instance RIÊNG cho render/prerender — dùng chung sẽ làm
@@ -221,8 +219,6 @@ export class ViewController {
         this._bufferedData = null;
         /** Only children paused by this controller may be resumed by it. */
         this._pausedChildren = [];
-        /** Trạng thái sống của một listener gốc — xem addEventListener. */
-        this.eventInvokers = new WeakMap();
         /** Deterministic fallback counter for the (contract-violating) missing-id path. */
         this._missingIncludeIdCounter = 0;
         this.__App = app();
@@ -694,7 +690,10 @@ export class ViewController {
         this.pendingReactiveUpdates.clear();
         this.hasScheduledUpdate = false;
         // Abort all event listeners
-        this.eventAbortController.abort();
+        for (const [element, events] of this.elementEventHandlers) {
+            for (const [event, live] of events)
+                element.removeEventListener(event, live.fn);
+        }
         this.elementEventHandlers.clear();
         // Sắp gỡ DOM khỏi real DOM
         const wasMounted = this._isMounted;
@@ -957,40 +956,44 @@ export class ViewController {
         if (failed)
             throw failure;
     }
-    addEventListener(element, event, handlers, modifiers = []) {
+    addEventListener(element, event, handlers, modifiers) {
         // MỘT listener gốc cho mỗi (element, event); nó đọc danh sách handler
         // hiện hành lúc event xảy ra. Re-render vì vậy chỉ thay danh sách —
         // không removeEventListener/addEventListener lại trên từng element
         // (đo được: đó là phần lớn chi phí của một lượt cập nhật @foreach).
-        const modKey = modifiers.join(',');
-        const current = this.elementEventHandlers.get(element)?.get(event)?.[0];
-        const live = current ? this.eventInvokers.get(current) : undefined;
-        if (live && live.modKey === modKey) {
-            live.handlers = handlers;
-            return;
-        }
-        this.removeEventListener(element, event);
-        const state = { handlers, modKey };
-        let fn = (e) => this.invokeEventHandlers(state.handlers, e);
-        if (modifiers.length)
-            fn = this.wrapEventModifiers(fn, modifiers);
-        element.addEventListener(event, fn, { signal: this.eventAbortController.signal, once: modifiers.includes('once') });
-        this.eventInvokers.set(fn, state);
+        const modKey = modifiers && modifiers.length ? modifiers.join(',') : '';
         let events = this.elementEventHandlers.get(element);
-        if (!events) {
-            events = new Map();
-            this.elementEventHandlers.set(element, events);
+        const live = events?.get(event);
+        if (live) {
+            if (live.modKey === modKey) {
+                live.handlers = handlers;
+                return;
+            }
+            element.removeEventListener(event, live.fn);
         }
-        events.set(event, [fn]);
+        const state = { handlers, modKey, fn: null };
+        let fn = (e) => this.invokeEventHandlers(state.handlers, e);
+        if (modKey)
+            fn = this.wrapEventModifiers(fn, modifiers);
+        state.fn = fn;
+        // Không gắn AbortSignal: mỗi listener kèm signal đắt hơn hẳn khi tạo
+        // hàng nghìn dòng. destroy() gỡ tường minh qua elementEventHandlers.
+        if (modKey && modifiers.includes('once'))
+            element.addEventListener(event, fn, { once: true });
+        else
+            element.addEventListener(event, fn);
+        if (!events)
+            this.elementEventHandlers.set(element, events = new Map());
+        events.set(event, state);
     }
     removeEventListener(element, event) {
         const events = this.elementEventHandlers.get(element);
-        const listeners = events?.get(event) ?? [];
-        for (const listener of listeners) {
-            element.removeEventListener(event, listener);
-        }
-        events?.delete(event);
-        if (events?.size === 0)
+        const live = events?.get(event);
+        if (!live)
+            return;
+        element.removeEventListener(event, live.fn);
+        events.delete(event);
+        if (events.size === 0)
             this.elementEventHandlers.delete(element);
     }
     // ─── Reactive Scheduling ────────────────────────────────────
@@ -1245,7 +1248,7 @@ export class ViewController {
      * Raw Text node bị mountElementList/Reactive.render bỏ qua → text tĩnh biến mất.
      */
     text(text) {
-        return new TextElement({ ctx: this, stateKeys: [], generateText: () => text });
+        return new TextElement({ ctx: this, stateKeys: NO_KEYS, text });
     }
     /**
      * Ghi element vào registry + nhớ key để destroy() gỡ lại được.
@@ -1255,10 +1258,12 @@ export class ViewController {
      */
     registerElement(id, el) {
         this.elements.set(id, el);
-        this.elementKeys.set(el, id);
+        // Khoá + registry dòng ghi thẳng lên element: hai WeakMap ở đây từng
+        // là ~5% thời gian tạo/xoá một danh sách dài.
+        el.__regKey = id;
         if (this.foreachRegistry) {
             this.foreachRegistry.set(id, el);
-            this.elementRegistries.set(el, this.foreachRegistry);
+            el.__regScope = this.foreachRegistry;
         }
         return el;
     }
@@ -1272,14 +1277,16 @@ export class ViewController {
      * khi prunePass destroy element cũ — xoá vô điều kiện sẽ gỡ nhầm bản mới.
      */
     releaseElement(el) {
-        const id = this.elementKeys.get(el);
+        const id = el.__regKey;
         if (id === undefined)
             return;
-        this.elementKeys.delete(el);
-        const registry = this.elementRegistries.get(el);
-        if (registry?.get(id) === el)
-            registry.delete(id);
-        this.elementRegistries.delete(el);
+        el.__regKey = undefined;
+        const registry = el.__regScope;
+        if (registry) {
+            if (registry.get(id) === el)
+                registry.delete(id);
+            el.__regScope = undefined;
+        }
         if (this.elements.get(id) === el)
             this.elements.delete(id);
     }
@@ -1473,7 +1480,7 @@ export class ViewController {
             return [];
         return [this.text(String(content))];
     }
-    __foreach(list, callback, keyFn, reconcile = false, scopeId, memo = 0) {
+    __foreach(list, callback, keyFn, reconcile = false, scopeId, memo = 0, memoDeps) {
         if (!list || typeof list !== 'object')
             return [];
         let cache = Array.isArray(list) || reconcile ? this._currentForeachCache : null;
@@ -1482,14 +1489,17 @@ export class ViewController {
         // theo dõi được (biến/hàm ngoài) → luôn chạy lại; 1 = chỉ phụ thuộc
         // item + state; 2 = thêm vị trí trong vòng lặp (index/count).
         // Một dòng được giữ nguyên khi item CÙNG reference và từ lần chạy
-        // trước không có: state nào khác của view đổi, data mới từ cha, sửa
+        // trước không có: state mà thân vòng lặp đọc (`memoDeps`) đổi, data mới từ cha, sửa
         // tại chỗ bên dưới state, hay vùng cha render lại (memoKeys = null).
         const memoKeys = cache && cache === this._currentForeachCache ? this._foreachMemoKeys : null;
         const memoSkip = this._foreachMemoSkip;
         this._foreachMemoKeys = null;
         this._foreachMemoSkip = false;
         const memoEpoch = memo !== 0 && reconcile && memoKeys && ViewController.foreachMemo
-            ? this.states.__.revisionExcluding(memoKeys) + StateManager.mutationEpoch + this._dataEpoch
+            // Compiler ≥ 3.7 liệt kê đúng những state thân vòng lặp chụp lại;
+            // bản cũ không có danh sách thì mọi state khác của view đều tính.
+            ? (memoDeps ? this.states.__.revisionOf(memoDeps) : this.states.__.revisionExcluding(memoKeys))
+                + StateManager.mutationEpoch + this._dataEpoch
             : -1;
         let ownsPass = false;
         if (!cache && reconcile && scopeId && this.foreachRegistry) {
@@ -1548,7 +1558,7 @@ export class ViewController {
                     this._foreachSkipRegistry = true;
                 let output;
                 try {
-                    output = callback(item, key, loopIndex, loopCtx.snapshot(), identity);
+                    output = callback(item, key, loopIndex, memo === 1 ? loopCtx : loopCtx.snapshot(), identity);
                 }
                 finally {
                     this._currentForeachCache = previousCache;

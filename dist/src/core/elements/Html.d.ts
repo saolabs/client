@@ -4,6 +4,14 @@ import type { ViewControllerInterface } from "../contracts/ViewControllerInterfa
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
 export declare class Html implements HtmlInterface {
+    /**
+     * CHỈ cho kiểm thử: bật thì element tạo ở client cũng mang class hydrate
+     * `{viewId}-{id}` như DOM của server. Cổng parity SSR↔CSR dựa vào class
+     * đó để biết element nào do compiler sinh; production để tắt (mỗi element
+     * một tên class duy nhất là ~1/3 thời gian tạo một danh sách dài).
+     * Bật trước khi app khởi động: `window.__SAOLA_CSR_HYDRATE_CLASS__ = true`.
+     */
+    static csrHydrateClass: boolean;
     saoType: SaoObjectType;
     element: HTMLElement;
     parent: HtmlInterface | null;
@@ -21,7 +29,7 @@ export declare class Html implements HtmlInterface {
     /** Config NGUYÊN BẢN compiler truyền vào — so identity để bỏ qua cập nhật thừa. */
     private sourceConfig;
     private isVoidTag;
-    /** Class hydrate chờ ghi cùng class tĩnh (chỉ element vừa tạo). */
+    /** Khác null = element vừa tạo ở client, class tĩnh chờ ghi một lần. */
     private pendingClass;
     private isOptionTag;
     private isTextareaTag;
@@ -30,11 +38,12 @@ export declare class Html implements HtmlInterface {
     /** Invalidates deferred/stale binding callbacks after a config reconciliation. */
     private bindingGeneration;
     private contentUnsubscribe;
-    /** DOM state owned by this Html config, used for exact cleanup before reuse. */
-    private managedAttributeNames;
-    private managedClassNames;
-    private managedStyleNames;
-    private managedPropertyNames;
+    /**
+     * Tên class do binding `dynamic` gắn lúc chạy — thứ duy nhất không suy ra
+     * được từ config. Attr/class/style/prop còn lại đọc thẳng từ config khi
+     * updateConfig cần gỡ phần thừa, nên element vừa tạo không tốn Set nào.
+     */
+    private dynamicClassNames;
     /** Events actually registered through ViewController, independent of current config. */
     private registeredEventNames;
     initMode: InitMode;

@@ -35,7 +35,7 @@ export interface ViewControllerInterface {
     hasSuperView: boolean;
 
     /** Exact DOM listener references, used for element-level cleanup before destroy. */
-    elementEventHandlers: Map<HTMLElement, Map<string, EventListener[]>>;
+    elementEventHandlers: Map<HTMLElement, Map<string, EventInvoker>>;
 
     /**
      * Active ForeachSlotCache — set bởi Reactive.renderForeach() trước khi gọi factory.
@@ -245,4 +245,11 @@ export interface ViewConfigThis {
     data: Record<string, any>;
     ctrl: ViewControllerInterface;
     view: ViewInterface;
+}
+
+/** Listener gốc của một (element, event) cùng danh sách handler hiện hành. */
+export interface EventInvoker {
+    handlers: any;
+    modKey: string;
+    fn: EventListener;
 }

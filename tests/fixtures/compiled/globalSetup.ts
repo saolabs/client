@@ -66,7 +66,7 @@ export default async function setup() {
         const saoPath = path.join(SRC_DIR, file);
 
         const source = readFileSync(saoPath, 'utf-8');
-        if (['db-language-page', 'auth-reactivity', 'use-auth', 'middleware', 'memo-rows'].includes(name)) {
+        if (['db-language-page', 'auth-reactivity', 'use-auth', 'middleware', 'memo-rows', 'memo-captured'].includes(name)) {
             // Pin this contract fixture to the compiler under change, rather than an older
             // Composer installation in the starter. Both use the public compile API.
             const compilerRoot = path.resolve(HERE, '../../../../compiler');

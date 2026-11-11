@@ -21,17 +21,18 @@ function sameKeys(a, b) {
             return false;
     return true;
 }
+const NO_NODES = Object.freeze([]);
 export class Output {
     constructor({ ctx, id = null, parent = null, stateKeys = [], contentFactory = () => '', isEscapeHTML = true, initMode = InitModes.CREATE }) {
         this.saoType = 'Output';
-        this.domChildren = []; // For compatibility with HtmlInterface; Output itself doesn't have a single root element
+        this.domChildren = NO_NODES; // For compatibility with HtmlInterface; Output itself doesn't have a single root element
         this.textNode = null;
         this.unsubscribe = null;
         this._isStarted = false;
         this._isDestroyed = false;
         this.initMode = InitModes.CREATE;
         /** Nodes của raw HTML mode ({!! !!}) — track để clear khi update */
-        this.rawNodes = [];
+        this.rawNodes = NO_NODES;
         this.ctx = ctx;
         this.parent = parent;
         this.stateKeys = stateKeys;
@@ -155,7 +156,7 @@ export class Output {
             current = next;
         }
         this.textNode = null;
-        this.rawNodes = [];
+        this.rawNodes = NO_NODES;
     }
     insertBeforeClose(node) {
         this.closeTag.parentNode?.insertBefore(node, this.closeTag);
@@ -246,7 +247,7 @@ export class Output {
             this.closeTag.remove();
         }
         this.textNode = null;
-        this.rawNodes = [];
+        this.rawNodes = NO_NODES;
         this.parent = null;
     }
     // ─── OneElement markers ─────────────────────────────

@@ -1,3 +1,19 @@
+# Saola Client v1.9.0
+
+Faster list creation and teardown, and `@foreach` rows are kept far more often.
+
+- `__foreach` accepts the compiler's captured-state list (7th argument, `saola/compiler` 3.7.0) and compares only those states; output from older compilers keeps the previous "any other state" rule. `StateManager.revisionOf(keys)` is the new counter; quiet `updateRealState` writes now bump per-key versions too.
+- **Behaviour change:** elements created on the client no longer carry the hydrate class `{viewId}-{id}`. That class exists to claim server-rendered DOM; nothing claims client-created elements, and one unique class per element was about a third of list creation time. Server-rendered elements keep it. Tooling that identifies compiler-owned elements by that class in client-rendered DOM (the SSR↔CSR parity gate does) must set `window.__SAOLA_CSR_HYDRATE_CLASS__ = true` before the app boots (`Html.csrHydrateClass`).
+- Element registry keys live on the element instead of two `WeakMap`s; `Html` no longer allocates tracking `Set`s per element (stale attrs / classes / styles / props are derived from the previous config on update); static text allocates no closure or key array.
+- Event listeners are no longer bound to an `AbortSignal`; a view removes its listeners explicitly on destroy. `elementEventHandlers` values are now `EventInvoker` records.
+- `bench/profile.mjs` prints self time per function; `BENCH_ONLY=saola` runs one side of `bench/run.mjs`.
+
+Benchmark (1,000-row table, Chrome, script ms, before → after; React 18.3 / Vue 3.5 for reference): create 18.8 → 9.9 (4.8 / 3.3), swap two rows after a selection 9.1 → 1.3 (4.8 / 1.1), replace 2,000 rows 69.5 → 36.0 (22.1 / 11.1), clear 2,000 rows 13.9 → 9.4 (7.6 / 3.7).
+
+Pairs with `saola/compiler` 3.7.0. Built `dist` is included in this release.
+
+Validation: 682 client tests (100 test files), TypeScript build; gehihi-app browser pass over 46 web and admin pages (direct load and SPA navigation) identical to 1.8.0.
+
 # Saola Client v1.8.0
 
 `__foreach` honours the compiler's memo mode (`1` / `2`): a row whose item is

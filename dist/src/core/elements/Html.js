@@ -53,6 +53,31 @@ function domTagName(el) {
 const VOID_TAGS = new Set(['input', 'img', 'br', 'hr', 'meta', 'link']);
 /** `dataCount` → `data-count`; kết quả nhớ lại vì mỗi tên được hỏi hàng nghìn lần. */
 const ATTR_NAME_CACHE = new Map();
+/** Chỉ để thoả HtmlInterface — không ai ghi vào. */
+const NO_NODES = Object.freeze([]);
+const NO_CHILDREN = Object.freeze([]);
+/** Tên DOM mà một bucket config quản lý — chỉ dựng khi updateConfig cần so. */
+function configKeys(bucket, normalize) {
+    let names = null;
+    if (bucket)
+        for (const key in bucket)
+            (names ?? (names = new Set())).add(normalize ? normalize(key) : key);
+    return names;
+}
+function configClassNames(classes, dynamic) {
+    let names = dynamic ? new Set(dynamic) : null;
+    if (Array.isArray(classes)) {
+        for (const item of classes) {
+            if (item && item.type !== 'dynamic' && item.value)
+                (names ?? (names = new Set())).add(item.value);
+        }
+    }
+    else if (classes) {
+        for (const key in classes)
+            (names ?? (names = new Set())).add(key);
+    }
+    return names;
+}
 function hasOwnKeys(value) {
     if (value)
         for (const _ in value)
@@ -62,8 +87,8 @@ function hasOwnKeys(value) {
 export class Html {
     constructor({ ctx, id = null, parentElement = null, tagName = 'div', element = null, config = {}, childrenFactory = null, initMode = InitModes.CREATE, }) {
         this.saoType = 'Html';
-        this.children = [];
-        this.domChildren = []; // For compatibility with HtmlInterface; Html itself doesn't have a single root element
+        this.children = NO_CHILDREN;
+        this.domChildren = NO_NODES; // For compatibility with HtmlInterface; Html itself doesn't have a single root element
         this.childrenFactory = null;
         /**
          * Chỉ `@bind` cần signal. Tạo sẵn cho MỌI element (và tạo lại ở mỗi
@@ -73,20 +98,21 @@ export class Html {
         /** Config NGUYÊN BẢN compiler truyền vào — so identity để bỏ qua cập nhật thừa. */
         this.sourceConfig = null;
         this.isVoidTag = false;
-        /** Class hydrate chờ ghi cùng class tĩnh (chỉ element vừa tạo). */
+        /** Khác null = element vừa tạo ở client, class tĩnh chờ ghi một lần. */
         this.pendingClass = null;
         this.isOptionTag = false;
         this.isTextareaTag = false;
         /** All state subscriptions for reactive bindings — cleanup on destroy */
-        this.bindingUnsubscribes = [];
+        this.bindingUnsubscribes = null;
         /** Invalidates deferred/stale binding callbacks after a config reconciliation. */
         this.bindingGeneration = 0;
         this.contentUnsubscribe = null;
-        /** DOM state owned by this Html config, used for exact cleanup before reuse. */
-        this.managedAttributeNames = null;
-        this.managedClassNames = null;
-        this.managedStyleNames = null;
-        this.managedPropertyNames = null;
+        /**
+         * Tên class do binding `dynamic` gắn lúc chạy — thứ duy nhất không suy ra
+         * được từ config. Attr/class/style/prop còn lại đọc thẳng từ config khi
+         * updateConfig cần gỡ phần thừa, nên element vừa tạo không tốn Set nào.
+         */
+        this.dynamicClassNames = null;
         /** Events actually registered through ViewController, independent of current config. */
         this.registeredEventNames = null;
         this.initMode = InitModes.CREATE;
@@ -169,10 +195,13 @@ export class Html {
         }
         else {
             // ── CSR (create mode): tạo element mới ───────────────────────────────
-            // Class hydrate được ghi chung MỘT lần với class tĩnh trong
-            // initializeClasses() thay vì mỗi tên một lệnh classList.add.
+            // KHÔNG gắn class hydrate: nó chỉ để claim DOM do server render, mà
+            // element tạo ở client không ai claim. Mỗi element một tên class
+            // duy nhất từng là ~1/3 thời gian tạo một danh sách dài. Hệ quả:
+            // DOM của CSR khác SSR đúng ở class `{viewId}-{id}` này.
+            // Class tĩnh vẫn ghi MỘT lần trong initializeClasses().
             this.element = createDomElement(this.tagName, parentElement);
-            this.pendingClass = hydrateClass;
+            this.pendingClass = Html.csrHydrateClass && hydrateClass ? hydrateClass : '';
         }
         const lowerTag = this.tagName.toLowerCase();
         this.isVoidTag = VOID_TAGS.has(lowerTag);
@@ -223,11 +252,10 @@ export class Html {
         // initialize() ghi lại chính xác những gì config mới quản lý; phần còn
         // sót trong tập cũ là thứ phải gỡ. Làm theo thứ tự này thì không cần
         // dựng riêng một bộ Set "config mới có gì" chỉ để so.
-        const attrs = this.managedAttributeNames, classes = this.managedClassNames;
-        const styles = this.managedStyleNames, props = this.managedPropertyNames;
-        this.managedAttributeNames = this.managedClassNames = this.managedStyleNames = this.managedPropertyNames = null;
+        const oldDynamic = this.dynamicClassNames;
+        this.dynamicClassNames = null;
         this.initialize();
-        this.removeStaleDomState(attrs, classes, styles, props);
+        this.removeStaleDomState(old, oldDynamic);
     }
     initialize() {
         this.initializeAttributes();
@@ -246,7 +274,7 @@ export class Html {
             this.abortController.abort();
             this.abortController = null;
         }
-        if (this.bindingUnsubscribes.length === 0)
+        if (!this.bindingUnsubscribes)
             return;
         for (const unsubscribe of this.bindingUnsubscribes) {
             try {
@@ -256,31 +284,37 @@ export class Html {
                 console.error('[Html] Failed to unsubscribe a reactive binding:', error);
             }
         }
-        this.bindingUnsubscribes = [];
+        this.bindingUnsubscribes = null;
     }
     /** Gỡ khỏi DOM những gì config CŨ quản lý mà config mới không còn nhắc tới. */
-    removeStaleDomState(attrs, classes, styles, props) {
-        if (attrs)
-            for (const name of attrs) {
-                if (!this.managedAttributeNames?.has(name))
+    removeStaleDomState(old, oldDynamic) {
+        const now = this.config;
+        const normalize = (name) => this.normalizeAttrName(name);
+        const attrs = configKeys(old.attrs, normalize);
+        if (attrs) {
+            const kept = configKeys(now.attrs, normalize);
+            for (const name of attrs)
+                if (!kept?.has(name))
                     this.element.removeAttribute(name);
-            }
-        if (classes)
-            for (const name of classes) {
-                if (!this.managedClassNames?.has(name))
+        }
+        const classes = configClassNames(old.classes, oldDynamic);
+        if (classes) {
+            const kept = configClassNames(now.classes, this.dynamicClassNames);
+            for (const name of classes)
+                if (!kept?.has(name))
                     this.removeClass(name);
-            }
-        if (styles)
-            for (const name of styles) {
-                if (!this.managedStyleNames?.has(name))
+        }
+        if (old.styles)
+            for (const name in old.styles) {
+                if (!now.styles || !(name in now.styles))
                     this.element.style.removeProperty(name);
             }
-        if (!props)
+        if (!old.props)
             return;
         let defaults = null;
         const target = this.element;
-        for (const propName of props) {
-            if (this.managedPropertyNames?.has(propName))
+        for (const propName in old.props) {
+            if (now.props && propName in now.props)
                 continue;
             defaults ?? (defaults = createDomElement(this.tagName, this.parent));
             try {
@@ -416,7 +450,7 @@ export class Html {
                 commitInput();
             }, { signal });
         }
-        this.bindingUnsubscribes.push(manager.subscribe([stateKey], () => applyState(manager.getStateByKey(stateKey))));
+        (this.bindingUnsubscribes ?? (this.bindingUnsubscribes = [])).push(manager.subscribe([stateKey], () => applyState(manager.getStateByKey(stateKey))));
     }
     initializeAttributes() {
         const attrs = this.config.attrs;
@@ -434,7 +468,6 @@ export class Html {
         // props độc lập với attrs/bind — element chỉ có props vẫn phải chạy
         if (this.config.props) {
             for (const [propName, propConfig] of Object.entries(this.config.props)) {
-                (this.managedPropertyNames ?? (this.managedPropertyNames = new Set())).add(propName);
                 if (propConfig.type === 'static' || propConfig.type === 'value') {
                     if (this.element[propName] !== propConfig.value)
                         this.element[propName] = propConfig.value;
@@ -465,7 +498,7 @@ export class Html {
                                 delete this.element[propName];
                             }
                         });
-                        this.bindingUnsubscribes.push(unsubscribe);
+                        (this.bindingUnsubscribes ?? (this.bindingUnsubscribes = [])).push(unsubscribe);
                     }
                 }
             }
@@ -479,7 +512,6 @@ export class Html {
     _applyAttr(attrName, attrConfig) {
         // FIX(Phase4): chuẩn hóa tên — dataCount → data-count
         const normalizedName = this.normalizeAttrName(attrName);
-        (this.managedAttributeNames ?? (this.managedAttributeNames = new Set())).add(normalizedName);
         // FIX(baseline#1): contract chuẩn là 'static' (compiler emit); 'value' giữ làm legacy alias
         if (attrConfig.type === 'static' || attrConfig.type === 'value') {
             if (attrConfig.value !== undefined && attrConfig.value !== null && attrConfig.value !== false) {
@@ -506,7 +538,7 @@ export class Html {
             if (attrConfig.stateKeys?.length) {
                 const unsubscribe = this.ctx.states.__.subscribe(attrConfig.stateKeys, () => { if (this.isBindingCurrent(generation))
                     applyValue(); });
-                this.bindingUnsubscribes.push(unsubscribe);
+                (this.bindingUnsubscribes ?? (this.bindingUnsubscribes = [])).push(unsubscribe);
             }
             // `@yield(name, ...)` — no static stateKeys (the section it resolves to is
             // only known at runtime); subscribe to SectionManager by name instead, fires
@@ -514,7 +546,7 @@ export class Html {
             if (attrConfig.yieldName) {
                 const unsubscribe = SectionManager.subscribe(attrConfig.yieldName, () => { if (this.isBindingCurrent(generation))
                     applyValue(); });
-                this.bindingUnsubscribes.push(unsubscribe);
+                (this.bindingUnsubscribes ?? (this.bindingUnsubscribes = [])).push(unsubscribe);
             }
         }
     }
@@ -527,13 +559,15 @@ export class Html {
             if (Array.isArray(list)) {
                 for (const item of list)
                     if (item && item.type === 'static' && item.value)
-                        value += ' ' + item.value;
+                        value = value ? value + ' ' + item.value : item.value;
             }
             // `class` có thể đã được ghi qua attrs — khi đó nối thêm, không đè.
-            if (this.element.hasAttribute('class'))
-                this.addClass(value);
-            else
-                this.element.setAttribute('class', value);
+            if (value) {
+                if (this.element.hasAttribute('class'))
+                    this.addClass(value);
+                else
+                    this.element.setAttribute('class', value);
+            }
         }
         if (!this.config.classes)
             return;
@@ -555,12 +589,12 @@ export class Html {
                         for (const prev of applied) {
                             if (next.indexOf(prev) === -1) {
                                 this.removeClass(prev);
-                                this.managedClassNames?.delete(prev);
+                                this.dynamicClassNames?.delete(prev);
                             }
                         }
                         for (const name of next) {
                             this.addClass(name);
-                            (this.managedClassNames ?? (this.managedClassNames = new Set())).add(name);
+                            (this.dynamicClassNames ?? (this.dynamicClassNames = new Set())).add(name);
                         }
                         applied = next;
                     };
@@ -568,14 +602,13 @@ export class Html {
                     if (classConfig.stateKeys?.length) {
                         const unsubscribe = this.ctx.states.__.subscribe(classConfig.stateKeys, () => { if (this.isBindingCurrent(generation))
                             applyDynamic(); });
-                        this.bindingUnsubscribes.push(unsubscribe);
+                        (this.bindingUnsubscribes ?? (this.bindingUnsubscribes = [])).push(unsubscribe);
                     }
                     continue;
                 }
                 if (!classConfig.value)
                     continue;
                 const className = classConfig.value;
-                (this.managedClassNames ?? (this.managedClassNames = new Set())).add(className);
                 if (classConfig.type === 'static') {
                     // Vừa ghi cùng class hydrate ở trên → DOM đã có.
                     if (pending === null)
@@ -593,14 +626,13 @@ export class Html {
                             const newValue = classConfig.factory ? classConfig.factory() : false;
                             this.toggleClass(className, !!newValue);
                         });
-                        this.bindingUnsubscribes.push(unsubscribe);
+                        (this.bindingUnsubscribes ?? (this.bindingUnsubscribes = [])).push(unsubscribe);
                     }
                 }
             }
             return;
         }
         for (const [className, classConfig] of Object.entries(this.config.classes)) {
-            (this.managedClassNames ?? (this.managedClassNames = new Set())).add(className);
             if (classConfig.type === 'static') {
                 if (classConfig.value) {
                     this.addClass(className);
@@ -619,7 +651,7 @@ export class Html {
                         const newValue = classConfig.factory ? classConfig.factory() : false;
                         this.toggleClass(className, !!newValue);
                     });
-                    this.bindingUnsubscribes.push(unsubscribe);
+                    (this.bindingUnsubscribes ?? (this.bindingUnsubscribes = [])).push(unsubscribe);
                 }
             }
         }
@@ -674,7 +706,6 @@ export class Html {
         if (!this.config.styles)
             return;
         for (const [prop, styleConfig] of Object.entries(this.config.styles)) {
-            (this.managedStyleNames ?? (this.managedStyleNames = new Set())).add(prop);
             if (styleConfig.type === 'static' || styleConfig.type === 'value') {
                 this.applyStyle(prop, styleConfig.value ?? '');
             }
@@ -691,7 +722,7 @@ export class Html {
                         const newValue = styleConfig.factory ? styleConfig.factory() : '';
                         this.applyStyle(prop, newValue);
                     });
-                    this.bindingUnsubscribes.push(unsubscribe);
+                    (this.bindingUnsubscribes ?? (this.bindingUnsubscribes = [])).push(unsubscribe);
                 }
             }
         }
@@ -747,7 +778,7 @@ export class Html {
             if (child === null || child === undefined)
                 continue;
             children.push(typeof child === 'string' || typeof child === 'number'
-                ? new TextElement({ ctx: this.ctx, parent: this.parent, stateKeys: [], generateText: () => String(child) })
+                ? new TextElement({ ctx: this.ctx, parent: this.parent, text: String(child) })
                 : child);
         }
         this.children = children;
@@ -977,7 +1008,7 @@ export class Html {
     /** Destroy children + dọn nội dung. Tách riêng để leave hoãn được. */
     teardownSubtree() {
         const children = this.children;
-        this.children = [];
+        this.children = NO_CHILDREN;
         for (let i = 0; i < children.length; i++)
             children[i].destroy?.();
         if (this.element.firstElementChild && !isDiscarded(this.element)) {
@@ -997,4 +1028,12 @@ export class Html {
         // No-op setter to satisfy the Interface; this property is always true for Html elements
     }
 }
+/**
+ * CHỈ cho kiểm thử: bật thì element tạo ở client cũng mang class hydrate
+ * `{viewId}-{id}` như DOM của server. Cổng parity SSR↔CSR dựa vào class
+ * đó để biết element nào do compiler sinh; production để tắt (mỗi element
+ * một tên class duy nhất là ~1/3 thời gian tạo một danh sách dài).
+ * Bật trước khi app khởi động: `window.__SAOLA_CSR_HYDRATE_CLASS__ = true`.
+ */
+Html.csrHydrateClass = !!globalThis.__SAOLA_CSR_HYDRATE_CLASS__;
 //# sourceMappingURL=Html.js.map

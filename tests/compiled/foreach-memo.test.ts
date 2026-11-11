@@ -56,11 +56,33 @@ it('set lại đúng mảng cũ (tuyên bố đã mutate) → mọi dòng chạy
     expect(rerun(() => view().replace(rows))).toBe(3);
 });
 
-it('state khác của view đổi → lượt danh sách kế tiếp chạy lại hết, lượt sau nữa thì không', () => {
+it('state chỉ nằm trong binding tự cập nhật đổi → binding tự chạy, không dòng nào chạy lại', () => {
     const rows = view().current();
     view().select(2); flush();
     expect(h.container.querySelector('li.on')?.getAttribute('data-id')).toBe('2');
-    expect(rerun(() => view().replace(rows.slice()))).toBe(3);
+    expect(rerun(() => view().replace(rows.slice()))).toBe(0);
+    view().select(3); flush();
+    expect(h.container.querySelector('li.on')?.getAttribute('data-id')).toBe('3');
+});
+
+it('state bị CHỤP trong tham số event đổi → lượt danh sách kế tiếp chạy lại hết; state không liên quan thì không', async () => {
+    h.destroy();
+    const mod = await import(/* @vite-ignore */ path.join(__dirname, '../fixtures/compiled/.generated/js/memo-captured.js'));
+    h = mount(mod.default);
+    flush();
+    html.mockRestore();
+    html = vi.spyOn(h.ctrl as any, 'html');
+    const rows = view().current();
+    view().replace(rows.slice()); flush();
+
+    view().touch(); flush();                                   // `other` không có mặt trong thân vòng lặp
+    expect(rerun(() => view().replace(rows.slice()))).toBe(0);
+
+    view().select(7); flush();                                 // `selected` nằm trong tham số của @click
+    expect(rerun(() => view().replace(rows.slice()))).toBe(2);
+    (h.container.querySelector('li[data-id="1"]') as HTMLElement).click(); flush();
+    expect(view().lastPick()).toEqual([1, 7]);                 // handler thấy giá trị MỚI
+    // `picked` đổi nhưng thân không đọc → lượt sau không chạy lại.
     expect(rerun(() => view().replace(rows.slice()))).toBe(0);
 });
 

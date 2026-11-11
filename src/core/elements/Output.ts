@@ -22,6 +22,8 @@ function sameKeys(a: readonly string[], b: readonly string[]): boolean {
     return true;
 }
 
+const NO_NODES = Object.freeze([]) as unknown as Node[];
+
 export class Output implements OutputInterface {
     saoType: SaoObjectType = 'Output';
     ctx: ViewControllerInterface;
@@ -31,7 +33,7 @@ export class Output implements OutputInterface {
     stateKeys: string[];
     contentFactory: () => string;
     isEscapeHTML: boolean;
-    domChildren: Node[] = []; // For compatibility with HtmlInterface; Output itself doesn't have a single root element
+    domChildren: Node[] = NO_NODES; // For compatibility with HtmlInterface; Output itself doesn't have a single root element
     private textNode: Text | null = null;
     private unsubscribe: (() => void) | null = null;
     private _isStarted = false;
@@ -132,7 +134,7 @@ export class Output implements OutputInterface {
     }
 
     /** Nodes của raw HTML mode ({!! !!}) — track để clear khi update */
-    private rawNodes: Node[] = [];
+    private rawNodes: Node[] = NO_NODES;
 
     /**
      * Render — idempotent + position-aware (RUNTIME_CONTRACT.md §2):
@@ -186,7 +188,7 @@ export class Output implements OutputInterface {
             current = next;
         }
         this.textNode = null;
-        this.rawNodes = [];
+        this.rawNodes = NO_NODES;
     }
 
     private insertBeforeClose(node: Node): void {
@@ -286,7 +288,7 @@ export class Output implements OutputInterface {
             this.closeTag.remove();
         }
         this.textNode = null;
-        this.rawNodes = [];
+        this.rawNodes = NO_NODES;
 
         this.parent = null;
     }

@@ -2,7 +2,7 @@ import type { BlockInterface, BlockOutletInterface, BlockRenderFactory } from ".
 import type { FragmentInterface, HtmlInterface, SaoChildrenFactory, SaoChildrenFactoryOutput, SaoChildrenSlotContent, SaoElementEventHandler, SaoNodeInterface, OutputInterface, TextInterface, WrapperInterface, YieldInterface, EventModifier } from "../contracts/ElementInterface.js";
 import type { LoopContextInterface } from "../contracts/LoopContextInterface.js";
 import type { ReactiveChildrenFactory, ReactiveInterface } from "../contracts/ReactiveInterface.js";
-import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo } from "../contracts/ViewControllerInterface.js";
+import type { ViewControllerInterface, ViewType, ViewConfig, ViewRuntimeConfig, ViewControllerConfig, ErrorInfo, EventInvoker } from "../contracts/ViewControllerInterface.js";
 import type { ViewInterface, ViewRenderFactory } from "../contracts/ViewInterface.js";
 import type { SaoObjectType } from "../types/utils.js";
 import { ViewState } from "./ViewState.js";
@@ -101,9 +101,8 @@ export declare class ViewController implements ViewControllerInterface {
     private pendingReactiveUpdates;
     private hasScheduledUpdate;
     /** Centralized AbortController for all event listeners */
-    private eventAbortController;
     /** Exact listener references for cleanup when an individual Html node dies. */
-    elementEventHandlers: Map<HTMLElement, Map<string, EventListener[]>>;
+    elementEventHandlers: Map<HTMLElement, Map<string, EventInvoker>>;
     /** Current loop context stack (@foreach, @for, @while) */
     loopContext: LoopContext | null;
     /**
@@ -122,7 +121,6 @@ export declare class ViewController implements ViewControllerInterface {
     static foreachMemo: boolean;
     _foreachSkipRegistry: boolean;
     private foreachRegistry;
-    private elementRegistries;
     private inlineForeachCaches;
     /** Deferred child factories retain the row scope in which they were created. */
     private scopeFactory;
@@ -132,8 +130,6 @@ export declare class ViewController implements ViewControllerInterface {
     /** Block slots in layout views */
     blocks: Map<string, BlockInterface>;
     elements: Map<string, ElementChild>;
-    /** element → key của nó trong `elements` (xem registerElement/releaseElement) */
-    private elementKeys;
     preloadElement: WrapperInterface | null;
     mainElement: WrapperInterface | null;
     /** Wrapper instance RIÊNG cho render/prerender — dùng chung sẽ làm
@@ -330,8 +326,6 @@ export declare class ViewController implements ViewControllerInterface {
      * `once` KHÔNG xử lý ở đây — nó là option của addEventListener.
      */
     private wrapEventModifiers;
-    /** Trạng thái sống của một listener gốc — xem addEventListener. */
-    private eventInvokers;
     /** Chạy danh sách handler compiler khai báo cho MỘT event. */
     private invokeEventHandlers;
     addEventListener(element: HTMLElement, event: string, handlers: SaoElementEventHandler, modifiers?: EventModifier[]): void;
@@ -475,7 +469,7 @@ export declare class ViewController implements ViewControllerInterface {
      *   - string — SSR data hoặc default '' → render text tĩnh (rỗng → []).
      */
     __children(content: SaoChildrenSlotContent, parentElement: HtmlInterface | null): SaoChildrenFactoryOutput;
-    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContextInterface, identity: number) => any, keyFn?: (item: T, index: number) => any, reconcile?: boolean, scopeId?: string, memo?: 0 | 1 | 2): any[];
+    __foreach<T>(list: T[] | Record<string, T>, callback: (item: T, key: string, index: number, loop: LoopContextInterface, identity: number) => any, keyFn?: (item: T, index: number) => any, reconcile?: boolean, scopeId?: string, memo?: 0 | 1 | 2, memoDeps?: readonly string[]): any[];
     __forelse<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any, emptyCallback?: () => any): any[];
     __each<T>(list: T[], callback: (item: T, key: string, index: number, loop: LoopContextInterface) => any): any[];
     /**
