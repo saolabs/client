@@ -1,3 +1,9 @@
+# Saola Client v1.10.1
+
+No runtime change; the published code is the same as 1.10.0. This release brings the package in line with `main`: the compiled-views test now follows the compiler's contract that `{{ fn() }}` in a template is a helper call (`App.Helper.fn`), even when the script declares a method of the same name.
+
+Validation: 706/706 client tests (102 test files).
+
 # Saola Client v1.10.0
 
 `@foreach` list creation is now on par with React 18 on the 1,000-row benchmark.
