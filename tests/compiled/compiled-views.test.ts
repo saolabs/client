@@ -92,35 +92,31 @@ describe('compiled-views: events (F1 — property access trong @click, F2 — ar
     });
 });
 
-describe('compiled-views: methods (F3 — gọi method component trong {{ }})', () => {
-    it('{{ label() }} gọi ĐÚNG method của component, KHÔNG rơi vào App.Helper', async () => {
+describe('compiled-views: lời gọi hàm trong {{ }} đi qua App.Helper', () => {
+    // Hợp đồng compiler (saola/compiler 902d17e, khoá ở SaolaCompilerTest::
+    // test_method_script_dung_trong_render_van_can_helper): `{{ fn() }}` luôn là
+    // helper đồng bộ SSR/CSR — Blade gọi `fn()` bằng PHP, nên method trong
+    // <script setup> không thể phục vụ phía server. Kế hoạch F3 cũ
+    // (docs/FIX_PLAN_2026-08-14.md, `this.view.label()`) đã bị thay bằng hợp đồng này.
+    it('{{ label() }} gọi App.Helper.label, method cùng tên trong script không chen vào', async () => {
         if (skipIfMissing('methods')) return;
         const Methods = await loadFixture('methods');
-        // Trước khi F3 được vá: mount() ném ngay (App.Helper.label is not a
-        // function) vì compiler emit `App.Helper.label()` cho một method định
-        // nghĩa trong <script setup>. Bài test PHẢI throw rõ ràng ở đây thay vì
-        // nuốt lỗi, để đỏ đúng nghĩa khi bug còn sống.
-        harness = mount(Methods, {});
-        const label = () => harness!.container.querySelector('#label')!.textContent;
-        const counted = () => harness!.container.querySelector('#counted')!.textContent;
+        const helper = (app('App') as any).Helper;
+        helper.label = () => 'from-helper';
+        try {
+            harness = mount(Methods, {});
+            const text = (id: string) => harness!.container.querySelector(id)!.textContent;
 
-        expect(label()).toBe('n=0');
-        // App.Helper.count(...) là helper THẬT (PHP count()) — vẫn phải hoạt động
-        // song song với method component, không được prefix nhầm chiều ngược lại.
-        expect(counted()).toBe('3');
+            expect(text('#label')).toBe('from-helper');
+            // count(...) là helper thật có sẵn ở cả hai phía.
+            expect(text('#counted')).toBe('3');
 
-        (harness.container.querySelector('#inc') as HTMLElement).click();
-        await nextFrame();
-        expect(harness.container.querySelector('#raw')!.textContent).toBe('1');
-        // `{{ label() }}` KHÔNG re-render theo click — giới hạn ĐÃ BIẾT, NGOÀI
-        // phạm vi F3 (xem docs/FIX_PLAN_2026-08-14.md §F3 "Giới hạn còn lại"
-        // và GAPS_AND_ROADMAP.md mục D1): stateKeys của output này rỗng vì
-        // compiler chỉ quét định danh NGAY TRONG biểu thức `{{ }}` — ở đây chỉ
-        // có `label`, không có `n` — không nhìn vào THÂN method để tìm state
-        // nó đọc. F3 chỉ đảm bảo lời gọi RESOLVE ĐÚNG (this.view.label(),
-        // không rơi vào App.Helper) và trả giá trị đúng tại thời điểm render;
-        // nó không thêm reactivity mà compiler chưa từng theo dõi được.
-        expect(label()).toBe('n=0');
+            (harness.container.querySelector('#inc') as HTMLElement).click();
+            await nextFrame();
+            expect(text('#raw')).toBe('1');
+        } finally {
+            delete helper.label;
+        }
     });
 });
 
