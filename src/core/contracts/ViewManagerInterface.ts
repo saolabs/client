@@ -27,13 +27,14 @@ export interface ViewManagerInterface {
     /** Static middleware aliases for a routed view, available before factory execution. */
     getViewMiddleware?(name: string): readonly string[];
     /** Initialize with optional config */
-    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; systemData?: Record<string, any>; revision?: string; contextViews?: string; dataEndpoint?: string; fetchOptions?: Record<string, any> }): void;
+    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; systemData?: Record<string, any>; sharedData?: Record<string, any>; revision?: string; contextViews?: string; dataEndpoint?: string; fetchOptions?: Record<string, any> }): void;
     /** Apply a newer server-authoritative view context. Returns true when changed. */
     applyViewContext?(state: Record<string, any>): boolean;
     /** A changed view namespace needs a full document load before it can be applied safely. */
     requiresReloadForViewContext?(state: Record<string, any>): boolean;
     /** Current server view-context fingerprint. */
     getContextRevision?(): string | null;
+    getSite?(): Readonly<Record<string, any>>;
     /** Mount a view by name — main entry point */
     mountView(name: string, data?: Record<string, any>, route?: any, navigationType?: RouterNavigationType ): any;
     /**

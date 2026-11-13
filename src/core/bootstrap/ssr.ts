@@ -80,6 +80,9 @@ export function readBootConfig(): Record<string, any> | null {
     if (cfg.view?.systemData && typeof cfg.view.systemData === 'object') {
         view.systemData = cfg.view.systemData;
     }
+    if (cfg.view?.sharedData && typeof cfg.view.sharedData === 'object') {
+        view.sharedData = cfg.view.sharedData;
+    }
     if (typeof cfg.view?.revision === 'string') {
         view.revision = cfg.view.revision;
     }

@@ -141,6 +141,8 @@ export class HttpService {
                 if (typeof revision === 'string' && !headers['X-Saola-View-Revision']) {
                     headers['X-Saola-View-Revision'] = revision;
                     headers['X-Sao-Response'] ??= 'json';
+                    // Phong bì mới: body chỉ {data, view?, auth?}, revision đi bằng header.
+                    headers['X-Saola-Client'] ??= '2';
                 }
             }
             controller.signal.throwIfAborted();
@@ -203,9 +205,19 @@ export class HttpService {
             if (viewContext?.changed === true
                 && (!currentContext || viewContext.context === currentContext)
                 && typeof window !== 'undefined') {
+                // Server cũ: trạng thái nằm ngay trong body.
                 window.dispatchEvent(new CustomEvent('saola:view-context', {
                     detail: viewContext,
                 }));
+            } else if (typeof window !== 'undefined' && urlObj.origin === window.location.origin
+                && raw.headers?.get?.('X-Saola-Envelope') === '1') {
+                const serverRevision = raw.headers.get('X-Saola-View-Revision');
+                const heldRevision = (window as any).APP_CONFIGS?.view?.revision;
+                if (serverRevision && typeof heldRevision === 'string' && serverRevision !== heldRevision && currentContext) {
+                    void HttpService.syncViewContext(currentContext, serverRevision);
+                }
+                const language = raw.headers.get('X-Saola-Language-Revision');
+                if (language) void HttpService.syncLanguage(language);
             }
 
             let response: HttpResponse<T> = {
@@ -258,6 +270,73 @@ export class HttpService {
                 if (group?.size === 0) this.pending.delete(requestKey);
             }
         }
+    }
+
+    // ─── View context & language sync ───────────────────────────
+
+    private static contextSyncs = new Map<string, Promise<void>>();
+    private static languageSyncs = new Map<string, Promise<void>>();
+
+    /**
+     * Revision ở header lệch bản đang giữ ⇒ tải trạng thái view context (routes,
+     * systemData có `__site`, sharedData) MỘT lần cho mỗi revision, rồi phát
+     * `saola:view-context` như trước — Router lo phần áp dụng/reload.
+     */
+    static syncViewContext(context: string, revision: string): Promise<void> {
+        const key = context + '@' + revision;
+        let pending = HttpService.contextSyncs.get(key);
+        if (pending) return pending;
+        pending = (async () => {
+            const base = (window as any).APP_CONFIGS?.view?.contextEndpoint ?? '/_saola/context/';
+            const response = await fetch(base + encodeURIComponent(context) + '?r=' + encodeURIComponent(revision), {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
+            if (!response.ok) throw new Error(`View context ${context}: HTTP ${response.status}`);
+            const state = await response.json();
+            if (state?.context !== context || (window as any).APP_CONFIGS?.view?.revision === state.revision) return;
+            window.dispatchEvent(new CustomEvent('saola:view-context', { detail: { ...state, changed: true } }));
+        })().catch(error => {
+            // Lần sau gặp lại revision này thì thử lại.
+            HttpService.contextSyncs.delete(key);
+            console.warn('[Http] Không đồng bộ được view context:', error);
+        });
+        HttpService.contextSyncs.set(key, pending);
+        return pending;
+    }
+
+    /**
+     * `X-Saola-Language-Revision: scope;vi=7` — catalog đang giữ đã cũ. Tải bản mới
+     * qua mẫu URL từ điển (`APP_CONFIGS.i18n.dictionary`); không có mẫu thì chỉ
+     * phát `saola:language-stale` để ứng dụng tự xử lý.
+     */
+    static syncLanguage(header: string): Promise<void> {
+        let pending = HttpService.languageSyncs.get(header);
+        if (pending) return pending;
+        pending = (async () => {
+            const [scope, ...parts] = header.split(';');
+            const locales = parts.map(part => part.split('=')[0]).filter(Boolean);
+            const helper: any = app.has('Helper') ? app('Helper') : null;
+            const pattern = (window as any).APP_CONFIGS?.i18n?.dictionary;
+            if (!helper || helper.getLanguageScope?.() !== scope || typeof pattern !== 'string' || !pattern.includes('_locale_')) {
+                window.dispatchEvent(new CustomEvent('saola:language-stale', { detail: { scope, locales } }));
+                return;
+            }
+            for (const locale of locales) {
+                await helper.loadLanguage(locale, async (code: string) => {
+                    const url = new URL(pattern.replace('_locale_', encodeURIComponent(code)), window.location.origin);
+                    if (url.origin !== window.location.origin) throw new Error('Language dictionary must use the current origin.');
+                    const response = await fetch(url.pathname + url.search, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+                    if (!response.ok) throw new Error(`Language ${code}: HTTP ${response.status}`);
+                    return response.json();
+                });
+            }
+        })().catch(error => {
+            HttpService.languageSyncs.delete(header);
+            console.warn('[Http] Không tải được từ điển:', error);
+        });
+        HttpService.languageSyncs.set(header, pending);
+        return pending;
     }
 
     // ─── Convenience ────────────────────────────────────────────

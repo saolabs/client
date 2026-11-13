@@ -40,6 +40,27 @@ describe('dynamic view-context route updates', () => {
         expect(vm.applyViewContext({ revision: 'rev-new' })).toBe(false);
     });
 
+    it('ViewManager puts shared data under each view\'s own data and replaces it with the context', () => {
+        const vm = new ViewManager({} as any);
+        const seen: Record<string, any>[] = [];
+        vm.init({
+            revision: 'rev-old',
+            contextViews: 'web',
+            sharedData: { site: { name: 'Old' }, legacy: true },
+            registry: { 'web.page': (data: Record<string, any>) => { seen.push(data); return {}; } },
+        });
+
+        vm.resolveViewSync('web.page', { title: 'A' }, false);
+        vm.resolveViewSync('web.page', { site: { name: 'Own' } }, false);
+        expect(seen[0]).toEqual({ site: { name: 'Old' }, legacy: true, title: 'A' });
+        expect(seen[1].site).toEqual({ name: 'Own' });
+
+        expect(vm.applyViewContext({ revision: 'rev-new', views: 'web', sharedData: { site: { name: 'New' } } })).toBe(true);
+        vm.resolveViewSync('web.page', {}, false);
+        expect(seen[2]).toEqual({ site: { name: 'New' } });
+        expect((window as any).APP_CONFIGS.view.sharedData).toEqual({ site: { name: 'New' } });
+    });
+
     it('ViewManager requires a document reload when the view namespace changes', () => {
         const vm = new ViewManager({} as any);
         vm.init({ revision: 'rev-old', contextViews: 'web' });

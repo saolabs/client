@@ -93,6 +93,12 @@ export class ViewManager implements ViewManagerInterface {
     private App: ApplicationInterface | null = null;
 
     private systemData: Record<string, any> = {}; // For internal use, not exposed to views
+    /**
+     * Data the server shares with every view of the context (ViewContextManager::share).
+     * It arrives once with the document and again only when the context revision changes,
+     * so page-data never has to repeat it.
+     */
+    private sharedData: Record<string, any> = {};
     private contextRevision: string | null = null;
     private contextViews: string | null = null;
 
@@ -269,7 +275,7 @@ export class ViewManager implements ViewManagerInterface {
     /**
      * Initialize the ViewManager.
      */
-    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; ssr?: SSRBootInfo | null; systemData?: Record<string, any>; ssrData?: Record<string, any>; revision?: string; contextViews?: string; dataEndpoint?: string; fetchOptions?: Record<string, any> }): void {
+    init(config?: { container?: HTMLElement | string; registry?: Record<string, any>; ssr?: SSRBootInfo | null; systemData?: Record<string, any>; sharedData?: Record<string, any>; ssrData?: Record<string, any>; revision?: string; contextViews?: string; dataEndpoint?: string; fetchOptions?: Record<string, any> }): void {
         if (typeof config?.dataEndpoint === 'string') this.dataEndpoint = config.dataEndpoint;
         if (config?.fetchOptions) this.fetchOptions = { ...config.fetchOptions };
         // SSR boot info (server-rendered): chứa view entry + viewId để route đầu
@@ -281,6 +287,9 @@ export class ViewManager implements ViewManagerInterface {
         // view factory ở view() để compiled view resolve superView/namespace.
         if (config?.systemData && typeof config.systemData === 'object') {
             this.systemData = { ...this.systemData, ...config.systemData };
+        }
+        if (config?.sharedData && typeof config.sharedData === 'object') {
+            this.sharedData = { ...config.sharedData };
         }
         if (typeof config?.revision === 'string') {
             this.contextRevision = config.revision;
@@ -454,7 +463,7 @@ export class ViewManager implements ViewManagerInterface {
             }
 
             const systemData = this.buildSystemData();
-            let view = factory(data ?? {}, systemData);
+            let view = factory(this.withSharedData(data), systemData);
 
             // Registry lazy → Promise<module>. Await, chuẩn hoá, cache factory đã
             // unwrap để lần navigate sau không phải await/unwrap lại.
@@ -467,7 +476,7 @@ export class ViewManager implements ViewManagerInterface {
                 // Cache theo `key` cho khớp chỗ đọc ở trên; theo `name` thì
                 // lần sau luôn trượt cache khi theme đang bật.
                 this.resolvedFactories.set(key, lazyFactory);
-                view = lazyFactory(data ?? {}, systemData);
+                view = lazyFactory(this.withSharedData(data), systemData);
             }
             return this.finalizeView(key, view, cache);
         }
@@ -495,7 +504,7 @@ export class ViewManager implements ViewManagerInterface {
                 return null;
             }
 
-            const view = factory(data ?? {}, this.buildSystemData());
+            const view = factory(this.withSharedData(data), this.buildSystemData());
             if (view && typeof view.then === 'function') {
                 logger.error(
                     `View "${name}" là lazy nhưng được dùng qua @include/@extends — render tree đồng bộ ` +
@@ -533,6 +542,22 @@ export class ViewManager implements ViewManagerInterface {
      * Trước đây bọc { data } → __data__.__SSR_VIEW_ID__ = undefined và ctrl.data
      * bị lồng (vỡ route-param). Xem docs/HYDRATION.md §9.2.
      */
+    /** Shared data sits underneath a view's own data, the way the server merges it before rendering. */
+    private withSharedData(data?: Record<string, any> | null): Record<string, any> {
+        if (data && Object.prototype.hasOwnProperty.call(data, '__site')) {
+            // Biến hệ thống chỉ đến từ systemData (server: ViewContextManager::RESERVED).
+            const { __site: _ignored, ...rest } = data;
+            data = rest;
+        }
+        for (const _ in this.sharedData) return { ...this.sharedData, ...data };
+        return data ?? {};
+    }
+
+    /** `__site`: nhóm thiết lập công khai của website, cùng bản mà mọi view nhận. */
+    getSite(): Readonly<Record<string, any>> {
+        return this.systemData.__site ?? {};
+    }
+
     private buildSystemData(): Record<string, any> {
         return { App: this.App, View: this, ...this.systemData };
     }
@@ -1604,6 +1629,10 @@ export class ViewManager implements ViewManagerInterface {
         if (state.systemData && typeof state.systemData === 'object') {
             this.systemData = { ...this.systemData, ...state.systemData };
         }
+        // Replaced, never merged: a key the server stopped sharing must disappear.
+        if (state.sharedData && typeof state.sharedData === 'object') {
+            this.sharedData = { ...state.sharedData };
+        }
 
         // Cached pages/layout factories belong to the previous namespace.
         this.pageCache.clear();
@@ -1616,6 +1645,7 @@ export class ViewManager implements ViewManagerInterface {
             appConfigs.view.revision = revision;
             appConfigs.view.contextViews = this.contextViews;
             appConfigs.view.systemData = { ...this.systemData };
+            appConfigs.view.sharedData = { ...this.sharedData };
         }
 
         return true;
@@ -1627,9 +1657,12 @@ export class ViewManager implements ViewManagerInterface {
 
     private extractAsyncData(response: any): Record<string, any> {
         const payload = response?.data ?? {};
+        // Server mới đánh dấu phong bì bằng header; server cũ nhận ra qua khoá body.
+        const envelope = response?.headers?.get?.('X-Saola-Envelope') === '1';
         if (payload && typeof payload === 'object'
             && Object.prototype.hasOwnProperty.call(payload, 'data')
-            && (Object.prototype.hasOwnProperty.call(payload, 'viewContext')
+            && (envelope
+                || Object.prototype.hasOwnProperty.call(payload, 'viewContext')
                 || Object.prototype.hasOwnProperty.call(payload, 'view'))) {
             if (payload.i18n) this.App?.Helper?.applyLanguageConfig?.(payload.i18n);
             return payload.data ?? {};

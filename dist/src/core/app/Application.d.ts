@@ -168,6 +168,13 @@ export declare class Application implements ApplicationInterface {
      * @example App.shared('permission', { routes: [] }).routes
      */
     shared<T = any>(key?: string, fallback?: T): T;
+    /**
+     * `__site` cho mã TS ngoài view (service, helper): các nhóm thiết lập công
+     * khai của website. Trong `.sao` đọc thẳng `__site`.
+     *
+     * @example App.site('branding').logo_url
+     */
+    site<T = any>(group?: string, fallback?: T): T;
     setMethod(name: string, method: Function, isOne?: boolean): void;
 }
 //# sourceMappingURL=Application.d.ts.map

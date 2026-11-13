@@ -99,6 +99,7 @@ export class Application implements ApplicationInterface {
         'getBindings',
         'getSingletons',
         'shared',
+        'site',
         '__store',
         'strictBundles',
     ]; // Để track dynamic properties nếu cần
@@ -430,6 +431,18 @@ export class Application implements ApplicationInterface {
         const all = (this.__store.get('SharedData')?.value ?? {}) as Record<string, any>;
         if (key === undefined) return all as T;
         return (Object.prototype.hasOwnProperty.call(all, key) ? all[key] : fallback) as T;
+    }
+
+    /**
+     * `__site` cho mã TS ngoài view (service, helper): các nhóm thiết lập công
+     * khai của website. Trong `.sao` đọc thẳng `__site`.
+     *
+     * @example App.site('branding').logo_url
+     */
+    site<T = any>(group?: string, fallback?: T): T {
+        const site = (this.View?.getSite?.() ?? {}) as Record<string, any>;
+        if (group === undefined) return site as T;
+        return (Object.prototype.hasOwnProperty.call(site, group) ? site[group] : fallback) as T;
     }
 
     setMethod(name: string, method: Function, isOne: boolean = false): void {

@@ -58,7 +58,9 @@ export interface MountOptions {
  * expect(c.text()).toContain('6');
  * c.destroy();
  */
-export declare function mount(factory: (data?: any, systemData?: any) => View, data?: Record<string, any>): Harness;
+export declare function mount(factory: (data?: any, systemData?: any) => View, data?: Record<string, any>, 
+/** Biến hệ thống như server gửi, vd. `{ __site: {...} }` hay `{ __layout__: '...' }`. */
+systemData?: Record<string, any>): Harness;
 /**
  * Mount từ render function viết tay — không cần compile.
  * `renderFn` chạy với `this` = ViewController, giống `config.render` compiler sinh.

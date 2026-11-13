@@ -30,6 +30,8 @@ export interface ApplicationInterface {
     get<T = any>(name: string): T;
     /** Dữ liệu package PHP chia sẻ (`APP_CONFIGS.shared`); không có khoá thì trả `fallback`. */
     shared<T = any>(key?: string, fallback?: T): T;
+    /** Nhóm thiết lập công khai của website (`__site`); không có nhóm thì trả `fallback`. */
+    site<T = any>(group?: string, fallback?: T): T;
     saoType?: SaoObjectType;
     isInitialized: boolean;
     isStarted: boolean;

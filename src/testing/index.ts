@@ -138,10 +138,12 @@ function buildHarness(view: View, container: HTMLElement): Harness {
 export function mount(
     factory: (data?: any, systemData?: any) => View,
     data: Record<string, any> = {},
+    /** Biến hệ thống như server gửi, vd. `{ __site: {...} }` hay `{ __layout__: '...' }`. */
+    systemData: Record<string, any> = {},
 ): Harness {
     ensureRegistry();
     const container = createContainer();
-    const view = factory(data, { App: app(), View: (app() as any).View });
+    const view = factory(data, { App: app(), View: (app() as any).View, ...systemData });
     return buildHarness(view, container);
 }
 
