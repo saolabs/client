@@ -102,10 +102,12 @@ function buildHarness(view, container) {
  * expect(c.text()).toContain('6');
  * c.destroy();
  */
-export function mount(factory, data = {}) {
+export function mount(factory, data = {}, 
+/** Biến hệ thống như server gửi, vd. `{ __site: {...} }` hay `{ __layout__: '...' }`. */
+systemData = {}) {
     ensureRegistry();
     const container = createContainer();
-    const view = factory(data, { App: app(), View: app().View });
+    const view = factory(data, { App: app(), View: app().View, ...systemData });
     return buildHarness(view, container);
 }
 /**

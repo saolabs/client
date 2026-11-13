@@ -26,6 +26,7 @@ export interface ViewManagerInterface {
         container?: HTMLElement | string;
         registry?: Record<string, any>;
         systemData?: Record<string, any>;
+        sharedData?: Record<string, any>;
         revision?: string;
         contextViews?: string;
         dataEndpoint?: string;
@@ -37,6 +38,7 @@ export interface ViewManagerInterface {
     requiresReloadForViewContext?(state: Record<string, any>): boolean;
     /** Current server view-context fingerprint. */
     getContextRevision?(): string | null;
+    getSite?(): Readonly<Record<string, any>>;
     /** Mount a view by name — main entry point */
     mountView(name: string, data?: Record<string, any>, route?: any, navigationType?: RouterNavigationType): any;
     /**

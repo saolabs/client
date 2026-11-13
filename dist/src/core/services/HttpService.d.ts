@@ -53,6 +53,20 @@ export declare class HttpService {
     /** Add interceptor. Returns unregister function. */
     addInterceptor(interceptor: HttpInterceptor): () => void;
     request<T = any>(method: string, url: string, data?: any, options?: HttpRequestConfig): Promise<HttpResponse<T>>;
+    private static contextSyncs;
+    private static languageSyncs;
+    /**
+     * Revision ở header lệch bản đang giữ ⇒ tải trạng thái view context (routes,
+     * systemData có `__site`, sharedData) MỘT lần cho mỗi revision, rồi phát
+     * `saola:view-context` như trước — Router lo phần áp dụng/reload.
+     */
+    static syncViewContext(context: string, revision: string): Promise<void>;
+    /**
+     * `X-Saola-Language-Revision: scope;vi=7` — catalog đang giữ đã cũ. Tải bản mới
+     * qua mẫu URL từ điển (`APP_CONFIGS.i18n.dictionary`); không có mẫu thì chỉ
+     * phát `saola:language-stale` để ứng dụng tự xử lý.
+     */
+    static syncLanguage(header: string): Promise<void>;
     get<T = any>(url: string, params?: any, options?: HttpRequestConfig): Promise<HttpResponse<T>>;
     post<T = any>(url: string, data?: any, options?: HttpRequestConfig): Promise<HttpResponse<T>>;
     put<T = any>(url: string, data?: any, options?: HttpRequestConfig): Promise<HttpResponse<T>>;

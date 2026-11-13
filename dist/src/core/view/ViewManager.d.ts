@@ -69,6 +69,12 @@ export declare class ViewManager implements ViewManagerInterface {
     /** DI container */
     private App;
     private systemData;
+    /**
+     * Data the server shares with every view of the context (ViewContextManager::share).
+     * It arrives once with the document and again only when the context revision changes,
+     * so page-data never has to repeat it.
+     */
+    private sharedData;
     private contextRevision;
     private contextViews;
     /** ROOT DOM container where views mount */
@@ -171,6 +177,7 @@ export declare class ViewManager implements ViewManagerInterface {
         registry?: Record<string, any>;
         ssr?: SSRBootInfo | null;
         systemData?: Record<string, any>;
+        sharedData?: Record<string, any>;
         ssrData?: Record<string, any>;
         revision?: string;
         contextViews?: string;
@@ -240,6 +247,10 @@ export declare class ViewManager implements ViewManagerInterface {
      * Trước đây bọc { data } → __data__.__SSR_VIEW_ID__ = undefined và ctrl.data
      * bị lồng (vỡ route-param). Xem docs/HYDRATION.md §9.2.
      */
+    /** Shared data sits underneath a view's own data, the way the server merges it before rendering. */
+    private withSharedData;
+    /** `__site`: nhóm thiết lập công khai của website, cùng bản mà mọi view nhận. */
+    getSite(): Readonly<Record<string, any>>;
     private buildSystemData;
     private finalizeView;
     /**

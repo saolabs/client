@@ -65,6 +65,7 @@ export class Application {
             'getBindings',
             'getSingletons',
             'shared',
+            'site',
             '__store',
             'strictBundles',
         ]; // Để track dynamic properties nếu cần
@@ -355,6 +356,18 @@ export class Application {
         if (key === undefined)
             return all;
         return (Object.prototype.hasOwnProperty.call(all, key) ? all[key] : fallback);
+    }
+    /**
+     * `__site` cho mã TS ngoài view (service, helper): các nhóm thiết lập công
+     * khai của website. Trong `.sao` đọc thẳng `__site`.
+     *
+     * @example App.site('branding').logo_url
+     */
+    site(group, fallback) {
+        const site = (this.View?.getSite?.() ?? {});
+        if (group === undefined)
+            return site;
+        return (Object.prototype.hasOwnProperty.call(site, group) ? site[group] : fallback);
     }
     setMethod(name, method, isOne = false) {
         if (this.ownProperties.includes(name)) {
