@@ -1,3 +1,15 @@
+# Saola Client v1.11.0
+
+Page data now travels as `{data, view?, auth?}` only, with revisions in response headers (pairs with `saola/core` 2.12 and `saola/compiler` 3.9).
+
+- Same-origin page requests send `X-Saola-Client: 2`. When `X-Saola-View-Revision` differs from the one the tab holds, `HttpService` fetches `GET /_saola/context/{context}` once per revision and dispatches the usual `saola:view-context` event; the Router then applies it or reloads as before.
+- `X-Saola-Language-Revision` (`scope;vi=7`) makes the client install the missing catalogs through `APP_CONFIGS.i18n.dictionary`; without a dictionary URL it dispatches `saola:language-stale`.
+- `extractAsyncData` recognises the envelope by `X-Saola-Envelope`; the previous in-body envelope (`viewContext`, `i18n`) from older servers is still understood.
+- System variable `__site`: replaced as a whole on view-context changes, never taken from view data, readable outside views with `App.site(group?)` / `ViewManager.getSite()`. Shared data from the view context sits underneath view data.
+- `mount(factory, data, systemData?)` in `@saolabs/client/testing` accepts system data such as `{ __site }`.
+
+Validation: 712 client tests (103 test files); gehihi-app `test:ui` 294/294 and browser QA on 22 pages against this build.
+
 # Saola Client v1.10.1
 
 No runtime change; the published code is the same as 1.10.0. This release brings the package in line with `main`: the compiled-views test now follows the compiler's contract that `{{ fn() }}` in a template is a helper call (`App.Helper.fn`), even when the script declares a method of the same name.
