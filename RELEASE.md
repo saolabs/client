@@ -1,3 +1,12 @@
+# Saola Client v1.12.0
+
+- State changes batch in a microtask. Text bindings and structural regions update in the same flush, and long update chains across views yield to the browser.
+- The event bus indexes multi-event subscriptions by event name. A `once` subscription is consumed before the callback runs, including during a recursive emit.
+- Keyed lists keep identical literal whitespace in place during reordering and retain the existing row DOM and handlers.
+- Navigation guards receive an `AbortSignal` as their fourth argument. Use it to cancel asynchronous work when a newer navigation supersedes the guard. Existing three-argument guards still work.
+
+Validation: 717 client tests, TypeScript build, and packed consumer export checks.
+
 # Saola Client v1.11.0
 
 Page data now travels as `{data, view?, auth?}` only, with revisions in response headers (pairs with `saola/core` 2.12 and `saola/compiler` 3.9).
