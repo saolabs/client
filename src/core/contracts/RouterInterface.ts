@@ -53,8 +53,8 @@ export interface RouterInterface {
     getURL(name: string, params?: Record<string, any>): string | null;
     /** Get current route */
     getCurrentRoute(): ActiveRouteInterface | null;
-    /** Navigation guards */
-    beforeEach(guard: (to: ActiveRouteInterface, from: ActiveRouteInterface, urlPath: string) => boolean | Promise<boolean>): this;
+    /** The signal aborts when a newer navigation supersedes the current one. */
+    beforeEach(guard: (to: ActiveRouteInterface, from: ActiveRouteInterface, urlPath: string, signal: AbortSignal) => boolean | Promise<boolean>): this;
     useMiddleware(config: ClientMiddlewareConfig): () => void;
     /** Đăng ký hook sau điều hướng; trả về hàm huỷ đăng ký. Nhiều hook cùng sống được. */
     afterEach(hook: (to: ActiveRouteInterface, from: ActiveRouteInterface) => void): () => void;

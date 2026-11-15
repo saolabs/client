@@ -99,6 +99,10 @@ export class TextElement {
     get text() {
         return this._text;
     }
+    /** Literal text has neither subscriptions nor a factory to refresh. */
+    get isLiteral() {
+        return this.isStatic && this.generateText === null;
+    }
     set text(newText) {
         this.update(newText);
     }

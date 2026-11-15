@@ -42,6 +42,9 @@ export declare class EventService {
      * event.off({ save: fn1 });
      */
     off(event: string | string[] | Record<string, EventCallback>, callback?: EventCallback): void;
+    private add;
+    private remove;
+    private removeMulti;
     /** Emit event with arguments */
     emit(event: string, ...args: any[]): void;
     /** Remove all listeners */

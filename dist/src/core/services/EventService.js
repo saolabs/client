@@ -16,7 +16,7 @@
 export class EventService {
     constructor() {
         this.listeners = new Map();
-        this.multiListeners = [];
+        this.multiListeners = new Map();
     }
     static getInstance(key = 'default') {
         if (!EventService.instances.has(key)) {
@@ -58,34 +58,23 @@ export class EventService {
         // Array of events — multi-listener (fires once per emit batch)
         if (Array.isArray(event)) {
             const events = new Set(event.filter((e) => typeof e === 'string'));
-            if (events.size === 0)
+            if (events.size === 0 || typeof callback !== 'function')
                 return () => { };
-            const listener = {
-                events,
-                callback: callback,
-                once,
-                called: false,
-            };
-            this.multiListeners.push(listener);
-            return () => {
-                const idx = this.multiListeners.indexOf(listener);
-                if (idx !== -1)
-                    this.multiListeners.splice(idx, 1);
-            };
+            const listener = { events, callback, once };
+            for (const name of events)
+                this.add(this.multiListeners, name, listener);
+            return () => this.removeMulti(listener);
         }
         // Single event
         if (typeof event !== 'string' || typeof callback !== 'function')
             return () => { };
-        if (!this.listeners.has(event)) {
-            this.listeners.set(event, []);
-        }
         const listener = { callback, once };
-        this.listeners.get(event).push(listener);
-        return () => this.off(event, callback);
+        this.add(this.listeners, event, listener);
+        return () => this.remove(this.listeners, event, listener);
     }
     /** Subscribe once — auto-unsubscribe after first call */
     once(event, callback) {
-        return this.on(event, callback, true);
+        return this.on(event, callback ?? true, true);
     }
     // ─── Unsubscribe ────────────────────────────────────────────
     /**
@@ -111,13 +100,13 @@ export class EventService {
         }
         // Array
         if (Array.isArray(event)) {
-            const eventSet = new Set(event);
-            this.multiListeners = this.multiListeners.filter((l) => {
-                if (callback && l.callback !== callback)
-                    return true;
-                return ![...l.events].some((e) => eventSet.has(e));
-            });
-            event.forEach((e) => this.off(e, callback));
+            for (const name of event) {
+                for (const listener of this.multiListeners.get(name) ?? []) {
+                    if (!callback || listener.callback === callback)
+                        this.removeMulti(listener);
+                }
+                this.off(name, callback);
+            }
             return;
         }
         // Single event
@@ -127,69 +116,79 @@ export class EventService {
             this.listeners.delete(event);
         }
         else {
-            const list = this.listeners.get(event);
-            if (list) {
-                const filtered = list.filter((l) => l.callback !== callback);
-                filtered.length > 0
-                    ? this.listeners.set(event, filtered)
-                    : this.listeners.delete(event);
+            for (const listener of this.listeners.get(event) ?? []) {
+                if (listener.callback === callback)
+                    this.remove(this.listeners, event, listener);
             }
         }
+    }
+    add(index, event, listener) {
+        let bucket = index.get(event);
+        if (!bucket)
+            index.set(event, bucket = new Set());
+        bucket.add(listener);
+    }
+    remove(index, event, listener) {
+        const bucket = index.get(event);
+        if (!bucket)
+            return;
+        bucket.delete(listener);
+        if (bucket.size === 0)
+            index.delete(event);
+    }
+    removeMulti(listener) {
+        for (const name of listener.events)
+            this.remove(this.multiListeners, name, listener);
     }
     // ─── Emit ───────────────────────────────────────────────────
     /** Emit event with arguments */
     emit(event, ...args) {
-        // Reset multi-listener flags
-        this.multiListeners.forEach((l) => (l.called = false));
-        // Single listeners
         const list = this.listeners.get(event);
         if (list) {
-            const snapshot = [...list];
-            const toRemove = [];
-            for (const listener of snapshot) {
+            for (const listener of [...list]) {
+                if (listener.fired)
+                    continue;
+                if (listener.once) {
+                    listener.fired = true;
+                    this.remove(this.listeners, event, listener);
+                }
                 try {
                     listener.callback(...args);
                 }
                 catch (err) {
                     console.error(`[EventService] Error in listener for "${event}":`, err);
                 }
-                if (listener.once)
-                    toRemove.push(listener);
-            }
-            if (toRemove.length) {
-                this.listeners.set(event, list.filter((l) => !toRemove.includes(l)));
             }
         }
-        // Multi listeners
-        const multiToRemove = [];
-        for (const listener of this.multiListeners) {
-            if (listener.events.has(event) && !listener.called) {
-                listener.called = true;
-                try {
-                    listener.callback(...args);
-                }
-                catch (err) {
-                    console.error(`[EventService] Error in multi-event listener:`, err);
-                }
-                if (listener.once)
-                    multiToRemove.push(listener);
+        // Select the matching bucket after singles, preserving dispatch order
+        // and giving recursive emits their own snapshot.
+        const multi = this.multiListeners.get(event);
+        if (!multi)
+            return;
+        for (const listener of [...multi]) {
+            if (listener.fired)
+                continue;
+            if (listener.once) {
+                listener.fired = true;
+                this.removeMulti(listener);
             }
-        }
-        if (multiToRemove.length) {
-            this.multiListeners = this.multiListeners.filter((l) => !multiToRemove.includes(l));
+            try {
+                listener.callback(...args);
+            }
+            catch (err) {
+                console.error('[EventService] Error in multi-event listener:', err);
+            }
         }
     }
     // ─── Utility ────────────────────────────────────────────────
     /** Remove all listeners */
     clear() {
         this.listeners.clear();
-        this.multiListeners = [];
+        this.multiListeners.clear();
     }
     /** Listener count for a specific event */
     listenerCount(event) {
-        const single = this.listeners.get(event)?.length ?? 0;
-        const multi = this.multiListeners.filter((l) => l.events.has(event)).length;
-        return single + multi;
+        return (this.listeners.get(event)?.size ?? 0) + (this.multiListeners.get(event)?.size ?? 0);
     }
     /** Check if event has listeners */
     hasListeners(event) {
@@ -198,9 +197,8 @@ export class EventService {
     /** Get all registered event names */
     eventNames() {
         const names = new Set(this.listeners.keys());
-        for (const l of this.multiListeners) {
-            l.events.forEach((e) => names.add(e));
-        }
+        for (const name of this.multiListeners.keys())
+            names.add(name);
         return [...names];
     }
     /** Destroy — alias for clear */

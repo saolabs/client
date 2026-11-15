@@ -62,6 +62,28 @@ it.each([
     expect(fused).toEqual(plain);
 });
 
+it('keeps literal gaps in place while keyed rows retain their identity and handlers', async () => {
+    h = mount(await load('fused-rows'));
+    flush();
+    const list = h.container.querySelector('article')!.parentElement!;
+    const elements = [...list.querySelectorAll('article')];
+    const gaps = () => [...list.childNodes].filter(node => node.nodeType === Node.TEXT_NODE);
+    const initialGaps = gaps();
+    const view = h.view as any;
+    view.replace(view.current().slice().reverse());
+    flush();
+    expect([...list.querySelectorAll('article')]).toEqual(elements.slice().reverse());
+    expect(gaps().every((node, index) => node === initialGaps[index])).toBe(true);
+    expect(gaps()).toHaveLength(initialGaps.length);
+
+    elements[2].querySelector('button')!.click();
+    flush();
+    expect([...list.querySelectorAll('article')]).toEqual([elements[1], elements[0]]);
+    view.replace([]);
+    flush();
+    expect(list.querySelectorAll('hr, article')).toHaveLength(0);
+});
+
 async function nested(fused: boolean, hydrateClass: boolean): Promise<string[]> {
     Html.csrHydrateClass = hydrateClass;
     h = mount(await load('fused-nested', fused)); flush();

@@ -335,6 +335,7 @@ export class Reactive {
                 }
             }
         });
+        cache.keepWhitespaceInPlace(this.children, newChildren);
         const trulyNew = newChildren.filter(child => !prevChildren.has(child));
         const parent = this.closeTag.parentNode;
         if (parent)

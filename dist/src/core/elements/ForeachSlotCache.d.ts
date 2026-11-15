@@ -99,6 +99,12 @@ export declare class ForeachSlotCache {
      */
     prunePass(onRemove: (slot: ForeachSlot) => void): void;
     /**
+     * During a reorder, equal literal whitespace can stay at its DOM position.
+     * Rebind slot ownership as a permutation so later removal still owns each
+     * text node exactly once, and preserve the exact whitespace from the template.
+     */
+    keepWhitespaceInPlace(previous: readonly any[], next: any[]): void;
+    /**
      * Xoá toàn bộ cache — dùng khi Reactive bị destroy.
      * KHÔNG tự gọi destroy() trên elements — caller phải làm trước.
      */

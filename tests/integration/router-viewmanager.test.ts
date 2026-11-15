@@ -377,6 +377,29 @@ describe('Router — query string + guard + navigationType', () => {
         expect(container.querySelector('#about-page')).toBeNull(); // view không mount
     });
 
+    it('aborts an async guard when the user chooses another route', async () => {
+        setup();
+        let pendingSignal: AbortSignal | undefined;
+        router.beforeEach((_to, _from, path, signal) => {
+            if (path !== '/about') return true;
+            pendingSignal = signal;
+            return new Promise((_, reject) => {
+                signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+            });
+        });
+        const commits: string[] = [];
+        const committed = new Promise<void>(resolve => {
+            router.afterEach(to => { commits.push(to.path); resolve(); });
+        });
+        router.navigate('/about');
+        expect(pendingSignal?.aborted).toBe(false);
+        router.navigate('/users/42');
+        await committed;
+        expect(pendingSignal?.aborted).toBe(true);
+        expect(commits).toEqual(['/users/42']);
+        expect(window.location.pathname).toBe('/users/42');
+    });
+
     it('pop truyền navigationType="pop" xuống mountView → restore từ PageCache', async () => {
         setup();
         await (router as any).handleRoute('/', 'push');

@@ -23,7 +23,7 @@ type Subscription = {
  * 
  * Core reactive primitive — when a state value changes:
  *   1. Batch the change (add to pendingChanges)
- *   2. Schedule a flush via requestAnimationFrame
+ *   2. Schedule a flush at the next microtask checkpoint
  *   3. On flush: notify all subscribed listeners
  *   4. Listeners can trigger Reactive.update() → DOM re-render
  * 
@@ -65,8 +65,8 @@ export class StateManager implements StateManagerInterface {
         return total;
     }
     private stateIndex = 0;
-    private flushRAF: number | null = null;
-    private hasPendingFlush = false;
+    private pendingFlush: object | null = null;
+    private flushTimer: ReturnType<typeof setTimeout> | null = null;
     private isFlushing = false;
     private _isDestroyed = false;
     // Browsers opt in explicitly; production never scans unrelated state objects.
@@ -509,16 +509,18 @@ export class StateManager implements StateManagerInterface {
         return dirty;
     }
 
-    /** Flush đồng bộ pending changes (huỷ RAF đang chờ nếu có). */
+    /** Flush pending changes now and invalidate the queued callback. */
     flushNow(): void {
-        if (this.flushRAF !== null) {
-            cancelAnimationFrame(this.flushRAF);
-            this.flushRAF = null;
-        }
-        if (this.pendingChanges.size > 0) {
-            this.executeFlush();
-        }
-        this.hasPendingFlush = false;
+        if (this.isFlushing) return;
+        this.cancelFlush();
+        if (this.pendingChanges.size > 0) this.executeFlush();
+    }
+
+    private cancelFlush(): void {
+        this.pendingFlush = null;
+        if (this.flushTimer === null) return;
+        clearTimeout(this.flushTimer);
+        this.flushTimer = null;
     }
 
     // ─── Batch Flush System ─────────────────────────────────────
@@ -637,14 +639,27 @@ export class StateManager implements StateManagerInterface {
 
         this.pendingChanges.add(key);
 
-        if (!this.hasPendingFlush) {
-            this.hasPendingFlush = true;
-            this.flushRAF = requestAnimationFrame(() => this.executeFlush());
-        }
+        if (this.pendingFlush || this.isFlushing) return;
+
+        const ticket = this.pendingFlush = {};
+        const depth = StateManager.flushChainDepth + 1;
+        const run = (chainDepth: number) => {
+            if (this.pendingFlush !== ticket) return;
+            this.flushTimer = null;
+            const previousDepth = StateManager.flushChainDepth;
+            StateManager.flushChainDepth = chainDepth;
+            try { this.executeFlush(); }
+            finally { StateManager.flushChainDepth = previousDepth; }
+        };
+        // Several views can trigger one another. Yield on long chains so their
+        // microtasks cannot keep the browser from processing input or rendering.
+        if (depth > StateManager.MAX_CASCADE) this.flushTimer = setTimeout(() => run(1), 0);
+        else queueMicrotask(() => run(depth));
     }
 
-    /** Trần số vòng flush nối tiếp trong 1 frame — chặn computed phụ thuộc vòng. */
+    /** Bound synchronous cascades and chains of flushes across views. */
     private static readonly MAX_CASCADE = 20;
+    private static flushChainDepth = 0;
 
     private executeFlush(): void {
         if (this._isDestroyed || this.isFlushing) return;
@@ -652,7 +667,7 @@ export class StateManager implements StateManagerInterface {
             this.isFlushing = true;
             // Listener CÓ THỂ enqueue key mới ngay trong lúc flush (computed
             // phụ thuộc computed). flushChanges() đã snapshot xong nên key mới
-            // sẽ nằm lại hàng đợi; lặp cho tới khi lắng, trong CÙNG frame —
+            // sẽ nằm lại hàng đợi; lặp cho tới khi lắng, trong cùng đợt flush —
             // nếu không, cập nhật dẫn xuất kẹt tới lần state đổi kế tiếp.
             let depth = 0;
             while (this.pendingChanges.size > 0 && depth < StateManager.MAX_CASCADE) {
@@ -667,20 +682,11 @@ export class StateManager implements StateManagerInterface {
             }
         } finally {
             this.isFlushing = false;
-            this.hasPendingFlush = false;
-            this.flushRAF = null;
+            this.pendingFlush = null;
         }
 
-        // FIX(F6, docs/FIX_PLAN_2026-08-14.md): state flush chạy trên RAF #1;
-        // listener gọi Reactive.update() → ctx.scheduleUpdate() lại đặt RAF #2
-        // (ViewController.scheduleUpdate) — trong một frame, Output patch
-        // textContent ĐỒNG BỘ ngay trong listener nên đã đổi, còn
-        // @foreach/@if (chờ RAF #2) thì CHƯA — DOM tạm thời không nhất quán
-        // (đo được: `{{ count }}` đã là "1" nhưng @foreach vẫn list cũ, phải
-        // đợi thêm 1 frame nữa). Flush luôn ngay sau khi cascade lắng, CÙNG
-        // frame — không đợi RAF kế tiếp. RAF trong scheduleUpdate() vẫn giữ
-        // nguyên làm đường dự phòng cho update phát sinh NGOÀI chu kỳ flush
-        // state; gặp hàng đợi rỗng (đã flush ở đây) thì chỉ là no-op.
+        // Outputs and structural regions commit in the same flush. The frame
+        // scheduler still handles region updates requested outside state flush.
         this.controller?.flushReactiveUpdatesNow?.();
     }
 
@@ -1068,17 +1074,24 @@ export class StateManager implements StateManagerInterface {
 
         // Snapshot the whole batch before invoking callbacks. Subscriptions added
         // during notification start next batch; removed records are never invoked.
-        const changedSet = new Set(changed.map(String));
-        const batches = changed.map(key => [String(key), Array.from(this.subscriptions.get(String(key)) ?? [])] as const);
-        const called = new Set<Subscription>();
+        const batches = new Map<string, Subscription[]>();
+        for (const key of changed) {
+            const name = String(key);
+            const records = this.subscriptions.get(name);
+            if (records && !batches.has(name)) batches.set(name, [...records]);
+        }
+        let changedSet: Set<string> | undefined;
+        let called: Set<Subscription> | undefined;
         for (const [key, records] of batches) {
             // Retain single-key-before-multi-key order used by existing bindings.
             for (const multi of [false, true]) {
                 for (const record of records) {
-                    if (!record.active || record.multi !== multi || called.has(record)) continue;
-                    called.add(record);
+                    if (!record.active || record.multi !== multi) continue;
                     let value: any;
                     if (multi) {
+                        if (called?.has(record)) continue;
+                        (called ??= new Set()).add(record);
+                        changedSet ??= new Set(changed.map(String));
                         value = {};
                         for (const k of record.keys) {
                             if (changedSet.has(k)) value[k] = this.states[k]?.value;
@@ -1152,10 +1165,7 @@ export class StateManager implements StateManagerInterface {
 
     destroy(): void {
         this._isDestroyed = true;
-        if (this.flushRAF !== null) {
-            cancelAnimationFrame(this.flushRAF);
-            this.flushRAF = null;
-        }
+        this.cancelFlush();
         this.authUnsubscribe?.();
         this.authUnsubscribe = null;
         for (const node of this.computedNodes.values()) node.tracker.destroy();

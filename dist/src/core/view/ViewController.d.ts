@@ -100,7 +100,7 @@ export declare class ViewController implements ViewControllerInterface {
     initMode: InitMode;
     /** Pending reactive updates — deduped, flushed in one RAF */
     private pendingReactiveUpdates;
-    private hasScheduledUpdate;
+    private reactiveFrame;
     /** Centralized AbortController for all event listeners */
     /** Exact listener references for cleanup when an individual Html node dies. */
     elementEventHandlers: Map<HTMLElement, Map<string, EventInvoker>>;

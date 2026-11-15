@@ -71,7 +71,7 @@ export interface RouterConfig {
     afterEach?: AfterNavigationHook;
 }
 
-export type NavigationGuard = (to: Route, from: ActiveRoute | null, urlPath: string) => boolean | Promise<boolean>;
+export type NavigationGuard = (to: Route, from: ActiveRoute | null, urlPath: string, signal: AbortSignal) => boolean | Promise<boolean>;
 export type AfterNavigationHook = (to: Route, from: ActiveRoute | null) => void;
 type NavigationType = 'push' | 'replace' | 'pop' | 'initial';
 type NavigationRequest = { id: number; path: string; type: NavigationType };
@@ -806,7 +806,8 @@ export class Router {
 
             // Before guard — chạy TRƯỚC khi đụng vào history: guard chặn thì URL giữ nguyên
             if (this._beforeEach) {
-                const allow = await this._beforeEach(route, from, normalizedPath);
+                const allow = await this._beforeEach(route, from, normalizedPath, middlewareAbort.signal);
+                if (middlewareAbort.signal.aborted) return;
                 if (allow === false) {
                     if (type === 'pop') this.restoreUrlAfterFailedPop(from);
                     return;
@@ -815,7 +816,9 @@ export class Router {
             for (const guard of [...this.navigationGuards]) {
                 if (!this.navigationGuards.has(guard)) continue;
                 if (requestId !== this.navigationSequence) return;
-                if (await guard(route, from, normalizedPath) === false) {
+                const allow = await guard(route, from, normalizedPath, middlewareAbort.signal);
+                if (middlewareAbort.signal.aborted) return;
+                if (allow === false) {
                     if (type === 'pop') this.restoreUrlAfterFailedPop(from);
                     return;
                 }

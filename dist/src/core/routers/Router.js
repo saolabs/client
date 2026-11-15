@@ -648,7 +648,9 @@ export class Router {
             }
             // Before guard — chạy TRƯỚC khi đụng vào history: guard chặn thì URL giữ nguyên
             if (this._beforeEach) {
-                const allow = await this._beforeEach(route, from, normalizedPath);
+                const allow = await this._beforeEach(route, from, normalizedPath, middlewareAbort.signal);
+                if (middlewareAbort.signal.aborted)
+                    return;
                 if (allow === false) {
                     if (type === 'pop')
                         this.restoreUrlAfterFailedPop(from);
@@ -660,7 +662,10 @@ export class Router {
                     continue;
                 if (requestId !== this.navigationSequence)
                     return;
-                if (await guard(route, from, normalizedPath) === false) {
+                const allow = await guard(route, from, normalizedPath, middlewareAbort.signal);
+                if (middlewareAbort.signal.aborted)
+                    return;
+                if (allow === false) {
                     if (type === 'pop')
                         this.restoreUrlAfterFailedPop(from);
                     return;

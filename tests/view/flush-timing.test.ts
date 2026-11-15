@@ -1,29 +1,17 @@
-/**
- * FIX(F6, docs/FIX_PLAN_2026-08-14.md): state flush chạy trên RAF #1;
- * listener của Reactive gọi `ctx.scheduleUpdate()` lại đặt RAF #2
- * (ViewController.scheduleUpdate) — trong MỘT frame, `{{ }}` (Output patch
- * textContent ĐỒNG BỘ ngay trong listener) đã đổi nhưng `@foreach`/`@if`
- * (chờ RAF #2) thì CHƯA. Đo được: click → frame 1 → `{{ count }}` = "1"
- * nhưng list vẫn cũ; phải đợi frame 2 mới thấy list mới — DOM tạm thời
- * không nhất quán giữa hai loại binding trong CÙNG một tương tác.
- *
- * Bài test CỐ Ý chỉ chờ ĐÚNG MỘT `requestAnimationFrame` (không dùng
- * `nextFrame()` của `src/testing` — nó chờ 2 RAF nên sẽ che mất chính bug
- * này). Trước fix, assertion `@foreach` bên dưới đỏ sau 1 RAF, xanh sau 2.
- */
 import { describe, it, expect, afterEach } from 'vitest';
 import { mountView, type Harness } from '../../src/testing';
+import { ViewState } from '../../src/core/view/ViewState';
 
 const oneFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-describe('State flush timing (F6) — Output và Reactive cùng nhất quán trong 1 frame', () => {
+describe('State flush timing', () => {
     let h: Harness | null = null;
     afterEach(() => {
         h?.destroy();
         h = null;
     });
 
-    it('sau ĐÚNG 1 RAF: Output text VÀ @foreach structural đều đã mới', async () => {
+    it('commits text and structural regions together before the next frame', async () => {
         h = mountView(function (this: any) {
             const S = this.states.__;
             S.register('items', [1, 2]);
@@ -50,11 +38,30 @@ describe('State flush timing (F6) — Output và Reactive cùng nhất quán tro
         expect(listCount()).toBe(2);
 
         h.setState('items', [1, 2, 3]);
-        await oneFrame();
-
-        // Output patch đồng bộ trong listener — luôn đúng, dù bug F6 còn sống hay không.
+        expect(len()).toBe('2');
+        await Promise.resolve();
         expect(len()).toBe('3');
-        // @foreach: TRƯỚC fix F6, cần RAF THỨ HAI mới cập nhật — sau đúng 1 RAF vẫn là 2.
         expect(listCount()).toBe(3);
+    });
+
+    it('invalidates queued work across flushNow, pause, resume and destroy', async () => {
+        const state = new ViewState().__;
+        const set = state.register('count', 0);
+        const seen: number[] = [];
+        state.subscribe('count', value => seen.push(value));
+
+        set(1); set(2);
+        state.flushNow();
+        set(3);
+        state.pause();
+        set(4); set(5);
+        await Promise.resolve();
+        expect(seen).toEqual([2, 3]);
+
+        state.resume();
+        set(6);
+        state.destroy();
+        await oneFrame();
+        expect(seen).toEqual([2, 3, 5]);
     });
 });

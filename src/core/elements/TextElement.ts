@@ -116,6 +116,11 @@ export class TextElement implements TextInterface {
         return this._text;
     }
 
+    /** Literal text has neither subscriptions nor a factory to refresh. */
+    get isLiteral(): boolean {
+        return this.isStatic && this.generateText === null;
+    }
+
     set text(newText: string) {
         this.update(newText);
     }

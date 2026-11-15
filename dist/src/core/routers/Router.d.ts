@@ -62,7 +62,7 @@ export interface RouterConfig {
     beforeEach?: NavigationGuard;
     afterEach?: AfterNavigationHook;
 }
-export type NavigationGuard = (to: Route, from: ActiveRoute | null, urlPath: string) => boolean | Promise<boolean>;
+export type NavigationGuard = (to: Route, from: ActiveRoute | null, urlPath: string, signal: AbortSignal) => boolean | Promise<boolean>;
 export type AfterNavigationHook = (to: Route, from: ActiveRoute | null) => void;
 export declare class ActiveRoute {
     readonly $route: Route;

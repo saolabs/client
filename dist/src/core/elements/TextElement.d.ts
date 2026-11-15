@@ -43,6 +43,8 @@ export declare class TextElement implements TextInterface {
     __destroyed__: boolean;
     destroy(): void;
     get text(): string;
+    /** Literal text has neither subscriptions nor a factory to refresh. */
+    get isLiteral(): boolean;
     set text(newText: string);
     get isSaoElement(): boolean;
     set isSaoElement(value: boolean);

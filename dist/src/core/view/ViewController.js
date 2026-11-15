@@ -154,7 +154,7 @@ export class ViewController {
         // ─── Reactive System ────────────────────────────────────────
         /** Pending reactive updates — deduped, flushed in one RAF */
         this.pendingReactiveUpdates = new Set();
-        this.hasScheduledUpdate = false;
+        this.reactiveFrame = null;
         /** Centralized AbortController for all event listeners */
         /** Exact listener references for cleanup when an individual Html node dies. */
         this.elementEventHandlers = new Map();
@@ -660,10 +660,12 @@ export class ViewController {
     }
     /** Flush đồng bộ các reactive update đang chờ RAF */
     flushReactiveUpdatesNow() {
-        if (this.hasScheduledUpdate || this.pendingReactiveUpdates.size > 0) {
-            this.flushReactiveUpdates();
-            this.hasScheduledUpdate = false;
+        if (this.reactiveFrame !== null) {
+            cancelAnimationFrame(this.reactiveFrame);
+            this.reactiveFrame = null;
         }
+        if (this.pendingReactiveUpdates.size > 0)
+            this.flushReactiveUpdates();
         else
             this.flushAfterDom();
     }
@@ -702,7 +704,9 @@ export class ViewController {
         this.cancelAfterDom();
         // Cancel pending updates
         this.pendingReactiveUpdates.clear();
-        this.hasScheduledUpdate = false;
+        if (this.reactiveFrame !== null)
+            cancelAnimationFrame(this.reactiveFrame);
+        this.reactiveFrame = null;
         // Abort all event listeners
         for (const [element, events] of this.elementEventHandlers) {
             for (const [event, live] of events)
@@ -945,14 +949,17 @@ export class ViewController {
                     continue;
                 const def = h;
                 const view = this.view;
-                const target = typeof def.handler === 'string' ? view[def.handler] : def.handler;
+                const named = typeof def.handler === 'string';
+                const target = named ? view[def.handler] : def.handler;
                 if (typeof target !== 'function')
                     continue;
                 if (!def.params) {
-                    if (typeof def.handler === 'string')
-                        view[def.handler](event);
-                    else
-                        target.call(event.currentTarget, event);
+                    target.call(named ? view : event.currentTarget, event);
+                    continue;
+                }
+                if (def.params.length === 1) {
+                    const param = def.params[0];
+                    target.call(view, typeof param === 'function' ? param(event) : param === '@EVENT' ? event : param);
                     continue;
                 }
                 const params = def.params.map((p) => typeof p === 'function' ? p(event) : p === '@EVENT' ? event : p);
@@ -1019,9 +1026,11 @@ export class ViewController {
         if (this._isDestroyed)
             return;
         this.pendingReactiveUpdates.add(reactive);
-        if (!this.hasScheduledUpdate) {
-            this.hasScheduledUpdate = true;
-            requestAnimationFrame(() => this.flushReactiveUpdates());
+        if (this.reactiveFrame === null) {
+            this.reactiveFrame = requestAnimationFrame(() => {
+                this.reactiveFrame = null;
+                this.flushReactiveUpdates();
+            });
         }
     }
     /**
@@ -1036,9 +1045,8 @@ export class ViewController {
     flushReactiveUpdates() {
         if (this._isDestroyed)
             return;
-        this.hasScheduledUpdate = false;
-        const updates = Array.from(this.pendingReactiveUpdates);
-        this.pendingReactiveUpdates.clear();
+        const updates = this.pendingReactiveUpdates;
+        this.pendingReactiveUpdates = new Set();
         for (const reactive of updates) {
             try {
                 reactive.render();

@@ -382,6 +382,7 @@ export class Reactive implements ReactiveInterface {
             }
         });
 
+        cache.keepWhitespaceInPlace(this.children, newChildren);
         const trulyNew = newChildren.filter(child => !prevChildren.has(child));
         const parent = this.closeTag.parentNode;
         if (parent) reconcileChildren(parent, this.children, newChildren, this.closeTag,

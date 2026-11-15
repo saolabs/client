@@ -5,7 +5,7 @@ import type { StateManagerInterface, ViewStateInterface, StateListener } from ".
  *
  * Core reactive primitive — when a state value changes:
  *   1. Batch the change (add to pendingChanges)
- *   2. Schedule a flush via requestAnimationFrame
+ *   2. Schedule a flush at the next microtask checkpoint
  *   3. On flush: notify all subscribed listeners
  *   4. Listeners can trigger Reactive.update() → DOM re-render
  *
@@ -37,8 +37,8 @@ export declare class StateManager implements StateManagerInterface {
     /** Tổng số lần các state trong `keys` đổi (kể cả computed). */
     revisionOf(keys: readonly string[]): number;
     private stateIndex;
-    private flushRAF;
-    private hasPendingFlush;
+    private pendingFlush;
+    private flushTimer;
     private isFlushing;
     private _isDestroyed;
     private mutationDiagnostics;
@@ -138,8 +138,9 @@ export declare class StateManager implements StateManagerInterface {
      * Trả về danh sách dirty keys (rỗng = không có gì thay đổi, không render).
      */
     resume(): Array<string | number>;
-    /** Flush đồng bộ pending changes (huỷ RAF đang chờ nếu có). */
+    /** Flush pending changes now and invalidate the queued callback. */
     flushNow(): void;
+    private cancelFlush;
     private commitStateChange;
     /**
      * Cùng reference nhưng NỘI DUNG (độ sâu 1) đã khác bản chụp gần nhất?
@@ -175,8 +176,9 @@ export declare class StateManager implements StateManagerInterface {
      * `states[key].value` → kích hoạt tính lại ngay, mất tính lazy.
      */
     private enqueueChange;
-    /** Trần số vòng flush nối tiếp trong 1 frame — chặn computed phụ thuộc vòng. */
+    /** Bound synchronous cascades and chains of flushes across views. */
     private static readonly MAX_CASCADE;
+    private static flushChainDepth;
     private executeFlush;
     /** Bản sao nông của lần flush gần nhất, theo key. */
     private mutationSnapshots;

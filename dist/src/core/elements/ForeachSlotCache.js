@@ -37,6 +37,7 @@
  * @see Reactive.renderForeach()
  * @see ViewController.__foreach()
  */
+import { TextElement } from './TextElement.js';
 export class ForeachSlotCache {
     constructor() {
         this.refreshedElements = new Set();
@@ -138,6 +139,58 @@ export class ForeachSlotCache {
                     this._map.delete(key);
                 }
             }
+        }
+    }
+    /**
+     * During a reorder, equal literal whitespace can stay at its DOM position.
+     * Rebind slot ownership as a permutation so later removal still owns each
+     * text node exactly once, and preserve the exact whitespace from the template.
+     */
+    keepWhitespaceInPlace(previous, next) {
+        if (previous.length !== next.length)
+            return;
+        let replacements;
+        for (let i = 0; i < next.length; i++) {
+            const before = previous[i];
+            const after = next[i];
+            if (before === after || !(before instanceof TextElement) || !(after instanceof TextElement)
+                || before.__destroyed__ || after.__destroyed__ || !before.isLiteral || !after.isLiteral
+                || before.text !== after.text || !/^[\t\n\f\r ]+$/.test(after.text))
+                continue;
+            (replacements ?? (replacements = new Map())).set(after, before);
+        }
+        if (!replacements)
+            return;
+        // Only transfer complete permutations of live slot text. New, removed,
+        // and position-dependent text must follow the normal reconciliation path.
+        for (const text of replacements.values())
+            if (!replacements.has(text))
+                return;
+        if (new Set(replacements.values()).size !== replacements.size)
+            return;
+        const owned = new Set();
+        for (const slot of this._touched) {
+            for (const text of slot.elements) {
+                if (!replacements.has(text))
+                    continue;
+                if (owned.has(text))
+                    return;
+                owned.add(text);
+            }
+        }
+        if (owned.size !== replacements.size)
+            return;
+        for (const slot of this._touched) {
+            for (let i = 0; i < slot.elements.length; i++) {
+                const replacement = replacements.get(slot.elements[i]);
+                if (replacement)
+                    slot.elements[i] = replacement;
+            }
+        }
+        for (let i = 0; i < next.length; i++) {
+            const replacement = replacements.get(next[i]);
+            if (replacement)
+                next[i] = replacement;
         }
     }
     /**
