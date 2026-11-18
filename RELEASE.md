@@ -1,3 +1,10 @@
+# Saola Client v1.13.1
+
+- `App.Router.href()` honors route-level domain overrides supplied by `saola/core` 2.13.1, including links to a module on a different host within the current context.
+- Named route parameters and nested query values follow Laravel's URL encoding. A missing required parameter logs an error and returns an empty string, so `App.Router.go()` stops navigation.
+
+Validation includes the shared PHP and Client regression cases, the TypeScript build, and packed consumer export checks.
+
 # Saola Client v1.13.0
 
 - `App.Router.href(name, params?, { absolute? })` builds URLs from route names across contexts with the same rule as `href()` in `saola/core` 2.13: full or unique short names, a relative path in the current context, an absolute URL on the right host otherwise. Unknown or ambiguous names log to the console and return `''`.

@@ -63,8 +63,8 @@ export interface RouterConfig {
     afterEach?: AfterNavigationHook;
     /** Context of this page (bootstrap `context`): the routes above belong to it. */
     context?: string;
-    /** Routes of other contexts that may be linked to: full name → [context, path]. */
-    links?: Record<string, [string, string]>;
+    /** Linkable routes and local host overrides: full name → [context, path, optional host override]. */
+    links?: Record<string, [string, string, string[]?]>;
     /** Every context: `as` (route name prefix, default the slug) and the hosts it claims (first = canonical). */
     contexts?: Record<string, {
         as?: string;
@@ -77,7 +77,7 @@ export interface HrefOptions {
     /** Always an absolute URL, even in the same context. */
     absolute?: boolean;
 }
-/** href() could not resolve a name. Same wording as the PHP HrefException, so shared cases can match on it. */
+/** href() could not resolve a route name or build its URL. */
 export declare class HrefError extends Error {
 }
 export type NavigationGuard = (to: Route, from: ActiveRoute | null, urlPath: string, signal: AbortSignal) => boolean | Promise<boolean>;
@@ -245,7 +245,7 @@ export declare class Router {
      * URL of a named route without knowing its context or host — same rule as PHP href()
      * (docs/CONTEXT_DOMAINS_AND_HREF_PLAN_2026-11-18.md §2.5/2.6, shared cases core/tests/fixtures/href-cases.json).
      * Same context: a relative path. Another context or host: an absolute URL on the right host.
-     * Unknown or ambiguous name: console.error and ''.
+     * An unknown or ambiguous name or a missing required parameter logs an error and returns ''.
      */
     href(name: string, params?: Record<string, any>, options?: HrefOptions): string;
     /** href() then go there: SPA navigation within this context, a page load otherwise. */
