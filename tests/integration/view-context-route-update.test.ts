@@ -97,12 +97,17 @@ describe('dynamic view-context route updates', () => {
                 changed: true,
                 routes: [{ name: 'home', path: '/', component: 'themes.storefront.pages.home' }],
                 systemData: { __context__: 'web', __base__: 'themes.storefront.' },
+                links: { 'app.home.index': ['app', '/'] },
+                contexts: { web: { as: 'web', hosts: [] }, app: { as: 'app', hosts: ['app.test'] } },
+                primary: 'http://example.test',
             },
         }));
 
         await new Promise(resolve => setTimeout(resolve, 0));
 
         expect(vm.applyViewContext).toHaveBeenCalledOnce();
+        // href() follows the new context state.
+        expect(router.resolveHref('app.home.index', {}, {}, new URL('http://example.test/'))).toBe('http://app.test/');
         expect(mountView).toHaveBeenCalledWith(
             'themes.storefront.pages.home',
             {},

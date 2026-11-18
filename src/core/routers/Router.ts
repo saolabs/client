@@ -69,7 +69,23 @@ export interface RouterConfig {
     allRoutes?: RouteDefinition[];
     beforeEach?: NavigationGuard;
     afterEach?: AfterNavigationHook;
+    /** Context of this page (bootstrap `context`): the routes above belong to it. */
+    context?: string;
+    /** Routes of other contexts that may be linked to: full name → [context, path]. */
+    links?: Record<string, [string, string]>;
+    /** Every context: `as` (route name prefix, default the slug) and the hosts it claims (first = canonical). */
+    contexts?: Record<string, { as?: string; hosts?: string[] }>;
+    /** Primary origin for host-less contexts seen from a claimed host (`sao.primary_host`, else APP_URL). */
+    primary?: string;
 }
+
+export interface HrefOptions {
+    /** Always an absolute URL, even in the same context. */
+    absolute?: boolean;
+}
+
+/** href() could not resolve a name. Same wording as the PHP HrefException, so shared cases can match on it. */
+export class HrefError extends Error {}
 
 export type NavigationGuard = (to: Route, from: ActiveRoute | null, urlPath: string, signal: AbortSignal) => boolean | Promise<boolean>;
 export type AfterNavigationHook = (to: Route, from: ActiveRoute | null) => void;
@@ -195,6 +211,13 @@ export class Router {
     /** Caches */
     private routeCache: Map<string, RouteMatch | null> = new Map();
 
+    /** href(): this page's context, the linkable routes of others, every context's hosts, the primary origin. */
+    private context: string | null = null;
+    private links: Record<string, [string, string]> = {};
+    private contexts: Record<string, { as?: string; hosts?: string[] }> = {};
+    private primary = '';
+    private hrefIndex: { routes: Map<string, [string | null, string]>; short: Map<string, string[]> } | null = null;
+
     /** State */
     private isStarted = false;
     private isNavigating = false;
@@ -283,6 +306,7 @@ export class Router {
     addRouteConfig(config: RouteDefinition): this {
         if (config.name) {
             this.routeConfigs[config.name] = config;
+            this.hrefIndex = null;
         }
         return this;
     }
@@ -372,6 +396,7 @@ export class Router {
         this.routes = [];
         this.routeConfigs = {};
         this.routeCache.clear();
+        this.hrefIndex = null;
         return this.addRoutes(routes);
     }
 
@@ -382,6 +407,11 @@ export class Router {
         if (config.mode) this.mode = config.mode;
         if (config.base) this.base = config.base;
         if (config.defaultRoute) this.defaultRoute = config.defaultRoute;
+        if (config.context) this.context = config.context;
+        if (config.links) this.links = config.links;
+        if (config.contexts) this.contexts = config.contexts;
+        if (config.primary) this.primary = config.primary;
+        this.hrefIndex = null;
         // MỘT danh sách thôi. Server từng phát cả `routes` (chỉ route có
         // component) lẫn `allRoutes` (đủ) — tập con của nhau, nên đăng ký cả
         // hai là mỗi route vào bảng hai lần. `allRoutes` giữ lại làm bí danh
@@ -478,6 +508,91 @@ export class Router {
             url = this.base + url;
         }
         return url;
+    }
+
+    /**
+     * URL of a named route without knowing its context or host — same rule as PHP href()
+     * (docs/CONTEXT_DOMAINS_AND_HREF_PLAN_2026-11-18.md §2.5/2.6, shared cases core/tests/fixtures/href-cases.json).
+     * Same context: a relative path. Another context or host: an absolute URL on the right host.
+     * Unknown or ambiguous name: console.error and ''.
+     */
+    href(name: string, params: Record<string, any> = {}, options: HrefOptions = {}): string {
+        try {
+            return this.resolveHref(name, params, options, new URL(window.location.href));
+        } catch (e) {
+            if (!(e instanceof HrefError)) throw e;
+            console.error(`[Router] ${e.message}`);
+            return '';
+        }
+    }
+
+    /** href() then go there: SPA navigation within this context, a page load otherwise. */
+    go(name: string, params: Record<string, any> = {}): void {
+        const url = this.href(name, params);
+        if (!url) return;
+        if (url.startsWith('/')) this.navigate(url);
+        else window.location.assign(url);
+    }
+
+    /** href() as seen from `here` (the page URL). Throws HrefError. Public for tests. */
+    resolveHref(name: string, params: Record<string, any>, options: HrefOptions, here: URL): string {
+        const { routes, short } = this.buildHrefIndex();
+        const current = this.context;
+        let full: string | undefined;
+        if (routes.has(name)) {
+            full = name;
+        } else if (current !== null && routes.has(`${this.contextAs(current)}.${name}`)) {
+            full = `${this.contextAs(current)}.${name}`;
+        } else {
+            const matches = short.get(name) ?? [];
+            if (matches.length > 1) throw new HrefError(`href(«${name}») is ambiguous: ${matches.join(', ')}. Use the full name.`);
+            if (matches.length === 0) throw new HrefError(`href(«${name}»): route not defined.`);
+            full = matches[0];
+        }
+        const [target, pattern] = routes.get(full)!;
+        const path = this.generateUrl(pattern, params);
+
+        const targetHosts = (target !== null && this.contexts[target]?.hosts) || [];
+        const host = here.hostname.toLowerCase();
+        const sameHost = targetHosts.length === 0 || targetHosts.includes(host);
+        if (target === current && sameHost && !options.absolute) return path;
+
+        let use: string;
+        let primary: URL | null = null;
+        const claimed = Object.values(this.contexts).some(c => (c.hosts ?? []).includes(host));
+        if (targetHosts.length) {
+            use = targetHosts.includes(host) ? host : targetHosts[0];
+        } else if (!claimed) {
+            use = host;
+        } else {
+            primary = new URL(this.primary || here.origin);
+            use = primary.hostname.toLowerCase();
+        }
+        const scheme = (primary ?? here).protocol.slice(0, -1);
+        // Only a non-default port is carried; URL.port is '' for the scheme's default.
+        const port = use === host ? here.port : (primary?.port || here.port);
+        const isDefault = !port || (scheme === 'https' ? port === '443' : port === '80');
+        return `${scheme}://${use}${isDefault ? '' : ':' + port}${path}`;
+    }
+
+    private contextAs(slug: string): string {
+        return this.contexts[slug]?.as || slug;
+    }
+
+    private buildHrefIndex() {
+        if (this.hrefIndex) return this.hrefIndex;
+        const routes = new Map<string, [string | null, string]>();
+        for (const [full, [ctx, path]] of Object.entries(this.links)) routes.set(full, [ctx, path]);
+        for (const [full, config] of Object.entries(this.routeConfigs)) routes.set(full, [this.context, config.path]);
+        const short = new Map<string, string[]>();
+        for (const [full, [ctx]] of routes) {
+            const as = ctx !== null ? this.contextAs(ctx) + '.' : '';
+            if (as && full.startsWith(as)) {
+                const key = full.slice(as.length);
+                short.set(key, [...(short.get(key) ?? []), full]);
+            }
+        }
+        return (this.hrefIndex = { routes, short });
     }
 
     /**
@@ -620,6 +735,10 @@ export class Router {
 
         if (Array.isArray(state.routes)) {
             this.replaceRoutes(state.routes);
+        }
+        // href() follows the page into its new context (server ≥ core H5 sends these with the routes).
+        if (typeof state.context === 'string') {
+            this.configure({ context: state.context, links: state.links ?? {}, contexts: state.contexts, primary: state.primary });
         }
 
         // If a fetch discovered the change mid-navigation, requestNavigation

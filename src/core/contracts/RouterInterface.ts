@@ -51,6 +51,10 @@ export interface RouterInterface {
     replace(path: string): void;
     /** Generate URL for a named route */
     getURL(name: string, params?: Record<string, any>): string | null;
+    /** URL of a named route in any context: relative in this context, absolute on the right host otherwise ('' if unknown). */
+    href(name: string, params?: Record<string, any>, options?: { absolute?: boolean }): string;
+    /** href() then navigate: SPA within this context, a page load otherwise. */
+    go(name: string, params?: Record<string, any>): void;
     /** Get current route */
     getCurrentRoute(): ActiveRouteInterface | null;
     /** The signal aborts when a newer navigation supersedes the current one. */
