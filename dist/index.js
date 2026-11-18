@@ -34,7 +34,7 @@ export { Devtools, devtools, inspector } from './src/core/devtools/index.js';
 export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext } from './src/core/view/index.js';
 export { ResourceScope } from './src/core/view/ResourceScope.js';
 // Router
-export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
+export { Router, ActiveRoute, HrefError, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
 export { authMiddleware, guestMiddleware } from './src/core/routers/ClientMiddleware.js';
 // Elements
 export { Reactive } from './src/core/elements/Reactive.js';

@@ -105,6 +105,11 @@ export function readBootConfig() {
             base: cfg.router?.base,
             defaultRoute: cfg.router?.defaultRoute,
             routes,
+            // href(): this page's context, linkable routes of other contexts, every context's hosts, primary origin.
+            ...(typeof (cfg.router?.context ?? cfg.context) === 'string' ? { context: cfg.router?.context ?? cfg.context } : {}),
+            ...(cfg.router?.links && typeof cfg.router.links === 'object' ? { links: cfg.router.links } : {}),
+            ...(cfg.router?.contexts && typeof cfg.router.contexts === 'object' ? { contexts: cfg.router.contexts } : {}),
+            ...(typeof cfg.router?.primary === 'string' ? { primary: cfg.router.primary } : {}),
         };
     }
     return Object.keys(out).length > 0 ? out : null;

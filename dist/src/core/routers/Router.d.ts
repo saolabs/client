@@ -61,6 +61,24 @@ export interface RouterConfig {
     allRoutes?: RouteDefinition[];
     beforeEach?: NavigationGuard;
     afterEach?: AfterNavigationHook;
+    /** Context of this page (bootstrap `context`): the routes above belong to it. */
+    context?: string;
+    /** Routes of other contexts that may be linked to: full name → [context, path]. */
+    links?: Record<string, [string, string]>;
+    /** Every context: `as` (route name prefix, default the slug) and the hosts it claims (first = canonical). */
+    contexts?: Record<string, {
+        as?: string;
+        hosts?: string[];
+    }>;
+    /** Primary origin for host-less contexts seen from a claimed host (`sao.primary_host`, else APP_URL). */
+    primary?: string;
+}
+export interface HrefOptions {
+    /** Always an absolute URL, even in the same context. */
+    absolute?: boolean;
+}
+/** href() could not resolve a name. Same wording as the PHP HrefException, so shared cases can match on it. */
+export declare class HrefError extends Error {
 }
 export type NavigationGuard = (to: Route, from: ActiveRoute | null, urlPath: string, signal: AbortSignal) => boolean | Promise<boolean>;
 export type AfterNavigationHook = (to: Route, from: ActiveRoute | null) => void;
@@ -119,6 +137,12 @@ export declare class Router {
     private afterHooks;
     /** Caches */
     private routeCache;
+    /** href(): this page's context, the linkable routes of others, every context's hosts, the primary origin. */
+    private context;
+    private links;
+    private contexts;
+    private primary;
+    private hrefIndex;
     /** State */
     private isStarted;
     private isNavigating;
@@ -217,6 +241,19 @@ export declare class Router {
      * Generate URL for a named route.
      */
     getURL(name: string, params?: Record<string, any>): string | null;
+    /**
+     * URL of a named route without knowing its context or host — same rule as PHP href()
+     * (docs/CONTEXT_DOMAINS_AND_HREF_PLAN_2026-11-18.md §2.5/2.6, shared cases core/tests/fixtures/href-cases.json).
+     * Same context: a relative path. Another context or host: an absolute URL on the right host.
+     * Unknown or ambiguous name: console.error and ''.
+     */
+    href(name: string, params?: Record<string, any>, options?: HrefOptions): string;
+    /** href() then go there: SPA navigation within this context, a page load otherwise. */
+    go(name: string, params?: Record<string, any>): void;
+    /** href() as seen from `here` (the page URL). Throws HrefError. Public for tests. */
+    resolveHref(name: string, params: Record<string, any>, options: HrefOptions, here: URL): string;
+    private contextAs;
+    private buildHrefIndex;
     /**
      * Generate URL with parameters (Laravel route() style).
      *

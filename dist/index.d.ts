@@ -36,7 +36,7 @@ export { View, ViewController, ViewManager, ViewState, StateManager, LoopContext
 export type { ViewUserConfig } from './src/core/view/View.js';
 export { ResourceScope } from './src/core/view/ResourceScope.js';
 export type { WatchCallback, WatchContext, WatchOptions, Cleanup } from './src/core/view/ResourceScope.js';
-export { Router, ActiveRoute, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
+export { Router, ActiveRoute, HrefError, useRoute, useParams, useQuery } from './src/core/routers/Router.js';
 export { authMiddleware, guestMiddleware } from './src/core/routers/ClientMiddleware.js';
 export type { ClientMiddlewareContext, ClientMiddlewareResult, ClientMiddleware, ClientMiddlewareHandler, ClientMiddlewareRef, ClientMiddlewareConfig, AuthMiddlewareOptions } from './src/core/routers/ClientMiddleware.js';
 export { Reactive } from './src/core/elements/Reactive.js';
@@ -64,7 +64,7 @@ export type { ViewConfigThis, ViewRuntimeConfig } from './src/core/contracts/Vie
 export type { ViewManagerInterface } from './src/core/contracts/ViewManagerInterface.js';
 export type { ReactiveInterface } from './src/core/contracts/ReactiveInterface.js';
 export type { RouterInterface } from './src/core/contracts/RouterInterface.js';
-export type { RouteDefinition, Route, RouteMatch, RouterConfig } from './src/core/routers/Router.js';
+export type { RouteDefinition, Route, RouteMatch, RouterConfig, HrefOptions } from './src/core/routers/Router.js';
 export type { MarkerTagName } from './src/core/contracts/MarkerInterface.js';
 export type { APIEndpoints } from './src/core/helpers/ApiClient.js';
 //# sourceMappingURL=index.d.ts.map

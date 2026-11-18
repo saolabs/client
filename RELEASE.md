@@ -1,3 +1,12 @@
+# Saola Client v1.13.0
+
+- `App.Router.href(name, params?, { absolute? })` builds URLs from route names across contexts with the same rule as `href()` in `saola/core` 2.13: full or unique short names, a relative path in the current context, an absolute URL on the right host otherwise. Unknown or ambiguous names log to the console and return `''`.
+- `App.Router.go(name, params?)` navigates within the SPA in the current context and loads the page otherwise.
+- The router reads `context`, `links`, `contexts` and `primary` from the boot config (`router`) and from `saola:view-context` changes. `HrefError` and `HrefOptions` are exported; `RouterInterface` gains `href` and `go`.
+- `tests/routers/href-cases.test.ts` runs the cases shared with core (`core/tests/fixtures/href-cases.json`).
+
+Validation: 738 client tests (105 files), TypeScript build, packed consumer export checks.
+
 # Saola Client v1.12.0
 
 - State changes batch in a microtask. Text bindings and structural regions update in the same flush, and long update chains across views yield to the browser.
