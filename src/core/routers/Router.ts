@@ -17,6 +17,7 @@
 import type { ViewManagerInterface } from "../contracts/ViewManagerInterface.js";
 import {app as application} from '../helpers/app.js';
 import {ClientMiddlewareRegistry, type ClientMiddlewareConfig} from './ClientMiddleware.js';
+import {hrefPath} from './hrefPath.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -71,8 +72,8 @@ export interface RouterConfig {
     afterEach?: AfterNavigationHook;
     /** Context of this page (bootstrap `context`): the routes above belong to it. */
     context?: string;
-    /** Routes of other contexts that may be linked to: full name → [context, path]. */
-    links?: Record<string, [string, string]>;
+    /** Linkable routes and local host overrides: full name → [context, path, optional host override]. */
+    links?: Record<string, [string, string, string[]?]>;
     /** Every context: `as` (route name prefix, default the slug) and the hosts it claims (first = canonical). */
     contexts?: Record<string, { as?: string; hosts?: string[] }>;
     /** Primary origin for host-less contexts seen from a claimed host (`sao.primary_host`, else APP_URL). */
@@ -84,8 +85,10 @@ export interface HrefOptions {
     absolute?: boolean;
 }
 
-/** href() could not resolve a name. Same wording as the PHP HrefException, so shared cases can match on it. */
+/** href() could not resolve a route name or build its URL. */
 export class HrefError extends Error {}
+
+type HrefTarget = [context: string | null, path: string, hosts?: string[]];
 
 export type NavigationGuard = (to: Route, from: ActiveRoute | null, urlPath: string, signal: AbortSignal) => boolean | Promise<boolean>;
 export type AfterNavigationHook = (to: Route, from: ActiveRoute | null) => void;
@@ -213,10 +216,10 @@ export class Router {
 
     /** href(): this page's context, the linkable routes of others, every context's hosts, the primary origin. */
     private context: string | null = null;
-    private links: Record<string, [string, string]> = {};
+    private links: NonNullable<RouterConfig['links']> = {};
     private contexts: Record<string, { as?: string; hosts?: string[] }> = {};
     private primary = '';
-    private hrefIndex: { routes: Map<string, [string | null, string]>; short: Map<string, string[]> } | null = null;
+    private hrefIndex: { routes: Map<string, HrefTarget>; short: Map<string, string[]> } | null = null;
 
     /** State */
     private isStarted = false;
@@ -514,7 +517,7 @@ export class Router {
      * URL of a named route without knowing its context or host — same rule as PHP href()
      * (docs/CONTEXT_DOMAINS_AND_HREF_PLAN_2026-11-18.md §2.5/2.6, shared cases core/tests/fixtures/href-cases.json).
      * Same context: a relative path. Another context or host: an absolute URL on the right host.
-     * Unknown or ambiguous name: console.error and ''.
+     * An unknown or ambiguous name or a missing required parameter logs an error and returns ''.
      */
     href(name: string, params: Record<string, any> = {}, options: HrefOptions = {}): string {
         try {
@@ -549,10 +552,12 @@ export class Router {
             if (matches.length === 0) throw new HrefError(`href(«${name}»): route not defined.`);
             full = matches[0];
         }
-        const [target, pattern] = routes.get(full)!;
-        const path = this.generateUrl(pattern, params);
+        const [target, pattern, hosts] = routes.get(full)!;
+        const path = hrefPath(pattern, params, key => {
+            throw new HrefError(`Missing required parameter for route «${full}»: ${key}.`);
+        });
 
-        const targetHosts = (target !== null && this.contexts[target]?.hosts) || [];
+        const targetHosts = hosts ?? (target !== null ? this.contexts[target]?.hosts : undefined) ?? [];
         const host = here.hostname.toLowerCase();
         const sameHost = targetHosts.length === 0 || targetHosts.includes(host);
         if (target === current && sameHost && !options.absolute) return path;
@@ -581,9 +586,10 @@ export class Router {
 
     private buildHrefIndex() {
         if (this.hrefIndex) return this.hrefIndex;
-        const routes = new Map<string, [string | null, string]>();
-        for (const [full, [ctx, path]] of Object.entries(this.links)) routes.set(full, [ctx, path]);
-        for (const [full, config] of Object.entries(this.routeConfigs)) routes.set(full, [this.context, config.path]);
+        const routes = new Map<string, HrefTarget>(Object.entries(this.links));
+        for (const [full, config] of Object.entries(this.routeConfigs)) {
+            routes.set(full, [this.context, config.path, routes.get(full)?.[2]]);
+        }
         const short = new Map<string, string[]>();
         for (const [full, [ctx]] of routes) {
             const as = ctx !== null ? this.contextAs(ctx) + '.' : '';

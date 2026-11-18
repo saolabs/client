@@ -11,14 +11,24 @@ import { Router, HrefError } from '../../src/core/routers/Router';
 import { readBootConfig } from '../../src/core/bootstrap/ssr';
 
 const fixture = JSON.parse(readFileSync(resolve(__dirname, '../../../core/tests/fixtures/href-cases.json'), 'utf8'));
-type World = { primary: string; contexts: Record<string, { hosts: string[]; routes: Record<string, string> }> };
+type World = {
+    primary: string;
+    contexts: Record<string, {
+        hosts: string[];
+        routes: Record<string, string>;
+        moduleHosts?: Record<string, string | string[]>;
+    }>;
+};
 
 function routerFor(world: World, context: string): Router {
     const routes = Object.entries(world.contexts[context].routes).map(([name, path]) => ({ name, path, component: name }));
-    const links: Record<string, [string, string]> = {};
+    const links: Record<string, [string, string, string[]?]> = {};
     for (const [slug, ctx] of Object.entries(world.contexts)) {
-        if (slug === context) continue;
-        for (const [name, path] of Object.entries(ctx.routes)) links[name] = [slug, path];
+        for (const [name, path] of Object.entries(ctx.routes)) {
+            const domain = ctx.moduleHosts?.[name.split('.')[1]];
+            if (domain) links[name] = [slug, path, Array.isArray(domain) ? domain : [domain]];
+            else if (slug !== context) links[name] = [slug, path];
+        }
     }
     const contexts = Object.fromEntries(Object.entries(world.contexts).map(([slug, c]) => [slug, { as: slug, hosts: c.hosts }]));
     const router = new Router();
@@ -51,6 +61,8 @@ describe('href() / go() on the page', () => {
         expect(router.href('users.index')).toBe(`${location.origin}/admin/users`);
         expect(router.href('nope.index')).toBe('');
         expect(error).toHaveBeenCalledWith(expect.stringContaining('not defined'));
+        expect(router.href('home.item')).toBe('');
+        expect(error).toHaveBeenCalledWith(expect.stringContaining('Missing required parameter'));
     });
 
     it('go(): SPA navigation in the same context, a page load otherwise', () => {
@@ -60,9 +72,11 @@ describe('href() / go() on the page', () => {
         vi.spyOn(window, 'location', 'get').mockReturnValue({ ...window.location, href: window.location.href, assign } as any);
         router.go('home.item', { id: 7 });
         router.go('app.home.item', { id: 7 });
+        router.go('store.index');
         expect(navigate).toHaveBeenCalledWith('/items/7');
         // The dev port of the page (jsdom: 3000) is carried to the other host.
         expect(assign).toHaveBeenCalledWith(`http://app.test${location.port ? ':' + location.port : ''}/items/7`);
+        expect(assign).toHaveBeenCalledWith(`http://shop.test${location.port ? ':' + location.port : ''}/store`);
     });
 
     it('boot config carries context, links, contexts and primary to the router', () => {
